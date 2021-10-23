@@ -20,11 +20,11 @@ const (
 
 // Credentials - for sign up.
 type Credentials struct {
-	username string `json:"username", db:"username", validate:"nonzero"`
-	pw       string `json:"password", db:"password", validate:"min=8,max=64,validpw"`
-	fname    string `json:"firstname", db:"firstname", validate:"nonzero"`
-	lname    string `json:"lastname", db:"lastname", validate:"nonzero"`
-	email    string `json:"email", db:"email", validate:"nonzero"`
+	Username string `json:"username" db:"username" validate:"nonzero"`
+	Pw       string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
+	Fname    string `json:"firstname" db:"firstname" validate:"nonzero"`
+	Lname    string `json:"lastname" db:"lastname" validate:"nonzero"`
+	Email    string `json:"email" db:"email" validate:"nonzero"`
 }
 
 // Router function to log in to website.
@@ -37,7 +37,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get password at given username, and assign it.
-	res := db.QueryRow(SELECT_ROW, "password", "users", "username", creds.username)
+	res := db.QueryRow(SELECT_ROW, "password", "users", "username", creds.Username)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -53,7 +53,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compare password to hash in database, and conclude status.
-	if err = bcrypt.CompareHashAndPassword([]byte(storedCreds.pw), []byte(creds.pw)); err != nil {
+	if !comparePw(creds.Pw, storedCreds.Pw) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	} else {
@@ -108,23 +108,33 @@ func validpw(v interface{}, param string) error {
 	}
 }
 
+// Hash a password
+func hashPw(pw string) []byte {
+	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), 8)
+	return hash
+}
+
+func comparePw(pw string, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
+}
+
 // Register a user to the database.
 func registerUser(creds *Credentials) error {
 	// Check username and email uniqueness.
-	err := checkUnique("users", creds.username, "username")
+	err := checkUnique("users", creds.Username, "username")
 	if err != nil {
 		return err
 	}
-	err = checkUnique("users", creds.email, "email")
+	err = checkUnique("users", creds.Email, "email")
 	if err != nil {
 		return err
 	}
 
 	// Hash password and store new credentials to database.
-	hash, _ := bcrypt.GenerateFromPassword([]byte(creds.pw), 8)
+	hash := hashPw(creds.Pw)
 
 	_, err = db.Query(INSERT_CRED, "users", "username", "password", "firstname", "lastname", "email",
-		creds.username, hash, creds.fname, creds.lname, creds.email)
+		creds.Username, hash, creds.Fname, creds.Lname, creds.Email)
 	if err != nil {
 		return err
 	} else {
