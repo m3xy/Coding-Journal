@@ -96,9 +96,10 @@ func validpw(v interface{}, param string) error {
 		// Set password and character number.
 		pw := st.String()
 		restrictions := []*regexp.Regexp{regexp.MustCompile("[a-z]"), // Must contain lowercase.
+			regexp.MustCompile("^[A-Za-z0-9\\$\\!\\@\\#\\%\\&\\*]*$"), // Must contain only some characters.
 			regexp.MustCompile("[A-Z]"), // Must contain uppercase.
 			regexp.MustCompile("[0-9]"), // Must contain numerics.
-			regexp.MustCompile("[$-!]")} // Must contain special characters.
+			regexp.MustCompile("[\\$\\-\\!\\=\\?\\#\\!\\@\\&\\%\\*]")} // Must contain special characters.
 		for _, restriction := range restrictions {
 			if !restriction.MatchString(pw) {
 				return errors.New("Restriction not matched!")
