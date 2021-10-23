@@ -29,11 +29,42 @@ type Credentials struct {
 
 // Router function to log in to website.
 func logIn(w http.ResponseWriter, r *http.Request) {
+	// Get credentials from log in request.
+	creds := &Credentials{}
+	err := json.NewDecoder(r.Body).Decode(creds)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
 
+	// Get password at given username, and assign it.
+	res := db.QueryRow(SELECT_ROW, "password", "users", "username", creds.username)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	storedCreds := &Credentials{}
+	err = res.Scan(storedCreds)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+
+	// Compare password to hash in database, and conclude status.
+	if err = bcrypt.CompareHashAndPassword([]byte(storedCreds.pw), []byte(creds.pw)); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	} else {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Successfully logged in!")
+	}
 }
 
 // Router function to sign up to website.
 func signUp(w http.ResponseWriter, r *http.Request) {
+	// Get credentials from JSON request and validate them.
 	creds := &Credentials{}
 	err := json.NewDecoder(r.Body).Decode(creds)
 	if err != nil { // Bad request
@@ -45,6 +76,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
+	// Register user to database.
 	err = registerUser(creds)
 	if err != nil { // User registration error.
 		w.WriteHeader(http.StatusInternalServerError)
