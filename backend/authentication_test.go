@@ -1,9 +1,23 @@
 package main
 
-import "testing"
+import (
+	"encoding/base64"
+	"testing"
+	"time"
+	"fmt"
+)
 
 // Test password hashing
 func testPwHash(t *testing.T) {
+	// Generate a password
+	t_random := time.Microsecond.Microseconds()
+	se := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", t_random)))
+
+	// Get password hash
+	hash := hashPw(se)
+	if string(hash) == se  {
+		t.Error("Hash unsuccessful!")
+	}
 
 }
 
