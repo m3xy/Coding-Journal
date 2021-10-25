@@ -1,11 +1,18 @@
+-- table for storing basic user information and credentials. Other info like user description, articles published
+-- etc. can all be kept in other tables.
 CREATE TABLE IF NOT EXISTS users (
   id int NOT NULL AUTO_INCREMENT, -- id which is auto-generated during user registration
-  username varchar(64) NOT NULL, -- username of the user
+
+  -- actual login credentials
+  email varchar(100) NOT NULL UNIQUE, -- user email, functions as unique username
   password varchar(64) NOT NULL, -- encrypted user password
+
+  -- necessary user info
   firstname varchar(32) NOT NULL, -- first name of the user
   lastname varchar(32) NOT NULL, -- last name of the user
-  email varchar(100), -- user email, can be null
-  usertype ENUM('publisher', 'reviewer', 'publisher-reviewer', 'user') NOT NULL DEFAULT 'user', -- "type" of user. 
+  usertype ENUM('publisher', 'reviewer', 'publisher-reviewer', 'user') NOT NULL DEFAULT 'user', -- role of the user in the organization
+
+  -- extra/optional user info
   phonenumber varchar(11), -- user phone number, is optional, 11 chars to allow for + and 10 digits
   organization varchar(32), -- organization the user is associated with (research org or company)
 
