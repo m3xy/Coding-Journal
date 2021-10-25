@@ -15,6 +15,7 @@ const (
 	PW_NO_LC  = "B123456$"
 	PW_NO_NUM = "aBcdefg$"
 	PW_NO_SC  = "aB123456"
+	PW_WRONG_CHARS = "asbd/\\s@!"
 )
 
 // Test password hashing
@@ -81,6 +82,12 @@ func TestValidPw(t *testing.T) {
 	testCreds0.Pw = PW_NO_SC
 	if validator.Validate(*testCreds0) == nil {
 		t.Error("No special charactacter error!")
+	}
+
+	// Password with wrong characters invalid.
+	testCreds0.Pw = PW_WRONG_CHARS
+	if validator.Validate(*testCreds0) == nil {
+		t.Error("Wrong special charactacters error!")
 	}
 }
 
