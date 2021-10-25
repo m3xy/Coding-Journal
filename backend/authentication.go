@@ -13,18 +13,14 @@ import (
 	"gopkg.in/validator.v2"
 )
 
-const (
-	SELECT_ROW  = "SELECT $1 FROM $2 WHERE $3 = $4"
-	INSERT_CRED = "INSERT INTO $1 ($2, $3, $4, $5, $6) VALUES ($7, $8, $9, $10)"
-)
-
-// Credentials - for sign up.
-type Credentials struct {
-	Username string `json:"username" db:"username" validate:"nonzero"`
-	Pw       string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
-	Fname    string `json:"firstname" db:"firstname" validate:"nonzero"`
-	Lname    string `json:"lastname" db:"lastname" validate:"nonzero"`
-	Email    string `json:"email" db:"email" validate:"nonzero"`
+// Get the database tag for a struct.
+func getDbTag(v interface{}, structVar string) string {
+	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
+	if !ok {
+		return ""
+	} else {
+		return field.Tag.Get("db")
+	}
 }
 
 // Router function to log in to website.
@@ -37,7 +33,11 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get password at given username, and assign it.
-	res := db.QueryRow(SELECT_ROW, "password", "users", "username", creds.Username)
+	res := db.QueryRow(SELECT_ROW,
+		getDbTag(creds, "Pw"),
+		TABLE_USERS,
+		getDbTag(creds, "Username"),
+		creds.Username)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -115,6 +115,7 @@ func hashPw(pw string) []byte {
 	return hash
 }
 
+// Compare password and hash for validity.
 func comparePw(pw string, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }
@@ -122,11 +123,11 @@ func comparePw(pw string, hash string) bool {
 // Register a user to the database.
 func registerUser(creds *Credentials) error {
 	// Check username and email uniqueness.
-	err := checkUnique("users", creds.Username, "username")
+	err := checkUnique(TABLE_USERS, creds.Username, getDbTag(creds, "Username"))
 	if err != nil {
 		return err
 	}
-	err = checkUnique("users", creds.Email, "email")
+	err = checkUnique(TABLE_USERS, creds.Email, getDbTag(creds, "Email"))
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,13 @@ func registerUser(creds *Credentials) error {
 	// Hash password and store new credentials to database.
 	hash := hashPw(creds.Pw)
 
-	_, err = db.Query(INSERT_CRED, "users", "username", "password", "firstname", "lastname", "email",
+	_, err = db.Query(INSERT_CRED,
+		TABLE_USERS,
+		getDbTag(creds, "Username"),
+		getDbTag(creds, "Pw"),
+		getDbTag(creds, "Firstname"),
+		getDbTag(creds, "Lastname"),
+		getDbTag(creds, "Email"),
 		creds.Username, hash, creds.Fname, creds.Lname, creds.Email)
 	if err != nil {
 		return err
@@ -144,8 +151,9 @@ func registerUser(creds *Credentials) error {
 }
 
 // Check if a credential is unique in the database.
-func checkUnique(table string, cred string, credtype string) error {
-	res := db.QueryRow(SELECT_ROW, "password", table, credtype, cred)
+func checkUnique(table string, creds string, credtype string) error {
+	res := db.QueryRow(SELECT_ROW,
+		getDbTag(creds, "Pw"), table, credtype, creds)
 	resScan := &Credentials{}
 	err := res.Scan(resScan)
 	if err != sql.ErrNoRows {
