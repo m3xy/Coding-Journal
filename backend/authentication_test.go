@@ -334,8 +334,10 @@ func TestLogIn(t *testing.T) {
 		err = row.Scan(&email)
 		if err != nil {
 			t.Errorf("Scan failure: %v\n", err)
+			return
 		} else if email != testUsers[i].Email {
 			t.Error("Returned email doesn't correspond to user's email.")
+			return
 		}
 	}
 

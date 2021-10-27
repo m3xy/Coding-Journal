@@ -49,10 +49,8 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil { // Error in scan.
 		if err == sql.ErrNoRows { // User doesn't exist
 			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Println(err.Error())
 		} else { // Other database related error.
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Println(err.Error())
 		}
 		return
 	}
