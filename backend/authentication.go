@@ -8,64 +8,85 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
+	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/validator.v2"
 )
 
-// Get the database tag for a struct.
-func getDbTag(v interface{}, structVar string) string {
-	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
-	if !ok {
-		return ""
-	} else {
-		return field.Tag.Get("db")
-	}
-}
-
-// Router function to log in to website.
+/*
+ Router function to log in to website.
+ Content type: application/json
+ Sucess: 200, Credentials are correct
+ Failure: 401, Unauthorized
+ Returns: userId
+*/
 func logIn(w http.ResponseWriter, r *http.Request) {
+	// Set up writer response.
+	w.Header().Set("Content-Type", "application/json")
+	respMap := make(map[string]string)
+
+
 	// Get credentials from log in request.
 	creds := &Credentials{}
 	err := json.NewDecoder(r.Body).Decode(creds)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
-	// Get password at given username, and assign it.
-	res := db.QueryRow(SELECT_ROW,
-		getDbTag(creds, "Pw"),
-		TABLE_USERS,
-		getDbTag(creds, "Username"),
-		creds.Username)
-	if err != nil {
+	// Get credentials at given email, and assign it.
+	vars := fmt.Sprintf("%s, %s", getDbTag(&Credentials{}, "Pw"), getDbTag(&Credentials{}, "Id"))
+	stmt := fmt.Sprintf(SELECT_ROW, vars, TABLE_USERS, getDbTag(&Credentials{}, "Email"))
+	res := db.QueryRow(stmt,
+		creds.Email)
+	if err != nil { // Database access error.
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	storedCreds := &Credentials{}
-	err = res.Scan(storedCreds)
-	if err != nil {
-		if err == sql.ErrNoRows {
+	err = res.Scan(&storedCreds.Pw, &storedCreds.Id)
+	if err != nil { // Error in scan.
+		if err == sql.ErrNoRows { // User doesn't exist
 			w.WriteHeader(http.StatusUnauthorized)
-		} else {
+			fmt.Println(err.Error())
+		} else { // Other database related error.
 			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Println(err.Error())
 		}
+		return
 	}
 
 	// Compare password to hash in database, and conclude status.
-	if !comparePw(creds.Pw, storedCreds.Pw) {
+	if comparePw(creds.Pw, storedCreds.Pw) { // Password incorrect.
+		// Write JSON body for successful response return.
+		w.WriteHeader(http.StatusOK)
+		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.FormatInt(int64(storedCreds.Id), 10)
+	} else {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
+	}
+
+	// Marshal JSON and insert it into the response.
+	jsonResp, err := json.Marshal(respMap)
+	if err != nil {
 	} else {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Successfully logged in!")
+		w.Write(jsonResp)
 	}
 }
 
-// Router function to sign up to website.
+/*
+  Router function to sign up to website.
+  Content type: application/json
+  Success: 200, OK
+  Failure: 400, bad request
+*/
 func signUp(w http.ResponseWriter, r *http.Request) {
+	// Set up writer response.
+	w.Header().Set("Content-Type", "application/json")
+
 	// Get credentials from JSON request and validate them.
-	creds := &Credentials{}
+	creds := newUser()
 	err := json.NewDecoder(r.Body).Decode(creds)
 	if err != nil { // Bad request
 		w.WriteHeader(http.StatusBadRequest)
@@ -74,16 +95,75 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	validator.SetValidationFunc("validpw", validpw)
 	if validator.Validate(*creds) != nil { // Bad credential semantics
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	// Register user to database.
 	err = registerUser(creds)
 	if err != nil { // User registration error.
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Println(err.Error())
+		w.WriteHeader(http.StatusBadRequest)
 	} else {
-		fmt.Fprintln(w, "Sign-up successful!")
+		// Return code OK
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// Register a user to the database.
+func registerUser(creds *Credentials) error {
+	// Check email uniqueness.
+	err := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
+	if err != nil {
+		return err
+	}
+
+	// Hash password and store new credentials to database.
+	hash := hashPw(creds.Pw)
+
+	// Make credentials insert statement for query.
+	stmt := fmt.Sprintf(INSERT_FULL,
+		TABLE_USERS,
+		getDbTag(&Credentials{}, "Pw"),
+		getDbTag(&Credentials{}, "Fname"),
+		getDbTag(&Credentials{}, "Lname"),
+		getDbTag(&Credentials{}, "Email"),
+		getDbTag(&Credentials{}, "Usertype"),
+		getDbTag(&Credentials{}, "PhoneNumber"),
+		getDbTag(&Credentials{}, "Organization"))
+
+	// Query full insert statement.
+	_, err = db.Query(stmt,
+		hash, creds.Fname, creds.Lname, creds.Email,
+		creds.Usertype, creds.PhoneNumber, creds.Organization)
+	if err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+// Set new user credentials
+func newUser() *Credentials {
+	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
+}
+
+// Check if a credential is unique in the database.
+func checkUnique(table string, credType string, credVal string) error {
+	// Prepare and query selection.
+	stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), table, credType)
+	res := db.QueryRow(stmt, credVal)
+
+	// Scan query and check for existing rows.
+	resScan := &Credentials{}
+	// Make columns interface for scan
+	err := res.Scan(&resScan.Id)
+	if err != sql.ErrNoRows {
+		if err != nil {
+			return err
+		} else {
+			return errors.New(credType + " already exists!")
+		}
+	} else {
+		return nil
 	}
 }
 
@@ -120,49 +200,13 @@ func comparePw(pw string, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }
 
-// Register a user to the database.
-func registerUser(creds *Credentials) error {
-	// Check username and email uniqueness.
-	err := checkUnique(TABLE_USERS, creds.Username, getDbTag(creds, "Username"))
-	if err != nil {
-		return err
+// Get all columns from an interface.
+func getCols(v interface{}) []interface{} {
+	s := reflect.ValueOf(v).Elem()
+	numCols := s.NumField()
+	cols := make([]interface{}, numCols)
+	for i := 0; i < numCols; i++ {
+		cols[i] = s.Field(i).Addr().Interface()
 	}
-	err = checkUnique(TABLE_USERS, creds.Email, getDbTag(creds, "Email"))
-	if err != nil {
-		return err
-	}
-
-	// Hash password and store new credentials to database.
-	hash := hashPw(creds.Pw)
-
-	_, err = db.Query(INSERT_CRED,
-		TABLE_USERS,
-		getDbTag(creds, "Username"),
-		getDbTag(creds, "Pw"),
-		getDbTag(creds, "Firstname"),
-		getDbTag(creds, "Lastname"),
-		getDbTag(creds, "Email"),
-		creds.Username, hash, creds.Fname, creds.Lname, creds.Email)
-	if err != nil {
-		return err
-	} else {
-		return nil
-	}
-}
-
-// Check if a credential is unique in the database.
-func checkUnique(table string, creds string, credtype string) error {
-	res := db.QueryRow(SELECT_ROW,
-		getDbTag(creds, "Pw"), table, credtype, creds)
-	resScan := &Credentials{}
-	err := res.Scan(resScan)
-	if err != sql.ErrNoRows {
-		if err != nil {
-			return err
-		} else {
-			return errors.New(credtype + " already exists!")
-		}
-	} else {
-		return nil
-	}
+	return cols
 }
