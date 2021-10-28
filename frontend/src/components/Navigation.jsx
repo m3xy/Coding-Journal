@@ -39,6 +39,14 @@ function Navigation(props) {
 									<span class="sr-only">(current)</span>
 								</Link>
 							</li>
+							<li
+								class="nav-item"
+							>
+								<Link class="nav-link" to="/login">
+									Login
+									<span class="sr-only">(current)</span>
+								</Link>
+							</li>
 						</ul>
 					</div>
 				</div>

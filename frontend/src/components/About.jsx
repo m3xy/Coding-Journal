@@ -1,3 +1,9 @@
+/**
+ * About.jsx
+ * 
+ * This file stores the info for rendering the About page of our Journal
+ */
+
 import React from "react";
 
 function About() {

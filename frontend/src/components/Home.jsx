@@ -1,3 +1,10 @@
+/**
+ * Home.jsx
+ * 
+ * This is the home page of the website. This file holds what will be displayed 
+ * when users first access the website
+ */
+
 import React from "react";
 
 function Home() {
