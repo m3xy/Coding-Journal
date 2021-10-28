@@ -14,6 +14,12 @@ import (
 	"gopkg.in/validator.v2"
 )
 
+const (
+	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//:"
+	ALPHANUMERICS = "a-zA-Z0-9"
+	HASH_COST = 8
+)
+
 /*
  Router function to log in to website.
  Content type: application/json
@@ -38,25 +44,24 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	// Get credentials at given email, and assign it.
 	vars := fmt.Sprintf("%s, %s", getDbTag(&Credentials{}, "Pw"), getDbTag(&Credentials{}, "Id"))
 	stmt := fmt.Sprintf(SELECT_ROW, vars, TABLE_USERS, getDbTag(&Credentials{}, "Email"))
-	res := db.QueryRow(stmt,
-		creds.Email)
-	if err != nil { // Database access error.
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	res := db.QueryRow(stmt, creds.Email)
 	storedCreds := &Credentials{}
 	err = res.Scan(&storedCreds.Pw, &storedCreds.Id)
-	if err != nil { // Error in scan.
-		if err == sql.ErrNoRows { // User doesn't exist
+	if err != nil {
+		// Error in scan.
+		if err == sql.ErrNoRows {
+			// User doesn't exist
 			w.WriteHeader(http.StatusUnauthorized)
-		} else { // Other database related error.
+		} else {
+			// Other database related error.
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// Compare password to hash in database, and conclude status.
-	if comparePw(creds.Pw, storedCreds.Pw) { // Password incorrect.
+	if comparePw(creds.Pw, storedCreds.Pw) {
+		// Password incorrect.
 		// Write JSON body for successful response return.
 		w.WriteHeader(http.StatusOK)
 		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.FormatInt(int64(storedCreds.Id), 10)
@@ -86,19 +91,22 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	// Get credentials from JSON request and validate them.
 	creds := newUser()
 	err := json.NewDecoder(r.Body).Decode(creds)
-	if err != nil { // Bad request
+	if err != nil {
+		// Bad request
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	validator.SetValidationFunc("validpw", validpw)
-	if validator.Validate(*creds) != nil { // Bad credential semantics
+	if validator.Validate(*creds) != nil {
+		// Bad credential semantics
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	// Register user to database.
 	err = registerUser(creds)
-	if err != nil { // User registration error.
+	if err != nil {
+		// User registration error.
 		w.WriteHeader(http.StatusBadRequest)
 	} else {
 		// Return code OK
@@ -155,6 +163,7 @@ func checkUnique(table string, credType string, credVal string) error {
 	// Make columns interface for scan
 	err := res.Scan(&resScan.Id)
 	if err != sql.ErrNoRows {
+		// Table isn't empty, error will be thrown.
 		if err != nil {
 			return err
 		} else {
@@ -174,10 +183,10 @@ func validpw(v interface{}, param string) error {
 		// Set password and character number.
 		pw := st.String()
 		restrictions := []*regexp.Regexp{regexp.MustCompile("[a-z]"), // Must contain lowercase.
-			regexp.MustCompile("^[A-Za-z0-9\\$\\!\\@\\#\\%\\&\\*]*$"), // Must contain only some characters.
+			regexp.MustCompile("^[" + ALPHANUMERICS + SPECIAL_CHARS + "]*$"), // Must contain only some characters.
 			regexp.MustCompile("[A-Z]"), // Must contain uppercase.
 			regexp.MustCompile("[0-9]"), // Must contain numerics.
-			regexp.MustCompile("[\\$\\-\\!\\=\\?\\#\\!\\@\\&\\%\\*]")} // Must contain special characters.
+			regexp.MustCompile("[" + SPECIAL_CHARS + "]")} // Must contain special characters.
 		for _, restriction := range restrictions {
 			if !restriction.MatchString(pw) {
 				return errors.New("Restriction not matched!")
@@ -189,7 +198,7 @@ func validpw(v interface{}, param string) error {
 
 // Hash a password
 func hashPw(pw string) []byte {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), 8)
+	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
 	return hash
 }
 

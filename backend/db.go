@@ -19,25 +19,35 @@ const (
 	UPDATE_ROWS = "UPDATE %s SET %s = ? WHERE %s = ?"
 	DELETE_ALL_ROWS = "DELETE FROM %s"
 
-	// Constants for usertype
 	USERTYPE_NIL 				= 0
 	USERTYPE_PUBLISHER 			= 1
 	USERTYPE_REVIEWER 			= 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
 	USERTYPE_USER 				= 4
+
 )
+var DB_PARAMS map[string]string = map[string]string {
+	"interpolateParams" : "true",
+}
+
 // Structure for user table.
 type Credentials struct {
-	// Mandatory credentials on signup.
+	// Password - given as plaintext by front end, and as hash by the database.
 	Pw       		string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
+	// First Name.
 	Fname    		string `json:"firstname" db:"firstname" validate:"nonzero,max=32"`
+	// Last Name.
 	Lname    		string `json:"lastname" db:"lastname" validate:"nonzero,max=32"`
+	// Email Address.
 	Email    		string `json:"email" db:"email" validate:"nonzero,max=100"`
 
-	// Optional variables for credentials passthrough.
-	Id 				int `json:"userId" db:"id"` 						// Auto-generated ID
-	Usertype 		int `json:"usertype" db:"usertype"`				// User role in journal.
+	// User auto incremented ID.
+	Id 				int `json:"userId" db:"id"`
+	// User role.
+	Usertype 		int `json:"usertype" db:"usertype"`
+	// User phone number.
 	PhoneNumber 	string `json:"phonenumber" db:"phonenumber" validate:"max=11"`
+	// Organization name.
 	Organization 	string `json:"organization" db:"organization" validate:"max=32"`
 }
 
@@ -61,14 +71,28 @@ func getJsonTag(v interface{}, structVar string) string {
 	return getTag(v, structVar, "json")
 }
 
+// Get database parameters string to place into DSN from a map.
+func getDbParams(paramMap map[string]string) string {
+	params := ""
+	i := 0
+	for key, val := range paramMap {
+		if i > 0 {
+			params += "&"
+		}
+		params += key + "=" + val
+		i++
+	}
+	return params
+}
+
 // Initialise connection to the database.
 func dbInit(user string, pw string, protocol string, h string, port int, dbname string) error {
 	var err error
 
 	// Set MySQL info in DSN format according to Go MySQL Drive -
 	// user:password@protocol(host:port)/dbname?[param1=val...]
-	mysqlInfo := fmt.Sprintf("%s:%s@%s(%s:%d)/%s?%s=%s", user, pw, protocol, h, port, dbname,
-		"interpolateParams", "true") // Setting this to allow prepared statements.
+	mysqlInfo := fmt.Sprintf("%s:%s@%s(%s:%d)/%s?%s", user, pw, protocol, h, port, dbname,
+		getDbParams(DB_PARAMS)) // Setting this to allow prepared statements.
 	db, err = sql.Open("mysql", mysqlInfo)
 	if err != nil {
 		return err
@@ -80,6 +104,8 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 	db.SetMaxIdleConns(10)
 	return nil
 }
+
+
 
 func dbCloseConnection() {
 	db.Close()
