@@ -1,0 +1,26 @@
+---
+#Pipeline stages
+stages:
+    - build
+    - test
+
+#Build stage
+build:
+    stage: build
+    script:
+        - echo "Building..."            #Prints "Building..."
+        - mkdir build                   #Creates build directory
+        - touch build/sample.txt        #Creates sample text file
+    artifacts:                          #Artifacts for testing
+        paths:
+            - build/                    #(Keep anything in build folder)
+
+#Test stage
+test:
+    stage: test
+    script:
+        - echo "Testing..."             #Prints "Testing..."
+        - test -f "build/sample.txt"    #Tests sample.txt exists in build file
+        - cd "./backend" && go test -v .
+
+...
