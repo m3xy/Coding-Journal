@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/handlers"
 )
 
 const (
@@ -19,21 +20,28 @@ const (
 	user     = "root"
 	protocol = "tcp"
 	password = "secret"
-	dbname   = "mydb"
+	dbname   = "mydb"	
 )
+
+var allowedOrigins = []string{"http://localhost:8080"}
 
 func main() {
 	// Set up login and signup functions
 	router := mux.NewRouter()
 	router.HandleFunc("/login", logIn)
-	router.HandleFunc("/signup", signUp)
+	router.HandleFunc("/register", signUp)
+
+	// sets up handler for CORS
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
+	originsOk := handlers.AllowedOrigins(allowedOrigins)
+	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 
 	// Initialise database with production credentials.
 	dbInit(user, password, protocol, host, port, dbname)
 	// Setup HTTP server and shutdown signal notification
 	srv := &http.Server {
-		Addr: ":8080",
-		Handler: router,
+		Addr: ":3333",
+		Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
 	}
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)

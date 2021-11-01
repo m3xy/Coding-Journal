@@ -46,7 +46,7 @@ class Register extends React.Component {
         this.setState({ submitted: true });
         const { user } = this.state;
         if (user.firstName && user.lastName && user.email && user.password) {
-            this.props.register(user);
+            this.props.register(user.firstName, user.lastName, user.email, user.password);
         }
     }
 

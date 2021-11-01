@@ -105,7 +105,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 
 	// Register user to database.
 	err = registerUser(creds)
-	if err != nil {
+	if err != nil {	
 		// User registration error.
 		w.WriteHeader(http.StatusBadRequest)
 	} else {

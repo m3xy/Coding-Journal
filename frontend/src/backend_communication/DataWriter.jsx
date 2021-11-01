@@ -7,6 +7,10 @@
  * All files send data through this class so that there is a common way of doing so
  */
 
+// URL endpoints for backend functions
+const loginEndpoint = '/login'
+const registerEndpoint = '/register'
+
 /**
  * Utility class with methods to send data to the backend via HTTP request
  * This class could be optimized by compiling many requests into a single
@@ -36,6 +40,7 @@ class DataWriter {
 
         // create a new XMLHttpRequest
         var request = new XMLHttpRequest()
+        var response;
 
         // get a callback when the server responds
         request.addEventListener('load', () => {
@@ -44,15 +49,13 @@ class DataWriter {
 
             // TEMP: return response here, set the state of the login widget to be login approved
         })
-        // request.setRequestHeader() // TEMP: to set headers if necessary
-
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
-        request.open('POST', this.backend_host + ':' + this.backend_port)
-
+        request.open('POST', this.backend_host + ':' + this.backend_port + loginEndpoint)
+        
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
 
-        // TEMP: return bool here to indicate success or failure
+        // TEMP: return bool here to indicate success or failure#
     }
 
 
@@ -83,10 +86,8 @@ class DataWriter {
 
             // TEMP: return response here, set the state of the login widget to be login approved
         })
-        // request.setRequestHeader() // TEMP: to set headers if necessary
-
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
-        request.open('POST', this.backend_host + ':' + this.backend_port)
+        request.open('POST', this.backend_host + ':' + this.backend_port + registerEndpoint)
 
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
