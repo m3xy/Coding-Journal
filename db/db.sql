@@ -23,4 +23,12 @@ CREATE TABLE IF NOT EXISTS users (
   PRIMARY KEY (id) -- makes the ID the primary key as we know it will be unique
 );
 
+CREATE TABLE IF NOT EXISTS idMappings (
+  globalId int NOT NULL UNIQUE, -- Global user ID
+  id int NOT NULL UNIQUE,       -- Local user ID linking to user on users table.
+
+  PRIMARY KEY (globalId)
+  FOREIGN KEY (id)
+)
+
 -- add code here to initialise other tables
