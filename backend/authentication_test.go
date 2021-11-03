@@ -44,19 +44,28 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 // Initialise the database for testing.
 func testInit() {
 	dbInit(user, password, protocol, host, port, TEST_DB)
-	stmt := fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
-	_, err := db.Query(stmt)
-	if err != nil {
-		fmt.Println(err.Error())
+
+	stmts := make([]string, 2)
+	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
+	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
+	for i := range stmts {
+		_, err := db.Query(stmts[i])
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	}
 }
 
 // Close database at the end of test.
 func testEnd() {
-	stmt := fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
-	_, err := db.Query(stmt)
-	if err != nil {
-		fmt.Println(err.Error())
+	stmts := make([]string, 2)
+	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
+	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
+	for i := range stmts {
+		_, err := db.Query(stmts[i])
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	}
 	db.Close()
 }

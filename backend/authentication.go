@@ -107,6 +107,23 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// User registration error.
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Make query to get user ID from email.
+	stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email"))
+	query := db.QueryRow(stmt, creds.Email)
+	err = query.Scan(&creds.Id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Map user ID to a global ID.
+	err = mapUserToGlobal(creds.Id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Println(err.Error())
 	} else {
 		// Return code OK
 		w.WriteHeader(http.StatusOK)
@@ -139,6 +156,32 @@ func registerUser(creds *Credentials) error {
 	_, err := db.Query(stmt,
 		hash, creds.Fname, creds.Lname, creds.Email,
 		creds.Usertype, creds.PhoneNumber, creds.Organization)
+	if err != nil {
+		return err
+	} else {
+		return nil
+	}
+}
+
+// Register local user to global ID mappings.
+func mapUserToGlobal(userId int) error {
+	// Check if ID exists in users table.
+	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), strconv.Itoa(userId)) {
+		return errors.New("No user with this ID!")
+	}
+
+	// Check if ID is unique in idMappings table.
+	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), strconv.Itoa(userId)) {
+		return errors.New("ID already exists in ID mappings!")
+	}
+
+	// Set new global ID for user.
+	globalId, _ := strconv.Atoi(TEAM_ID + strconv.Itoa(userId))
+	idMap := &IdMappings{Id: userId, GlobalId: globalId}
+
+	// Insert new mapping to ID Mappings.
+	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
+	_, err := db.Query(stmt, idMap.GlobalId, idMap.Id)
 	if err != nil {
 		return err
 	} else {

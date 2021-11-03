@@ -12,12 +12,15 @@ var db *sql.DB
 
 const (
 	// Constant for table operations.
-	TABLE_USERS     = "users"
-	SELECT_ROW      = "SELECT %s FROM %s WHERE %s = ?"
-	INSERT_CRED     = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_FULL     = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	UPDATE_ROWS     = "UPDATE %s SET %s = ? WHERE %s = ?"
-	DELETE_ALL_ROWS = "DELETE FROM %s"
+	TABLE_USERS      = "users"
+	TABLE_IDMAPPINGS = "idMappings"
+	TEAM_ID          = "11"
+	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
+	INSERT_CRED      = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
+	INSERT_FULL      = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
+	UPDATE_ROWS      = "UPDATE %s SET %s = ? WHERE %s = ?"
+	DELETE_ALL_ROWS  = "DELETE FROM %s"
 
 	USERTYPE_NIL                = 0
 	USERTYPE_PUBLISHER          = 1
@@ -52,7 +55,7 @@ type Credentials struct {
 }
 
 // Structure for ID mappings.
-type idMappings struct {
+type IdMappings struct {
 	GlobalId int `json:"globalId" db:"globalId"`
 	Id       int `json:"userId" db:"id"`
 }
