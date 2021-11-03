@@ -3,56 +3,62 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"time"
-	"reflect"
 	_ "github.com/go-sql-driver/mysql"
+	"reflect"
+	"time"
 )
 
 var db *sql.DB
 
 const (
 	// Constant for table operations.
-	TABLE_USERS = "users"
-	SELECT_ROW  = "SELECT %s FROM %s WHERE %s = ?"
-	INSERT_CRED = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_FULL = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	UPDATE_ROWS = "UPDATE %s SET %s = ? WHERE %s = ?"
+	TABLE_USERS     = "users"
+	SELECT_ROW      = "SELECT %s FROM %s WHERE %s = ?"
+	INSERT_CRED     = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
+	INSERT_FULL     = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	UPDATE_ROWS     = "UPDATE %s SET %s = ? WHERE %s = ?"
 	DELETE_ALL_ROWS = "DELETE FROM %s"
 
-	USERTYPE_NIL 				= 0
-	USERTYPE_PUBLISHER 			= 1
-	USERTYPE_REVIEWER 			= 2
+	USERTYPE_NIL                = 0
+	USERTYPE_PUBLISHER          = 1
+	USERTYPE_REVIEWER           = 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
-	USERTYPE_USER 				= 4
-
+	USERTYPE_USER               = 4
 )
-var DB_PARAMS map[string]string = map[string]string {
-	"interpolateParams" : "true",
+
+var DB_PARAMS map[string]string = map[string]string{
+	"interpolateParams": "true",
 }
 
 // Structure for user table.
 type Credentials struct {
 	// Password - given as plaintext by front end, and as hash by the database.
-	Pw       		string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
+	Pw string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
 	// First Name.
-	Fname    		string `json:"firstname" db:"firstname" validate:"nonzero,max=32"`
+	Fname string `json:"firstname" db:"firstname" validate:"nonzero,max=32"`
 	// Last Name.
-	Lname    		string `json:"lastname" db:"lastname" validate:"nonzero,max=32"`
+	Lname string `json:"lastname" db:"lastname" validate:"nonzero,max=32"`
 	// Email Address.
-	Email    		string `json:"email" db:"email" validate:"nonzero,max=100"`
+	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
 
 	// User auto incremented ID.
-	Id 				int `json:"userId" db:"id"`
+	Id int `json:"userId" db:"id"`
 	// User role.
-	Usertype 		int `json:"usertype" db:"usertype"`
+	Usertype int `json:"usertype" db:"usertype"`
 	// User phone number.
-	PhoneNumber 	string `json:"phonenumber" db:"phonenumber" validate:"max=11"`
+	PhoneNumber string `json:"phonenumber" db:"phonenumber" validate:"max=11"`
 	// Organization name.
-	Organization 	string `json:"organization" db:"organization" validate:"max=32"`
+	Organization string `json:"organization" db:"organization" validate:"max=32"`
+}
+
+// Structure for ID mappings.
+type idMappings struct {
+	GlobalId int `json:"globalId" db:"globalId"`
+	Id       int `json:"userId" db:"id"`
 }
 
 // Get the tag in a struct.
-func getTag(v interface {}, structVar string, tag string) string {
+func getTag(v interface{}, structVar string, tag string) string {
 	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
 	if !ok {
 		return ""
@@ -63,7 +69,7 @@ func getTag(v interface {}, structVar string, tag string) string {
 
 // Get the database tag for a struct.
 func getDbTag(v interface{}, structVar string) string {
-	return getTag(v, structVar , "db")
+	return getTag(v, structVar, "db")
 }
 
 // Get the database tag for a struct.
@@ -104,8 +110,6 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 	db.SetMaxIdleConns(10)
 	return nil
 }
-
-
 
 func dbCloseConnection() {
 	db.Close()
