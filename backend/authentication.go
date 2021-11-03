@@ -17,7 +17,7 @@ import (
 const (
 	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//:"
 	ALPHANUMERICS = "a-zA-Z0-9"
-	HASH_COST = 8
+	HASH_COST     = 8
 )
 
 /*
@@ -31,7 +31,6 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 	respMap := make(map[string]string)
-
 
 	// Get credentials from log in request.
 	creds := &Credentials{}
@@ -105,7 +104,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 
 	// Register user to database.
 	err = registerUser(creds)
-	if err != nil {	
+	if err != nil {
 		// User registration error.
 		w.WriteHeader(http.StatusBadRequest)
 	} else {
@@ -117,9 +116,9 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 // Register a user to the database.
 func registerUser(creds *Credentials) error {
 	// Check email uniqueness.
-	err := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
-	if err != nil {
-		return err
+	unique := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
+	if !unique {
+		return errors.New(getDbTag(&Credentials{}, "Email") + " is not unique!")
 	}
 
 	// Hash password and store new credentials to database.
@@ -137,7 +136,7 @@ func registerUser(creds *Credentials) error {
 		getDbTag(&Credentials{}, "Organization"))
 
 	// Query full insert statement.
-	_, err = db.Query(stmt,
+	_, err := db.Query(stmt,
 		hash, creds.Fname, creds.Lname, creds.Email,
 		creds.Usertype, creds.PhoneNumber, creds.Organization)
 	if err != nil {
@@ -152,28 +151,6 @@ func newUser() *Credentials {
 	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
 }
 
-// Check if a credential is unique in the database.
-func checkUnique(table string, credType string, credVal string) error {
-	// Prepare and query selection.
-	stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), table, credType)
-	res := db.QueryRow(stmt, credVal)
-
-	// Scan query and check for existing rows.
-	resScan := &Credentials{}
-	// Make columns interface for scan
-	err := res.Scan(&resScan.Id)
-	if err != sql.ErrNoRows {
-		// Table isn't empty, error will be thrown.
-		if err != nil {
-			return err
-		} else {
-			return errors.New(credType + " already exists!")
-		}
-	} else {
-		return nil
-	}
-}
-
 // Checks if a password contains upper case, lower case, numbers, and special characters.
 func validpw(v interface{}, param string) error {
 	st := reflect.ValueOf(v)
@@ -184,9 +161,9 @@ func validpw(v interface{}, param string) error {
 		pw := st.String()
 		restrictions := []*regexp.Regexp{regexp.MustCompile("[a-z]"), // Must contain lowercase.
 			regexp.MustCompile("^[" + ALPHANUMERICS + SPECIAL_CHARS + "]*$"), // Must contain only some characters.
-			regexp.MustCompile("[A-Z]"), // Must contain uppercase.
-			regexp.MustCompile("[0-9]"), // Must contain numerics.
-			regexp.MustCompile("[" + SPECIAL_CHARS + "]")} // Must contain special characters.
+			regexp.MustCompile("[A-Z]"),                                      // Must contain uppercase.
+			regexp.MustCompile("[0-9]"),                                      // Must contain numerics.
+			regexp.MustCompile("[" + SPECIAL_CHARS + "]")}                    // Must contain special characters.
 		for _, restriction := range restrictions {
 			if !restriction.MatchString(pw) {
 				return errors.New("Restriction not matched!")

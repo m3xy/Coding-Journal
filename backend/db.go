@@ -67,6 +67,23 @@ func getTag(v interface{}, structVar string, tag string) string {
 	}
 }
 
+// Check if a value is unique in a given table.
+func checkUnique(table string, varName string, val string) bool {
+	// Query prepared and formatted statement.
+	stmt := fmt.Sprintf(SELECT_ROW, varName, table, varName)
+	query := db.QueryRow(stmt, val)
+
+	// Scan query and check for existing rows.
+	var res interface{}
+	err := query.Scan(&res)
+	if err != sql.ErrNoRows {
+		// Table isn't empty or error occured, return false.
+		return false
+	} else {
+		return true
+	}
+}
+
 // Get the database tag for a struct.
 func getDbTag(v interface{}, structVar string) string {
 	return getTag(v, structVar, "db")
