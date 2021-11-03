@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS idMappings (
   globalId int NOT NULL UNIQUE, -- Global user ID
   id int NOT NULL UNIQUE,       -- Local user ID linking to user on users table.
 
-  PRIMARY KEY (globalId)
-  FOREIGN KEY (id)
-)
+  PRIMARY KEY (globalId),
+  FOREIGN KEY (id) REFERENCES users(id)
+);
 
 -- add code here to initialise other tables
