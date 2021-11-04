@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -223,19 +224,29 @@ func TestSignUp(t *testing.T) {
 		defer resp.Body.Close()
 
 		// Check if response OK and user registered.
-		if resp.StatusCode == http.StatusOK {
-			stmt := fmt.Sprintf(SELECT_ROW, "*", TABLE_USERS, getDbTag(&Credentials{}, "Email"))
-			res := db.QueryRow(stmt, testUsers[i].Email)
-
-			storedCreds := &Credentials{}
-			err := res.Scan(storedCreds)
-			if err == sql.ErrNoRows {
-				t.Errorf("No rows despire register: %v\n", err)
-				return
-			}
-		} else {
+		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Error occured: %d\n", resp.StatusCode)
 			return
+		}
+
+		stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email"))
+		res := db.QueryRow(stmt, testUsers[i].Email)
+
+		storedCreds := &Credentials{}
+		err = res.Scan(&storedCreds.Id)
+		if err == sql.ErrNoRows {
+			t.Errorf("No rows despire register: %v\n", err)
+			return
+		}
+
+		// Check if global ID exists for user.
+		stmt = fmt.Sprintf(SELECT_ROW, getDbTag(&IdMappings{}, "GlobalId"), TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"))
+		res = db.QueryRow(stmt, strconv.Itoa(storedCreds.Id))
+
+		storedMapping := &IdMappings{Id: storedCreds.Id}
+		err = res.Scan(storedMapping.GlobalId)
+		if err == sql.ErrNoRows {
+			t.Errorf("No rows despite register: %v\n", err)
 		}
 	}
 

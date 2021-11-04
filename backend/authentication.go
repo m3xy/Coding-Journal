@@ -1,3 +1,13 @@
+// === === === === === === === === === === === === ===
+// authentication.go
+// Set of all functions relating to user authentication,
+// registration, and migration.
+//
+// Authors: 190014935
+// Creation Date: 19/10/2021
+// Last Modified: 04/11/2021
+// === === === === === === === === === === === === ===
+
 package main
 
 import (
@@ -84,28 +94,23 @@ func logIn(w http.ResponseWriter, r *http.Request) {
   Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
-	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
 	creds := newUser()
 	err := json.NewDecoder(r.Body).Decode(creds)
 	if err != nil {
-		// Bad request
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	validator.SetValidationFunc("validpw", validpw)
 	if validator.Validate(*creds) != nil {
-		// Bad credential semantics
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	// Register user to database.
 	err = registerUser(creds)
 	if err != nil {
-		// User registration error.
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -124,10 +129,9 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Println(err.Error())
-	} else {
-		// Return code OK
-		w.WriteHeader(http.StatusOK)
+		return
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // Register a user to the database.
