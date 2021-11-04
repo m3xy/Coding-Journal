@@ -409,3 +409,8 @@ func TestLogIn(t *testing.T) {
 	}
 	testEnd()
 }
+
+// Test user import.
+func TestExport(t *testing.T) {
+
+}

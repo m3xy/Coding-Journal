@@ -16,6 +16,7 @@ const (
 	TABLE_IDMAPPINGS = "idMappings"
 	TEAM_ID          = "11"
 	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
+	INNER_JOIN       = "%s INNER JOIN %s"
 	INSERT_CRED      = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
 	INSERT_FULL      = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
 	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
@@ -35,17 +36,16 @@ var DB_PARAMS map[string]string = map[string]string{
 
 // Structure for user table.
 type Credentials struct {
+	// User auto incremented ID.
+	Id int `json:"userId" db:"id"`
+	// Email Address.
+	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
 	// Password - given as plaintext by front end, and as hash by the database.
 	Pw string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
 	// First Name.
 	Fname string `json:"firstname" db:"firstname" validate:"nonzero,max=32"`
 	// Last Name.
 	Lname string `json:"lastname" db:"lastname" validate:"nonzero,max=32"`
-	// Email Address.
-	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
-
-	// User auto incremented ID.
-	Id int `json:"userId" db:"id"`
 	// User role.
 	Usertype int `json:"usertype" db:"usertype"`
 	// User phone number.

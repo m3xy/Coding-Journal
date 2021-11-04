@@ -134,6 +134,67 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Export user credentials. Exports all available details.
+//
+// Content type: application/json
+// Success: 200, OK
+// Failure: 401, Unauthorized
+// Parameters: email, password
+// Returns: {
+// 	email, password, first name, last name, phone number, organisation, id (global)
+// }
+func exportUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "application/json")
+
+	// Decode input into credentials and check necessary parameters.
+	inputCreds := &Credentials{}
+	err := json.NewDecoder(r.Body).Decode(inputCreds)
+	if err != nil || inputCreds.Pw == "" || inputCreds.Email == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// SELECT - FROM idMappings INNER JOIN users WHERE Email = ?
+	stmt := fmt.Sprintf(SELECT_ROW,
+		fmt.Sprintf("(%s, %s, %s, %s, %s, %s, %s)",
+			getDbTag(&IdMappings{}, "GlobalId"),
+			getDbTag(&Credentials{}, "Email"),
+			getDbTag(&Credentials{}, "Pw"),
+			getDbTag(&Credentials{}, "Fname"),
+			getDbTag(&Credentials{}, "Lname"),
+			getDbTag(&Credentials{}, "PhoneNumer"),
+			getDbTag(&Credentials{}, "Organization")),
+		fmt.Sprintf(INNER_JOIN, TABLE_IDMAPPINGS, TABLE_USERS),
+		getDbTag(&Credentials{}, "Email"))
+	query := db.QueryRow(stmt, inputCreds.Email)
+
+	storedCreds := newUser()
+	err = query.Scan(getCols(storedCreds)...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			fmt.Println()
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			fmt.Printf("Error occured! %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Check password hash and proceed to export.
+	if !comparePw(inputCreds.Pw, storedCreds.Pw) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	} else {
+		storedCreds.Pw = inputCreds.Pw // Make sure not to send the hash to server.
+		err = json.NewEncoder(w).Encode(storedCreds)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
 // Register a user to the database.
 func registerUser(creds *Credentials) error {
 	// Check email uniqueness.
