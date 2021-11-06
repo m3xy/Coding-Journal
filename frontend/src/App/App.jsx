@@ -28,7 +28,7 @@ import { Navigation, Home, Login, Register, About, Contact, Footer } from '../Pa
 const constants = {
     frontend: {
         host: 'http://localhost',
-        port: '8080' // TEMP: for now
+        port: '23409' // TEMP: for now
     },
     backend: {
         host: 'http://localhost',

@@ -17,5 +17,5 @@ else
     then
         docker volume create $volume
     fi
-    docker run --name $container -dp 3306:3306 -v $volume:/var/lib/mysql $image #   -> Run the image as a container
+    docker run --name $container -dp 3307:3306 -v $volume:/var/lib/mysql $image #   -> Run the image as a container
 fi
