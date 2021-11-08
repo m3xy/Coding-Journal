@@ -27,6 +27,17 @@ CREATE TABLE IF NOT EXISTS users (
   PRIMARY KEY (id) -- makes the ID the primary key as we know it will be unique
 );
 
+/*
+	Servers table
+	Stores server group number, security token, and URL for server.
+*/
+CREATE TABLE IF NOT EXISTS servers (
+	groupNumber int NOT NULL,    -- Group number.
+	token varchar(128) NOT NULL, -- Token corresponding to the group.
+	url varchar(256) NOT NULL, -- URL for server access.
+
+	PRIMARY KEY(groupNumber)
+);
 
 /* 
 ID mappings table
