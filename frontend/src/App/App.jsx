@@ -20,7 +20,10 @@ import { alertActions } from '../_actions';
 import { PrivateRoute } from '../_components';
 
 import { DataWriter } from '../backend_communication';
-import { Navigation, Home, Login, Register, About, Contact, Footer } from '../Pages'
+import { Navigation, CommentModal, Home, Login, Register, About, Contact, Footer, Code, Upload, Profile } from '../Pages'
+
+
+// import 'bootstrap/dist/css/bootstrap.min.css'
 
 // defines website constants here for ease of configuration. 
 // TEMP: could be moved to another file
@@ -52,12 +55,6 @@ class App extends React.Component {
     render() {
         const { alert } = this.props;
         return (
-            <div className="jumbotron">
-                <div className="container">
-                    <div className="col-sm-8 col-sm-offset-2">
-                        {alert.message &&
-                            <div className={`alert ${alert.type}`}>{alert.message}</div>
-                        }
                         <Router history={history}>
                             <Navigation />
                             <Switch>
@@ -69,14 +66,16 @@ class App extends React.Component {
                                     register={(firstname, lastname, email, password) => this.writer.registerUser(firstname, lastname, email, password)}/>} 
                                 />
                                 <Route path="/about" exact component={() => <About />} />
+                                <Route path="/code" exact component={() => <Code />} />
                                 <Route path="/contact" exact component={() => <Contact />} />
+                                <Route path="/commentModal" exact component={() => <CommentModal />} />
+                                <Route path="/profile" exact component={() => <Profile />} />
+                                <Route path="/upload" exact component={() => <Upload />} />
                                 <Redirect from="*" to="/" />
                             </Switch>
                             <Footer />
                         </Router>
-                    </div>
-                </div>
-            </div>
+
         );
     }
 }
