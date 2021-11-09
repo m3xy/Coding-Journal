@@ -1,16 +1,29 @@
----
+# gitlab.ci
+# File used to execute CI
+# Author(s): 190014935
+
+image: docker:20-dind
+
 #Pipeline stages
 stages:
     - build
     - test
 
+
+before_script:
+    - docker --version
+
 #Build stage
 build:
     stage: build
     script:
-        - echo "Building..."            #Prints "Building..."
-        - mkdir build                   #Creates build directory
-        - touch build/sample.txt        #Creates sample text file
+        # Database build
+        - docker build -t ci-mariadb db
+        - docker build -t ci-frontend frontend
+        - docker build -t ci-backend backend
+        - docker volume create my-db
+
+        # Run build methods
     artifacts:                          #Artifacts for testing
         paths:
             - build/                    #(Keep anything in build folder)
@@ -19,8 +32,9 @@ build:
 test:
     stage: test
     script:
-        - echo "Testing..."             #Prints "Testing..."
-        - test -f "build/sample.txt"    #Tests sample.txt exists in build file
-        - cd "./backend" && go test -v .
+      # Run docker images
+        - docker run ci-mariadb -dp 3307:3306 -v my-db:/var/lib/mysql
+        - docker run ci-backend -dp 8080:8080 go test -v .
+        - docker run ci-en
 
 ...
