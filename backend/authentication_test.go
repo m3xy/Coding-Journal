@@ -42,10 +42,8 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 	{Email: "test.wrongchars@test.com", Pw: "Tho/se]chars|ille\"gal", Fname: "test", Lname: "wrongchars"},
 }
 
-// Initialise the database for testing.
-func testInit() {
-	dbInit(user, password, protocol, host, port, TEST_DB)
-
+// Purge the database.
+func purgeDB() {
 	stmts := make([]string, 2)
 	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
 	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
@@ -57,17 +55,16 @@ func testInit() {
 	}
 }
 
+// Initialise the database for testing.
+func testInit() {
+	dbInit(user, password, protocol, host, port, TEST_DB)
+
+	purgeDB()
+}
+
 // Close database at the end of test.
 func testEnd() {
-	stmts := make([]string, 2)
-	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
-	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
-	for i := range stmts {
-		_, err := db.Query(stmts[i])
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
+	purgeDB()
 	db.Close()
 }
 
@@ -148,7 +145,7 @@ func TestRegisterUser(t *testing.T) {
 	testInit()
 	// Test registering new users with default credentials.
 	for i := range testUsers {
-		err := registerUser(testUsers[i])
+		_, err := registerUser(testUsers[i])
 		if err != nil {
 			t.Errorf("User registration error: %v\n", err.Error())
 			return
@@ -157,7 +154,7 @@ func TestRegisterUser(t *testing.T) {
 
 	// Test reregistering those users
 	for i := range testUsers {
-		err := registerUser(testUsers[i])
+		_, err := registerUser(testUsers[i])
 		if err == nil {
 			t.Error("Already registered account cannot be reregistered.")
 			return
@@ -312,7 +309,14 @@ func TestLogIn(t *testing.T) {
 
 	// Populate database with valid users.
 	for i := range testUsers {
-		registerUser(testUsers[i])
+		id, err := registerUser(testUsers[i])
+		if err != nil {
+			t.Errorf("User registration error: %v\n", err)
+			return
+		} else {
+			// Set user ID for ID checking.
+			testUsers[i].Id = id
+		}
 	}
 
 	// Test valid logins
@@ -326,7 +330,8 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/login", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:8080/login",
+			"application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
@@ -345,18 +350,10 @@ func TestLogIn(t *testing.T) {
 			return
 		}
 
-		// Check if user ID exists in database with same associated email.
-		stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Email"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Id"))
-		row := db.QueryRow(stmt, respMap[getJsonTag(&Credentials{}, "Id")])
-		email := ""
-		err = row.Scan(&email)
-		if err != nil {
-			t.Errorf("Scan failure: %v\n", err)
-			return
-		} else if email != testUsers[i].Email {
-			t.Error("Returned email doesn't correspond to user's email.")
+		// Check if gotten 
+		storedId, _ := strconv.Atoi(respMap[getJsonTag(&Credentials{}, "Id")])
+		if (storedId != testUsers[i].Id) {
+			t.Error("IDs don't correspond!")
 			return
 		}
 	}
@@ -410,7 +407,3 @@ func TestLogIn(t *testing.T) {
 	testEnd()
 }
 
-// Test user import.
-func TestExport(t *testing.T) {
-
-}

@@ -3,9 +3,11 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
+	"log"
 	"reflect"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var db *sql.DB
@@ -14,6 +16,7 @@ const (
 	// Constant for table operations.
 	TABLE_USERS      = "users"
 	TABLE_IDMAPPINGS = "idMappings"
+	VIEW_LOGIN		 = "globalLogins"
 	TEAM_ID          = "11"
 	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
 	INNER_JOIN       = "%s INNER JOIN %s"
@@ -57,7 +60,7 @@ type Credentials struct {
 // Structure for ID mappings.
 type IdMappings struct {
 	GlobalId int `json:"globalId" db:"globalId"`
-	Id       int `json:"userId" db:"id"`
+	Id       int `json:"userId" db:"localId"`
 }
 
 // Get the tag in a struct.
@@ -81,6 +84,9 @@ func checkUnique(table string, varName string, val string) bool {
 	err := query.Scan(&res)
 	if err != sql.ErrNoRows {
 		// Table isn't empty or error occured, return false.
+		if err != nil {
+			log.Printf("Scan error on checkUnique: %v\n", err)
+		}
 		return false
 	} else {
 		return true
@@ -131,6 +137,18 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 	return nil
 }
 
+// Close a database connection.
 func dbCloseConnection() {
 	db.Close()
+}
+
+// Get all columns from an interface.
+func getCols(v interface{}) []interface{} {
+	s := reflect.ValueOf(v).Elem()
+	numCols := s.NumField()
+	cols := make([]interface{}, numCols)
+	for i := 0; i < numCols; i++ {
+		cols[i] = s.Field(i).Addr().Interface()
+	}
+	return cols
 }

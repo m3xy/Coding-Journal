@@ -30,6 +30,10 @@ const (
 	HASH_COST     = 8
 )
 
+// ----
+// User log in
+// ----
+
 /*
  Router function to log in to website.
  Content type: application/json
@@ -51,11 +55,10 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get credentials at given email, and assign it.
-	vars := fmt.Sprintf("%s, %s", getDbTag(&Credentials{}, "Pw"), getDbTag(&Credentials{}, "Id"))
-	stmt := fmt.Sprintf(SELECT_ROW, vars, TABLE_USERS, getDbTag(&Credentials{}, "Email"))
+	stmt := fmt.Sprintf(SELECT_ROW, "*", VIEW_LOGIN, getDbTag(&Credentials{}, "Email"))
 	res := db.QueryRow(stmt, creds.Email)
 	storedCreds := &Credentials{}
-	err = res.Scan(&storedCreds.Pw, &storedCreds.Id)
+	err = res.Scan(&storedCreds.Id, &storedCreds.Email, &storedCreds.Pw)
 	if err != nil {
 		// Error in scan.
 		if err == sql.ErrNoRows {
@@ -73,7 +76,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		// Password incorrect.
 		// Write JSON body for successful response return.
 		w.WriteHeader(http.StatusOK)
-		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.FormatInt(int64(storedCreds.Id), 10)
+		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.Itoa(storedCreds.Id)
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -86,6 +89,10 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		w.Write(jsonResp)
 	}
 }
+
+// ----
+// User signup
+// ----
 
 /*
   Router function to sign up to website.
@@ -109,32 +116,85 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = registerUser(creds)
+	_, err = registerUser(creds)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// Make query to get user ID from email.
-	stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email"))
-	query := db.QueryRow(stmt, creds.Email)
-	err = query.Scan(&creds.Id)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// Map user ID to a global ID.
-	err = mapUserToGlobal(creds.Id)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Println(err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
+// Register a user to the database.
+// Returns user global ID.
+func registerUser(creds *Credentials) (int, error) {
+	// Check email uniqueness.
+	unique := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
+	if !unique {
+		return -1, errors.New(getDbTag(&Credentials{}, "Email") + " is not unique!")
+	}
+
+	// Hash password and store new credentials to database.
+	hash := hashPw(creds.Pw)
+
+	// Make credentials insert statement for query.
+	stmt := fmt.Sprintf(INSERT_FULL,
+		TABLE_USERS,
+		getDbTag(&Credentials{}, "Pw"),
+		getDbTag(&Credentials{}, "Fname"),
+		getDbTag(&Credentials{}, "Lname"),
+		getDbTag(&Credentials{}, "Email"),
+		getDbTag(&Credentials{}, "Usertype"),
+		getDbTag(&Credentials{}, "PhoneNumber"),
+		getDbTag(&Credentials{}, "Organization"))
+
+	// Query full insert statement.
+	res, err := db.Exec(stmt,
+		hash, creds.Fname, creds.Lname, creds.Email,
+		creds.Usertype, creds.PhoneNumber, creds.Organization)
+	if err != nil {
+		return -1, err
+	}
+	id, err := res.LastInsertId()
+	return mapUserToGlobal(int(id))
+
+}
+
+// Register local user to global ID mappings.
+func mapUserToGlobal(userId int) (int, error) {
+	// Check if ID exists in users table.
+	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), strconv.Itoa(userId)) {
+		return -1, errors.New("No user with this ID!")
+	}
+
+	// Check if ID is unique in idMappings table.
+	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), strconv.Itoa(userId)) {
+		return -1, errors.New("ID already exists in ID mappings!")
+	}
+
+	// Set new global ID for user.
+	globalId, _ := strconv.Atoi(TEAM_ID + strconv.Itoa(userId))
+
+	// Insert new mapping to ID Mappings.
+	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
+	_, err := db.Exec(stmt, globalId, userId)
+	if err != nil {
+		return -1, err
+	} else {
+		return globalId, nil
+	}
+}
+
+// Set new user credentials
+func newUser() *Credentials {
+	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
+}
+
+// ----
+// User exportation/importation
+// ----
+
 // Export user credentials. Exports all available details.
+// TODO Testing for after MVP.
 //
 // Content type: application/json
 // Success: 200, OK
@@ -195,69 +255,9 @@ func exportUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Register a user to the database.
-func registerUser(creds *Credentials) error {
-	// Check email uniqueness.
-	unique := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
-	if !unique {
-		return errors.New(getDbTag(&Credentials{}, "Email") + " is not unique!")
-	}
-
-	// Hash password and store new credentials to database.
-	hash := hashPw(creds.Pw)
-
-	// Make credentials insert statement for query.
-	stmt := fmt.Sprintf(INSERT_FULL,
-		TABLE_USERS,
-		getDbTag(&Credentials{}, "Pw"),
-		getDbTag(&Credentials{}, "Fname"),
-		getDbTag(&Credentials{}, "Lname"),
-		getDbTag(&Credentials{}, "Email"),
-		getDbTag(&Credentials{}, "Usertype"),
-		getDbTag(&Credentials{}, "PhoneNumber"),
-		getDbTag(&Credentials{}, "Organization"))
-
-	// Query full insert statement.
-	_, err := db.Query(stmt,
-		hash, creds.Fname, creds.Lname, creds.Email,
-		creds.Usertype, creds.PhoneNumber, creds.Organization)
-	if err != nil {
-		return err
-	} else {
-		return nil
-	}
-}
-
-// Register local user to global ID mappings.
-func mapUserToGlobal(userId int) error {
-	// Check if ID exists in users table.
-	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), strconv.Itoa(userId)) {
-		return errors.New("No user with this ID!")
-	}
-
-	// Check if ID is unique in idMappings table.
-	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), strconv.Itoa(userId)) {
-		return errors.New("ID already exists in ID mappings!")
-	}
-
-	// Set new global ID for user.
-	globalId, _ := strconv.Atoi(TEAM_ID + strconv.Itoa(userId))
-	idMap := &IdMappings{Id: userId, GlobalId: globalId}
-
-	// Insert new mapping to ID Mappings.
-	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
-	_, err := db.Query(stmt, idMap.GlobalId, idMap.Id)
-	if err != nil {
-		return err
-	} else {
-		return nil
-	}
-}
-
-// Set new user credentials
-func newUser() *Credentials {
-	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
-}
+// ----
+// Password control
+// ----
 
 // Checks if a password contains upper case, lower case, numbers, and special characters.
 func validpw(v interface{}, param string) error {
@@ -290,15 +290,4 @@ func hashPw(pw string) []byte {
 // Compare password and hash for validity.
 func comparePw(pw string, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
-}
-
-// Get all columns from an interface.
-func getCols(v interface{}) []interface{} {
-	s := reflect.ValueOf(v).Elem()
-	numCols := s.NumField()
-	cols := make([]interface{}, numCols)
-	for i := 0; i < numCols; i++ {
-		cols[i] = s.Field(i).Addr().Interface()
-	}
-	return cols
 }
