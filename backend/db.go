@@ -6,7 +6,6 @@ import (
 	"log"
 	"reflect"
 	"time"
-
 	_ "github.com/go-sql-driver/mysql"
 )
 

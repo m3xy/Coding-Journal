@@ -2,6 +2,9 @@
 #The container containing the database
 container="mariadb"
 
+
+cd $(dirname "$(readlink -f "$0")")
+
 #Stop the container
 docker stop $container
 

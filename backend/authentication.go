@@ -62,10 +62,8 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Error in scan.
 		if err == sql.ErrNoRows {
-			// User doesn't exist
 			w.WriteHeader(http.StatusUnauthorized)
 		} else {
-			// Other database related error.
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
@@ -73,8 +71,6 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 	// Compare password to hash in database, and conclude status.
 	if comparePw(creds.Pw, storedCreds.Pw) {
-		// Password incorrect.
-		// Write JSON body for successful response return.
 		w.WriteHeader(http.StatusOK)
 		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.Itoa(storedCreds.Id)
 	} else {
@@ -184,11 +180,6 @@ func mapUserToGlobal(userId int) (int, error) {
 	}
 }
 
-// Set new user credentials
-func newUser() *Credentials {
-	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
-}
-
 // ----
 // User exportation/importation
 // ----
@@ -245,19 +236,18 @@ func exportUser(w http.ResponseWriter, r *http.Request) {
 	if !comparePw(inputCreds.Pw, storedCreds.Pw) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
-	} else {
-		storedCreds.Pw = inputCreds.Pw // Make sure not to send the hash to server.
-		err = json.NewEncoder(w).Encode(storedCreds)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
 	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // ----
 // Password control
 // ----
+
+// Set new user credentials
+func newUser() *Credentials {
+	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
+}
 
 // Checks if a password contains upper case, lower case, numbers, and special characters.
 func validpw(v interface{}, param string) error {
