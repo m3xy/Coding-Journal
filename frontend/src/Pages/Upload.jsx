@@ -1,5 +1,6 @@
 import React from "react";
 import DragAndDrop from "./DragAndDrop";
+import {Form, Button, Card} from "react-bootstrap"
 
 class Upload extends React.Component {
 
@@ -66,7 +67,7 @@ class Upload extends React.Component {
             formFileList.items.add(files[i]);
         }
         
-        document.getElementById("uploadFiles").files = formFileList.files;
+        document.getElementById("formFile").files = formFileList.files;
         this.setState({
             files: fileList
         });
@@ -77,7 +78,7 @@ class Upload extends React.Component {
 
         const files = this.state.files.map((file, i) => {
             return (
-                <button type="button" class="list-group-item list-group-item-action" disabled key={i}>
+                <button type="button" className="list-group-item list-group-item-action" disabled key={i}>
                     <label>File name: {file.name}</label>
                     <br/>
                     <label>File type: {file.type}</label>
@@ -90,35 +91,38 @@ class Upload extends React.Component {
         });
 
 		return (
-            <div className="col-md-6 col-md-offset-3">
-                <head>
-					<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous"/>
-				</head>
-                <h2>Upload File</h2>
-                
+            <div className="col-md-6 offset-md-5">
+                <br/>
+
                 <form name="form" onSubmit={this.handleSubmit}>
                 <DragAndDrop handleDrop={this.handleDrop}>
-                    <div class="custom-file">
-                        <label class="custom-file-label" htmlFor="uploadFiles">Choose/Drop files (.zip)</label>
-                        <input type="file" class="custom-file-input" id="uploadFiles" name="uploadFiles" accept=".zip" onChange={this.handleChange} multiple/>
-                    </div>
+                    {/* <div className="custom-file">
+                        <label className="custom-file-label" htmlFor="uploadFiles">Choose/Drop files (.zip)</label>
+                        <input type="file" className="custom-file-input" id="uploadFiles" name="uploadFiles" accept=".zip" onChange={this.handleChange} multiple/>
+                    </div> */}
 
                     {/* <label htmlFor="uploadFiles" style={lblCSS}>Choose file(s) to upload (.zip)</label>
                     <input type="file" id="uploadFiles" name="uploadFiles" accept=".zip" onChange={this.handleChange} style={{opacity:0}} multiple/> */}
 
-                    <div class="card">
-                        <div class="card-body">
+
+
+                    <Card style={{ width: '18rem' }}>
+                    <Card.Header className="text-center"><h5>Upload Files</h5></Card.Header>
+                        <Form.Group controlId="formFile" className="mb-3">
+                            <Form.Control type="file" accept=".zip" onChange={this.handleChange} multiple/>
+                        </Form.Group>
+                        <Card.Body>
+
                             {this.state.files.length > 0 ? (
-                                <ul class="list-group">{files}</ul>
+                                <ul className="list-group">{files}</ul>
                             ) : (
-                                <label>No files selected.</label>
+                                <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><p/></Card.Text>
                             )}
-                        </div>
-                    </div>
+                        </Card.Body>
+                        <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload files</Button>{' '}</Card.Footer>
+                        
+                    </Card>
                     </DragAndDrop>
-                    <div>
-                        <button className="btn btn-primary">Upload files</button>
-                    </div>
                 </form>
                 
             </div>

@@ -12,7 +12,7 @@ class DragAndDrop extends Component {
         e.stopPropagation();
     }
 
-    handleDrag = (e) => {
+    handleDragStart = (e) => {
         this.preventDefaults(e);
         e.dataTransfer.clearData();
     }
@@ -24,7 +24,6 @@ class DragAndDrop extends Component {
     handleDragIn = (e) => {
         this.preventDefaults(e);
         this.dragCounter++;
-        console.log(this.dragCounter)
         if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
             this.setState({drag: true});
         }
@@ -33,7 +32,6 @@ class DragAndDrop extends Component {
     handleDragOut = (e) => {
         this.preventDefaults(e);
         this.dragCounter--;
-        console.log(this.dragCounter)
         if (this.dragCounter === 0) {
             this.setState({drag: false});
         }
@@ -47,7 +45,6 @@ class DragAndDrop extends Component {
             // e.dataTransfer.clearData();
             this.dragCounter = 0;
         }
-        console.log(this.dragCounter)
     }
 
     componentDidMount() {

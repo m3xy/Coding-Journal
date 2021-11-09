@@ -69,8 +69,8 @@ class App extends React.Component {
                                 <Route path="/code" exact component={() => <Code />} />
                                 <Route path="/contact" exact component={() => <Contact />} />
                                 <Route path="/commentModal" exact component={() => <CommentModal />} />
-                                <Route path="/profile" exact component={() => <Profile />} />
                                 <Route path="/upload" exact component={() => <Upload />} />
+                                <Route path="/profile" exact component={() => <Profile />} />
                                 <Redirect from="*" to="/" />
                             </Switch>
                             <Footer />
