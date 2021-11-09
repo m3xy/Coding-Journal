@@ -26,46 +26,161 @@ NOTES:
 - Maybe config path to dir holding projects with an environment variable?
 - Maybe generalize the inner join query a bit more so that querying authors and reviewers is the same function?
 - refine error handling
-- refine tags in db.go
-- talk with alex about best practice for tags in structs (i.e. multi-table db tags)
-	is table.column allowed for tags?
-- factor out and generalize functionality for concatenating query results?
+- Talk about what to store/return in structs for authors and reviewers (i.e. full name or ID)
+- Do we want to store base64 text or raw source code in the backend filesystem? storing base64 is more efficient
 */
 
 package main
 
 import (
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"net/http"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
 	"strings"
+	"strconv"
 )
 
 // file constants, includes
 const (
 	// TEMP: hard coded for testing
 	FILESYSTEM_ROOT = "/home/ewp3/Documents/CS3099/project-code/testProjects/" // path to the root directory holding all project directories TEMP: maybe set with an env variable?
+	DATA_DIR_NAME = ".data" // name of the hidden data dir to be put into the project directory structure
+
+	// File Mode Constants
+	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
+	FILE_PERMISSIONS = 0644 // permissions for project files
 )
 
-// structure to hold json data from data files
-type CodeFileData struct {
-	Comments []Comment `json:"comments"`
+////////////////////////////////////////////////////////////////////////// HELPER FUNCTIONS FOR UPLOAD //////////////////////////////////////////////////////////////////////////
+
+// /*
+// helper function to add a project to the filesystem and database. Note that
+// the project id in this object should be set to -1 before this function is called
+// on it, because it will be set on addition to the db anyway.
+
+// Params:
+// 	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
+// Returns:
+// 	(uint) : the id of the added project
+// 	(error) : if the operation fails
+// */
+// func (project *Project) Add() (uint, error) {
+// 	return 1, nil
+// }
+
+// /*
+// helper function to add a file to the filesystem and database. Note that every
+// file must have a valid project to be attached to or else the adding will fail
+// Note that when a file is added, no commments or other data are present yet, and
+// hence it's data file will be empty.
+// This function should only be accessed from inside this file.
+
+// Params:
+// 	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
+// 	projectId (uint) : the id of the project which the added file is to be linked 
+// 		to as an unsigned integer
+// Returns:
+// 	(uint) : the id of the added file (0 if an error occurs)
+// 	(error) : if the operation fails
+// */
+// func (file *File) AddTo(projectId uint) (uint, error) {
+// 	// declares return value variables 
+// 	var fileId int
+// 	var err error
+
+// 	// formats SQL query to insert the file into the db
+// 	insertFile := fmt.Sprintf(
+// 		INSERT_FILE,
+// 		TABLE_FILES,
+// 		getDbTag(&File{}, "ProjectId"),
+// 		getDbTag(&File{}, "Path"),
+// 	)
+// 	// executes the formatted query, returning the fileId 
+// 	// (note that here SQL implicitly checks that the projectId exists in the projects table via Foreign key constraint)
+// 	row := db.QueryRow(insertFile, projectId, file.Path)
+// 	if row.Err() != nil {
+// 		return 0, row.Err()
+// 	}
+// 	// gets the id from the just inserted file
+// 	if err = row.Scan(&fileId); err != nil {
+// 		return 0, err
+// 	}
+
+// 	// Adds the file to the filesystem
+// 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
+// 	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME, file.projectName, strings.TrimSuffix(file.Path, filepath.Ext(file.Path)) + ".json")
+// 	// file paths without the file name (for creating directories if they do not yet exist)
+// 	fileDirPath := filepath.Dir(filePath)
+// 	fileDataDirPath := filepath.Dir(fileDataPath)
+
+// 	// populates the filesystem with a test file and data about said test file
+// 	testFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	testDataFile, err := os.OpenFile(fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+
+// 	// writes data to the file
+// 	if _, err = testFile.Write([]byte(file.Content)); err != nil {
+// 		return 0, err
+// 	}
+// 	jsonString, err := json.Marshal(data)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	if _, err = testDataFile.Write([]byte(jsonString)); err != nil {
+// 		return 0, err
+// 	}
+
+// 	// if the operation was successful, the file id is set in the file object and the file is returned
+// 	file.Id = fileId
+// 	file.ProjectId = projectId
+// 	return fileId, nil
+// }
+
+////////////////////////////////////////////////////////////////////////////// FILES FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////
+
+/*
+Router function to retrieve go code files from the filesystem. This function returns
+the actual content of a code file along with comments and some data
+*/
+func getFile(w http.ResponseWriter, r *http.Request) {
+	// Set up writer response.
+	w.Header().Set("Content-Type", "application/json")
+
+	// creates an empty project and gets the project id from the Get request header. If the header
+	// does not contain an int value, return BadRequest header
+	fileId, err := strconv.Atoi(r.Header.Get("file")) // TEMP: don't hard code this
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	// TEMP: add different responses for error handling here
+	// populates all fields for the file except content and comments by querying the db
+	file := &File{Id: fileId}
+	if err = getFileData(file, fileId); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	// gets the file contents, encodes it in Base64, and inserts it into the structure
+	} else if err = getFileContent(file); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	// gets the file comments, and inserts them into the file structure
+	} else if err = getFileComments(file); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	} 
+
+	// writes JSON data for the file to the HTTP connection if no error has occured
+	response, err := json.Marshal(file)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	w.Write(response)
 }
-
-// // lightweight struct for listing project id/name pairs
-// type ProjectsList struct {
-// 	projects []
-// 	id int `json:"id" db:"id"`
-// 	name string `json:"name" db:"project_name"`
-// }
-
-// // structure to hold project data as read from json
-// type ProjectData {
-
-// }
 
 /*
 Function to populate File instance's fields by querying the SQL database
@@ -75,24 +190,30 @@ Params:
 Returns:
 	error if something goes wrong while querying the DB
 */
-func getFileData(file *File, fileID int) error {
+func getFileData(file *File, fileId int) error {
 	// queries the file path, project ID, and project name from the database
-	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
-		getDbTag(&File{}, "path"),
-		TABLE_FILES+", "+getDbTag(&File{}, "projectID")+", "+getDbTag(&File{}, "projectName"),
-		TABLE_PROJECTS,
-		TABLE_PROJECTS+"."+getDbTag(&Project{}, "id"),
-		TABLE_FILES+"."+getDbTag(&File{}, "id"),
-		TABLE_FILES+"."+getDbTag(&File{}, "id"),
+	queryColumns := fmt.Sprintf("%s, %s, %s", 
+		getDbTag(&File{}, "Path"), 
+		getDbTag(&File{}, "ProjectId"), 
+		getDbTag(&Project{}, "Name"),
 	)
+	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
+		queryColumns,
+		TABLE_FILES,
+		TABLE_PROJECTS,
+		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"),
+		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
+		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
+	)
+
 	// executes query (should only return 1 row via unique constraint on file ids)
-	row := db.QueryRow(stmt, fileID)
-	if err := row.Scan(file.path, file.projectID, file.projectName); err != nil {
+	row := db.QueryRow(stmt, fileId)
+	if err := row.Scan(&file.Path, &file.ProjectId, &file.ProjectName); err != nil {
 		return err
 	}
 
 	// sets the file name in the object using the path
-	file.name = filepath.Base(file.path)
+	file.Name = filepath.Base(file.Path)
 
 	// if no error has occurred, return nil
 	return nil
@@ -109,10 +230,10 @@ Returns:
 */
 func getFileContent(file *File) error {
 	// builds the path to the file and reads its content
-	fullPath := filepath.Join(FILESYSTEM_ROOT, 
-		fmt.Sprint(file.projectID),
-		file.projectName,
-		file.path,
+	fullPath := filepath.Join(FILESYSTEM_ROOT,
+		fmt.Sprint(file.ProjectId),
+		file.ProjectName,
+		file.Path,
 	)
 	fileData, err := ioutil.ReadFile(fullPath)
 	if err != nil {
@@ -120,7 +241,7 @@ func getFileContent(file *File) error {
 	}
 
 	// if no error occurred, encode and returns the file's content
-	file.content = base64.StdEncoding.EncodeToString(fileData)
+	file.Content = base64.StdEncoding.EncodeToString(fileData)
 	return nil
 }
 
@@ -135,120 +256,156 @@ Returns:
 */
 func getFileComments(file *File) error {
 	// builds the path to the file and reads its content
-	fullPath := filepath.Join(FILESYSTEM_ROOT, 
-		fmt.Sprint(file.projectID), 
-		".data", 
-		file.projectName, 
-		strings.TrimSuffix(file.path, filepath.Ext(file.path)) + ".json",
+	fullPath := filepath.Join(FILESYSTEM_ROOT,
+		fmt.Sprint(file.ProjectId),
+		".data", // TEMP: maybe don't hard code this?
+		file.ProjectName,
+		strings.TrimSuffix(file.Path, filepath.Ext(file.Path))+".json",
 	)
 	jsonData, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		return err
 	}
-	
+
 	// fileData is parsed from json into the CodeFileData struct
 	codeFileData := &CodeFileData{}
 	err = json.Unmarshal(jsonData, codeFileData)
 	if err != nil {
 		return err
 	}
-	
+
 	// if no error occurred, set the CodeFileData.comments field and return
-	file.comments = codeFileData.Comments
+	file.Comments = codeFileData.Comments
 	return nil
 }
 
-/*
-Router function to retrieve go code files from the filesystem. This function returns
-the actual content of a code file
+////////////////////////////////////////////////////////// PROJECTS FUNCTIONALITY ///////////////////////////////////////////////////////////
 
-Params:
-	path (String) : the path to the file to be retrieved, including the file name and
-		extension
-Returns:
-	the contents of a file along with it's data
+/*
+Router function to get the names and id's of every project currently saved
 */
-func getFile(w http.ResponseWriter, r *http.Request) {
+func getAllProjects(w http.ResponseWriter, r *http.Request) {
+	// set content type for return
+	w.Header().Set("Content-Type", "application/json")
+
+	// queries the database for the project ID and name pairs
+	columns := fmt.Sprintf("%s, %s",
+		getDbTag(&Project{}, "Id"),
+		getDbTag(&Project{}, "Name"),
+	)
+	stmt := fmt.Sprintf(SELECT_ALL_ORDER_BY, columns, TABLE_PROJECTS)
+	rows, err := db.Query(stmt, getDbTag(&Project{}, "Name"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	// parses query result into { id : project name } mappings
+	var id int
+	var projectName string
+	projects := make(map[int]string)
+	for rows.Next() {
+		// if there is an error returned by scanning the row, the error is returned
+		// without the array
+		if err := rows.Scan(&id, &projectName); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		projects[id] = projectName
+	}
+
+	// marshals and returns the map as JSON
+	jsonString, err := json.Marshal(projects)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	// writes json string
+	w.Write(jsonString)
+}
+
+/*
+Router function to retrieve a code project to be displayed on the web interface.
+This function does not return the content of the code files, rather it'll return
+the project name, ID and directory structure, so that the code files can be individually
+queried
+
+TEMP: figure out what URL to have as endpoint here
+*/
+func getProject(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// creates the file object and gets its ID 
-	file := &File{}
-	err := json.NewDecoder(r.Body).Decode(file)
+	// creates an empty project and gets the project id from the Get request header. If the header
+	// does not contain an int value, return BadRequest header
+	projectId, err := strconv.Atoi(r.Header.Get("project")) // TEMP: don't hard code this
 	if err != nil {
-		// Bad request
 		w.WriteHeader(http.StatusBadRequest)
-		return
 	}
-	
-	// TEMP: add different responses for error handling here
-	// populates all fields for the file except content and comments by querying the db
-	if getFileData(file, int(file.id)) != nil {
+	// creates a project with the given ID
+	project := &Project{Id: projectId}
+
+	// statement to query project name
+	getProjectName := fmt.Sprintf(SELECT_ROW,
+		getDbTag(&Project{}, "Name"),
+		TABLE_PROJECTS,
+		getDbTag(&Project{}, "Id"),
+	)
+
+	// executes query
+	row := db.QueryRow(getProjectName, projectId)
+	if row.Err() != nil {
+		fmt.Println(row.Err())
 		w.WriteHeader(http.StatusBadRequest)
-	// gets the file contents, encodes it in Base64, and inserts it into the structure
-	} else if getFileContent(file) != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	// gets the file comments, and inserts them into the file structure
-	} else if getFileComments(file) != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	// writes JSON data for the file to the HTTP connection if no error has occured
-	} else {
-		response, err := json.Marshal(file)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-		}
-		w.Write(response)
 	}
-}
-
-// /*
-// Router function to get the names and id's of every project currently saved
-
-// TEMP: impl some ordering based on views
-
-// */
-// func getAllProjects(w http.ResponseWriter, r *http.Request) {
-// 	// set content type for return
-// 	w.Header().Set("Content-Type", "application/json")
-
-// 	// queries the database for the project ID and name pairs
-// 	stmt := fmt.Sprintf(SELECT_ALL_ORDER_BY, TABLE_PROJECTS)
-// 	rows, err := db.Query(stmt, )
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// }
-
-// create and return a new project struct
-func newProject() *Project {
-	return &Project{
-		projectName: "",
-		reviewers:    nil,
-		authors:      nil,
+	// if no project name was returned for the given project id
+	if err := row.Scan(&project.Name); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 	}
+
+	// gets project authors, reviewers, and file paths (as relpaths from the root of the project)
+	project.Authors, err = getProjectAuthors(projectId)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	project.Reviewers, err = getProjectReviewers(projectId)
+	if err != nil {
+		fmt.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	project.FilePaths, err = getProjectFiles(projectId)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	// writes JSON data for the project to the HTTP connection
+	response, err := json.Marshal(project)
+	if err != nil {
+		fmt.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	w.Write(response)
 }
 
 /*
 Queries the authors of a given project from the database
 
 Params:
-	projectID (int) : the id of the project to get authors of
+	projectId (int) : the id of the project to get authors of
 Returns:
 	[]string of the author's names
 	error if something goes wrong during the query
 */
-func getProjectAuthors(projectID int) ([]string, error) {
+func getProjectAuthors(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
 		getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
 		TABLE_USERS,
 		TABLE_AUTHORS,
 		TABLE_USERS+"."+getDbTag(&Credentials{}, "Id"),
-		TABLE_AUTHORS+"."+"user_id",
-		TABLE_AUTHORS+"."+"project_id",
+		TABLE_AUTHORS+"."+"userId",
+		TABLE_AUTHORS+"."+"projectId",
 	)
 	// executes query
-	rows, err := db.Query(stmt, projectID)
+	rows, err := db.Query(stmt, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -271,23 +428,23 @@ func getProjectAuthors(projectID int) ([]string, error) {
 Queries the reviewers of a given project from the database
 
 Params:
-	projectID (int) : the id of the project to get reviewers of
+	projectId (int) : the id of the project to get reviewers of
 Returns:
 	[]string of the reviewer's names
 	error if something goes wrong during the query
 */
-func getProjectReviewers(projectID int) ([]string, error) {
+func getProjectReviewers(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
 		getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
 		TABLE_USERS,
 		TABLE_REVIEWERS,
 		TABLE_USERS+"."+getDbTag(&Credentials{}, "Id"),
-		TABLE_REVIEWERS+"."+"user_id",
-		TABLE_REVIEWERS+"."+"project_id",
+		TABLE_REVIEWERS+"."+"userId",
+		TABLE_REVIEWERS+"."+"projectId",
 	)
 	// executes query
-	rows, err := db.Query(stmt, projectID)
+	rows, err := db.Query(stmt, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -311,20 +468,20 @@ Queries the database for file paths with the given project ID
 (i.e. files in the project)
 
 Params:
-	projectID (int) : the id of the project to get the files of
+	projectId (int) : the id of the project to get the files of
 Returns:
 	[]string of the file paths
 	error if something goes wrong during the query
 */
-func getProjectFiles(projectID int) ([]string, error) {
+func getProjectFiles(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(SELECT_ROW,
-		getDbTag(&File{}, "path"),
+		getDbTag(&File{}, "Path"),
 		TABLE_FILES,
-		getDbTag(&File{}, "id"),
+		getDbTag(&File{}, "ProjectId"),
 	)
 	// executes query
-	rows, err := db.Query(stmt, projectID)
+	rows, err := db.Query(stmt, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -341,54 +498,4 @@ func getProjectFiles(projectID int) ([]string, error) {
 		files = append(files, file)
 	}
 	return files, nil
-}
-
-/*
-Router function to retrieve code projects to be displayed on the web interface.
-This function does not return the content of the code files, rather it'll return
-the project name, ID and directory structure
-
-TEMP: figure out what URL to have as endpoint here
-*/
-func getProject(w http.ResponseWriter, r *http.Request) {
-	// Set up writer response.
-	w.Header().Set("Content-Type", "application/json")
-
-	// Decodes request into Project struct, which only sets the id field (in db.go)
-	project := newProject()
-	err := json.NewDecoder(r.Body).Decode(project)
-	if err != nil {
-		// Bad request
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// statement to query project name
-	getProjectName := fmt.Sprintf(SELECT_ROW,
-		getDbTag(&Project{}, "projectName"),
-		TABLE_PROJECTS,
-		getDbTag(&Project{}, "id"),
-	)
-
-	// executes query
-	row := db.QueryRow(getProjectName, project.id)
-	if row.Err() != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		// TEMP: write something like "project does not exist"
-	}
-	if err := row.Scan(project.projectName); err != nil {
-		// TEMP: do some error handling here
-	}
-
-	// gets project authors TEMP: add error handling
-	project.authors, err = getProjectAuthors(project.id)
-	project.reviewers, err = getProjectReviewers(project.id)
-	project.filePaths, err = getProjectFiles(project.id)
-
-	// writes JSON data for the project to the HTTP connection
-	response, err := json.Marshal(project)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-	w.Write(response)
 }
