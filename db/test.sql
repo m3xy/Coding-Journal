@@ -135,4 +135,5 @@ CREATE TABLE IF NOT EXISTS reviewers (
 /* Set view for users with global ID as ID. */
 CREATE VIEW IF NOT EXISTS globalLogins AS
 	SELECT globalId, email, password
-	FROM idMappings INNER JOIN users;
+	FROM idMappings INNER JOIN users
+	ON idMappings.localId = users.id;
