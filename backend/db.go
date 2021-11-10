@@ -15,6 +15,7 @@ const (
 	// Constant for table operations.
 	TABLE_USERS      = "users"
 	TABLE_IDMAPPINGS = "idMappings"
+	TABLE_SERVERS	 = "servers"
 	VIEW_LOGIN		 = "globalLogins"
 	TEAM_ID          = "11"
 	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
@@ -64,7 +65,7 @@ type IdMappings struct {
 
 // Structure for servers.
 type Servers struct {
-	GroupNb	int `json:"gropNumber" db:"groupNumber"`
+	GroupNb	int `json:"groupNumber" db:"groupNumber"`
 	Token	string `json:"token" db:"token"`
 	Url		string `json:"url" db:"url"`
 }

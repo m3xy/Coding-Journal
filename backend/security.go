@@ -1,38 +1,51 @@
 package main
 
 import (
-	"encoding/base64"
-	"encoding/binary"
 	"fmt"
+	"log"
 	"math/rand"
+	"time"
+)
 
-	"golang.org/x/crypto/chacha20"
+const (
+	BASE64_CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/"
+	SECURITY_KEY_SIZE = 128
 )
 
 // Generate a new security key.
-func getNewSecurityKey(seed int) (string, error) {
-	// Generate key.
-	rand.Seed(int64(seed))
-	keyNum := rand.Uint32()
-	key := make([]byte, 4)
-	binary.BigEndian.PutUint32(key[0:4], uint32(keyNum))
+func getNewSecurityKey() string {
+	return randStringBase64(int(time.Now().UnixNano()), SECURITY_KEY_SIZE)
+}
 
-	// Generate nonce.
-	rand.Seed(int64(seed + 1))
-	nonceNum := int16(rand.Uint32())
-	nonce := make([]byte, 2)
-	binary.BigEndian.PutUint16(nonce[0:2], uint16(nonceNum))
-
-	// Generate password, then base64 string.
-	cipher, err := chacha20.HChaCha20(key, nonce)
-	if err != nil {
-		return "", err
-	} else {
-		return base64.StdEncoding.EncodeToString(cipher), nil
+// Generate a random base64 string.
+func randStringBase64(seed int, n int) string {
+	retStr := ""
+	for i := 0; i < n; i++ {
+		rand.Seed(int64(seed))
+		randIndex := rand.Int() % 64
+		retStr = fmt.Sprintf(retStr + "%c", BASE64_CHARS[randIndex])
+		seed++
 	}
+	return retStr
 }
 
 // Check needed configuration setup before running server
-func securityCheck() {
+func securityCheck() error {
 	// Check security token existence before running.
+	if checkUnique(TABLE_SERVERS, getDbTag(&Servers{}, "GroupNb"), TEAM_ID) {
+		log.Println("Server token not set! Setting up...")
+		securityToken := getNewSecurityKey()
+		_, err := db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
+			TEAM_ID, securityToken, allowedOrigins[0])
+		if err != nil {
+			log.Fatalf("Critical token failure! %v\n", err)
+			return err
+		} else {
+			log.Println("Security token successfully stored in database.")
+			log.Printf("Store this security token: %s\n", securityToken)
+			return nil
+		}
+	} else {
+		return nil
+	}
 }

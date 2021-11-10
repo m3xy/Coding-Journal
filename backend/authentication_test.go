@@ -44,9 +44,10 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 
 // Purge the database.
 func purgeDB() {
-	stmts := make([]string, 2)
-	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
-	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
+	stmts := make([]string, 3)
+	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_SERVERS)
+	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
+	stmts[2] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
 	for i := range stmts {
 		_, err := db.Query(stmts[i])
 		if err != nil {
