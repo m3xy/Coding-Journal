@@ -23,7 +23,7 @@ const (
 	dbname   = "mydb"
 )
 
-var allowedOrigins = []string{"http://localhost:8080"}
+var allowedOrigins = []string{"http://localhost:3333"}
 
 func main() {
 	// Set up login and signup functions

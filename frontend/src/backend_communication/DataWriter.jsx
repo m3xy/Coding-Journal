@@ -10,6 +10,7 @@
 // URL endpoints for backend functions
 const loginEndpoint = '/login'
 const registerEndpoint = '/register'
+// const uploadEndpoint = '/upload'
 
 /**
  * Utility class with methods to send data to the backend via HTTP request
@@ -92,6 +93,13 @@ class DataWriter {
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
     }
+
+
+
+    // uploadFiles() {
+        
+    // }
+
 
     // add more writing functions here
 }

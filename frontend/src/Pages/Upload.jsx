@@ -40,9 +40,10 @@ class Upload extends React.Component {
             file => {
                 if (file) {
                     var reader = new FileReader();
-                    reader.readAsText(file, "UTF-8");
+                    reader.readAsDataURL(file);
                     reader.onload = function (e) {
                         console.log(e.target.result);
+                        this.props.uploadFiles();
                     }
                     reader.onerror = function (e) {
                         console.log("Error reading file");
@@ -64,11 +65,14 @@ class Upload extends React.Component {
         // console.log(this.state.files);
         // console.log(document.getElementById("formFile").files);
 
+        if(this.state.files.length === 1) return; /* Remove later for multiple files */
+
         let formFileList = new DataTransfer();
         let fileList = this.state.files;
 
         for(var i = 0; i < files.length; i++){
-            if(!files[i] || !files[i].name.endsWith(".zip")){
+            if(!files[i] 
+            || !(files[i].name.endsWith(".css") || files[i].name.endsWith(".java") || files[i].name.endsWith(".js"))){
                 console.log("Invalid file");
                 return;
             } 
@@ -78,7 +82,6 @@ class Upload extends React.Component {
                     console.log("Duplicate file");
                     return;
                 }
-                
             }
 
             fileList.push(files[i]);
@@ -135,7 +138,7 @@ class Upload extends React.Component {
                     <Card style={{ width: '18rem' }}>
                     <Card.Header className="text-center"><h5>Upload Files</h5></Card.Header>
                         <Form.Group controlId="formFile" className="mb-3">
-                            <Form.Control type="file" accept=".zip" onChange={this.handleChange} multiple/>
+                            <Form.Control type="file" accept=".css,.java,.js" onChange={this.handleChange}/>{/* multiple later */}
                         </Form.Group>
                         <Card.Body>
 
