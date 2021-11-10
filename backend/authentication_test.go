@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"testing"
 	"time"
 	"gopkg.in/validator.v2"
@@ -236,7 +235,7 @@ func TestSignUp(t *testing.T) {
 
 		// Check if global ID exists for user.
 		stmt = fmt.Sprintf(SELECT_ROW, getDbTag(&IdMappings{}, "GlobalId"), TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"))
-		res = db.QueryRow(stmt, strconv.Itoa(storedCreds.Id))
+		res = db.QueryRow(stmt, storedCreds.Id)
 
 		storedMapping := &IdMappings{Id: storedCreds.Id}
 		err = res.Scan(storedMapping.GlobalId)

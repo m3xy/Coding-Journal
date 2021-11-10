@@ -13,6 +13,7 @@ FROM mariadb:latest
 # -> Each .sh/.sql/.sql.gz file within this directory is run in alphabetical order
 COPY db.sql /docker-entrypoint-initdb.d/
 COPY test.sql /docker-entrypoint-initdb.d/
+COPY users.sql /docker-entrypoint-initdb.d/
 
 #Environment variable - Root user's password
 ENV MARIADB_ROOT_PASSWORD secret
