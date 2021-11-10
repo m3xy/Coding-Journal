@@ -264,35 +264,20 @@ func TestAddAuthors(t *testing.T) {
 
 		// declares test variables
 		var projectId int
-		var authorId int
-		var queriedProjectId int // gotten from db after adding author
-		var queriedAuthorId int // gotten from db after adding author
+		var authorId string
+		var queriedProjectId int   // gotten from db after adding author
+		var queriedAuthorId string // gotten from db after adding author
 
 		// adds a valid project and user to the db and filesystem so that an author can be added
 		projectId, err = addProject(testProject)
 		if err != nil {
 			return err
 		}
-		err = registerUser(author)
+		authorId, err = registerUser(author)
 		if err != nil {
 			return errors.New(fmt.Sprintf("error registering the author: %v", err))
 		}
 
-		// gets the just added user's user Id to add them as an author
-		queryUserId := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Credentials{}, "Id"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-		)
-		// queries the userId from the db
-		row := db.QueryRow(queryUserId, author.Email)
-		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error getting author Id from the db: %v", row.Err()))
-		} else if err = row.Scan(&authorId); err != nil {
-			return errors.New(fmt.Sprintf("error getting author Id from the db: %v", err))
-		}
-		
 		// adds the author to the database
 		if err = addAuthor(authorId, projectId); err != nil {
 			return errors.New(fmt.Sprintf("error adding the author to the db: %v", err))
@@ -306,12 +291,13 @@ func TestAddAuthors(t *testing.T) {
 			"userId",
 		)
 		// executes query
-		row = db.QueryRow(queryAuthor, authorId)
+		row := db.QueryRow(queryAuthor, authorId)
 		if row.Err() != nil {
 			return errors.New(fmt.Sprintf("error while querying db for authors: %v", row.Err()))
 		} else if err = row.Scan(&queriedProjectId, &queriedAuthorId); err != nil {
 			return errors.New(fmt.Sprintf("error while querying db for authors: %v", row.Err()))
 		}
+
 		// checks data returned from the database
 		if projectId != queriedProjectId {
 			return errors.New(fmt.Sprintf("Author added to the wrong project: Wanted: %d Got: %d", projectId, queriedProjectId))
@@ -323,7 +309,7 @@ func TestAddAuthors(t *testing.T) {
 		if err = clearTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while tearing down db: %v", err))
 		}
-		return nil 
+		return nil
 	}
 
 	// attemps to add an author without the correct permissions, if addAuthor succeeds, an error is thrown
@@ -335,32 +321,18 @@ func TestAddAuthors(t *testing.T) {
 
 		// declares test variables
 		var projectId int
-		var authorId int
+		var authorId string
 
 		// adds a valid project and user to the db and filesystem so that an author can be added
 		projectId, err = addProject(testProject)
 		if err != nil {
 			return err
 		}
-		err = registerUser(author)
+		authorId, err = registerUser(author)
 		if err != nil {
 			return errors.New(fmt.Sprintf("error registering the author: %v", err))
 		}
 
-		queryUserId := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Credentials{}, "Id"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-		)
-		// queries the userId from the db
-		row := db.QueryRow(queryUserId, author.Email)
-		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error getting author Id from the db: %v", row.Err()))
-		} else if err = row.Scan(&authorId); err != nil {
-			return errors.New(fmt.Sprintf("error getting author Id from the db: %v", err))
-		}
-		
 		// if adding the author is successful, throw an error
 		if err = addAuthor(authorId, projectId); err == nil {
 			return errors.New("author with permissions incorrect permissions added to authors table")
@@ -404,35 +376,20 @@ func TestAddReviewers(t *testing.T) {
 
 		// declares test variables
 		var projectId int
-		var reviewerId int
+		var reviewerId string
 		var queriedProjectId int // gotten from db after adding reviewer
-		var queriedReviewerId int // gotten from db after adding reviewer
+		var queriedReviewerId string // gotten from db after adding reviewer
 
 		// adds a valid project and user to the db and filesystem so that an reviewer can be added
 		projectId, err = addProject(testProject)
 		if err != nil {
 			return err
 		}
-		err = registerUser(reviewer)
+		reviewerId, err = registerUser(reviewer)
 		if err != nil {
 			return errors.New(fmt.Sprintf("error registering the reviewer: %v", err))
 		}
 
-		// gets the just added user's user Id to add them as an reviewer
-		queryUserId := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Credentials{}, "Id"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-		)
-		// queries the userId from the db
-		row := db.QueryRow(queryUserId, reviewer.Email)
-		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error getting reviewer Id from the db: %v", row.Err()))
-		} else if err = row.Scan(&reviewerId); err != nil {
-			return errors.New(fmt.Sprintf("error getting reviewer Id from the db: %v", err))
-		}
-		
 		// adds the reviewer to the database
 		if err = addReviewer(reviewerId, projectId); err != nil {
 			return errors.New(fmt.Sprintf("error adding the reviewer to the db: %v", err))
@@ -446,7 +403,7 @@ func TestAddReviewers(t *testing.T) {
 			"userId",
 		)
 		// executes query
-		row = db.QueryRow(queryReviewers, reviewerId)
+		row := db.QueryRow(queryReviewers, reviewerId)
 		if row.Err() != nil {
 			return errors.New(fmt.Sprintf("error while querying db for reviewers: %v", row.Err()))
 		} else if err = row.Scan(&queriedProjectId, &queriedReviewerId); err != nil {
@@ -463,7 +420,7 @@ func TestAddReviewers(t *testing.T) {
 		if err = clearTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while tearing down db: %v", err))
 		}
-		return nil 
+		return nil
 	}
 
 	// attemps to add an reviewer without the correct permissions, if addReviewer succeeds, an error is thrown
@@ -475,32 +432,18 @@ func TestAddReviewers(t *testing.T) {
 
 		// declares test variables
 		var projectId int
-		var reviewerId int
+		var reviewerId string
 
 		// adds a valid project and user to the db and filesystem so that an reviewer can be added
 		projectId, err = addProject(testProject)
 		if err != nil {
 			return err
 		}
-		err = registerUser(reviewer)
+		reviewId, err = registerUser(reviewer)
 		if err != nil {
 			return errors.New(fmt.Sprintf("error registering the reviewer: %v", err))
 		}
 
-		queryUserId := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Credentials{}, "Id"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-		)
-		// queries the userId from the db
-		row := db.QueryRow(queryUserId, reviewer.Email)
-		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error getting reviewer Id from the db: %v", row.Err()))
-		} else if err = row.Scan(&reviewerId); err != nil {
-			return errors.New(fmt.Sprintf("error getting reviewer Id from the db: %v", err))
-		}
-		
 		// if adding the reviewer is successful, throw an error
 		if err = addReviewer(reviewerId, projectId); err == nil {
 			return errors.New("reviewer with permissions incorrect permissions added to reviewers table")
@@ -589,8 +532,8 @@ func TestAddFiles(t *testing.T) {
 
 		// checks that a data file has been generated for the uploaded file
 		fileDataPath := filepath.Join(
-			TEST_FILES_DIR, 
-			fmt.Sprint(projectId), 
+			TEST_FILES_DIR,
+			fmt.Sprint(projectId),
 			DATA_DIR_NAME,
 			projectName,
 			strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath)) + ".json",
@@ -634,7 +577,7 @@ func TestAddFiles(t *testing.T) {
 		if err = clearTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while tearing down test environment: %v", err))
 		}
-		return nil 
+		return nil
 	}
 
 	testAddNValidFiles := func(files []*File) error {
@@ -660,7 +603,7 @@ func TestAddFiles(t *testing.T) {
 		if err = clearTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while tearing down test environment: %v", err))
 		}
-		return nil 
+		return nil
 	}
 
 	// runs tests
@@ -691,8 +634,8 @@ func TestAddComment(t *testing.T) {
 
 		// reads the data file into a CodeDataFile struct
 		fileDataPath := filepath.Join(
-			TEST_FILES_DIR, 
-			fmt.Sprint(testProject.Id), 
+			TEST_FILES_DIR,
+			fmt.Sprint(testProject.Id),
 			DATA_DIR_NAME,
 			testProject.Name,
 			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path)) + ".json",
@@ -713,8 +656,7 @@ func TestAddComment(t *testing.T) {
 		if comment.AuthorId != addedComment.AuthorId {
 			return errors.New(fmt.Sprintf(
 				"read in comment author which is different from that which was given. Given: %d Returned: %d", comment.AuthorId, addedComment.AuthorId))
-		} 
-
+		}
 		return nil
 	}
 
@@ -812,7 +754,7 @@ func TestGetAllProjects(t *testing.T) {
 				t.Errorf("Projects of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentProjects[k], v)
 			}
 		}
-		
+
 		// destroys the test environment
 		if err = clearTestEnvironment(); err != nil {
 			t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
@@ -854,8 +796,6 @@ func TestGetProject(t *testing.T) {
 	*/
 	testGetValidProject := func() {
 		var projectId int // holds the project id as returned from the addProject() function
-		var authorId int // holds the project author's user id
-		var reviewerId int // holds the project reviewer's user id
 
 		testFile := testFiles[0] // defines the file to use for the test here so that it can be easily changed
 		testProject := testProjects[0] // defines the project to use for the test here so that it can be easily changed
@@ -877,36 +817,15 @@ func TestGetProject(t *testing.T) {
 			t.Errorf("Error adding file to the project %v", err)
 		}
 		// adds an author and reviewer to the project
-		err = registerUser(testAuthor)
+		authorId, err := registerUser(testAuthor)
 		if err != nil {
 			t.Errorf("Error registering author in the db: %v", err)
 		}
-		err = registerUser(testReviewer)
+		reviewerId, err := registerUser(testReviewer)
 		if err != nil {
 			t.Errorf("Error registering reviewer in the db: %v", err)
 		}
 
-		// gets the author and reviewer user ids
-		queryUserId := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Credentials{}, "Id"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-		)
-		// gets author id
-		row := db.QueryRow(queryUserId, testAuthor.Email)
-		if row.Err() != nil {
-			t.Errorf("Error while getting the test author's user id: %v", row.Err())
-		} else if err = row.Scan(&authorId); err != nil {
-			t.Errorf("Error while getting the test author's user id: %v", err)
-		}
-		// gets reviewer id
-		row = db.QueryRow(queryUserId, testReviewer.Email)
-		if row.Err() != nil {
-			t.Errorf("Error while getting the test reviewer's user id: %v", row.Err())
-		} else if err = row.Scan(&reviewerId); err != nil {
-			t.Errorf("Error while getting the test reviewer's user id: %v", err)
-		}
 		// adds reviewer and author to the project
 		if err = addAuthor(authorId, projectId); err != nil {
 			t.Errorf("Error adding author to the project: %v", err)
@@ -914,7 +833,7 @@ func TestGetProject(t *testing.T) {
 		if err = addReviewer(reviewerId, projectId); err != nil {
 			t.Errorf("Error adding reviewer to the project: %v", err)
 		}
-	
+
 		// creates a request to get a project of a given id
 		client := &http.Client{}
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/project", TEST_URL, TEST_SERVER_PORT), nil)
@@ -953,10 +872,10 @@ func TestGetProject(t *testing.T) {
 			t.Errorf("Project file path lists do not match. Given: %s != Returned: %s", testProject.FilePaths[0], project.FilePaths[0])
 		// tests that the authors lists match (done directly here as there is only one author)
 		} else if (authorId != project.Authors[0]) {
-			t.Errorf("Authors do not match. Expected: %d Given: %d", authorId, testProject.Authors[0])
+			t.Errorf("Authors do not match. Expected: %s Given: %s", authorId, testProject.Authors[0])
 		// tests that the reviewer lists match (done directly here as there is only one reviewer)
 		} else if (reviewerId != project.Reviewers[0]) {
-			t.Errorf("Authors do not match. Expected: %d Given: %d", reviewerId, testProject.Reviewers[0])
+			t.Errorf("Authors do not match. Expected: %s Given: %s", reviewerId, testProject.Reviewers[0])
 		}
 
 		// destroys the filesystem and clears the db
@@ -1018,7 +937,7 @@ func TestGetFile(t *testing.T) {
 		}
 		// sets the project id of the added file to link it with the project on this end (just in case. This should happen in addFileTo)
 		testFile.ProjectId = projectId
-			
+
 		// creates a request to get a file of a given id
 		client := &http.Client{}
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/project/file", TEST_URL, TEST_SERVER_PORT), nil)
@@ -1052,7 +971,7 @@ func TestGetFile(t *testing.T) {
 			t.Errorf("File Project Id %d != %d", file.ProjectId, testFile.ProjectId)
 		// tests if the file paths are identical
 		} else if (testFile.Path != file.Path) {
-			t.Errorf("File Path %s != %s", file.Path, testFile.Path)		
+			t.Errorf("File Path %s != %s", file.Path, testFile.Path)
 		// tests that the file content is correct
 		} else if (testFile.Content != file.Content) {
 			t.Error("File Content does not match")

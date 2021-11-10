@@ -32,15 +32,16 @@ NOTES:
 package main
 
 import (
-	"os"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
-	"errors"
+	"strings"
 )
 
 // file constants, includes
@@ -81,10 +82,8 @@ func addProject(project *Project) (int, error) {
 
 	// formats query to insert the project into the db
 	insertProject := fmt.Sprintf(
-		INSERT_PROJ, 
-		TABLE_PROJECTS,
-		getDbTag(&Project{}, "Name"),
-	)
+		INSERT_PROJ, TABLE_PROJECTS,
+		getDbTag(&Project{}, "Name"))
 
 	// executes the query and gets the project id
 	row := db.QueryRow(insertProject, project.Name)
@@ -165,10 +164,10 @@ func addFileTo(file *File, projectId int) (int, error) {
 	// Adds the file to the filesystem
 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
 	fileDataPath := filepath.Join(
-		FILESYSTEM_ROOT, 
-		fmt.Sprint(projectId), 
-		DATA_DIR_NAME, 
-		file.ProjectName, 
+		FILESYSTEM_ROOT,
+		fmt.Sprint(projectId),
+		DATA_DIR_NAME,
+		file.ProjectName,
 		strings.TrimSuffix(file.Path, filepath.Ext(file.Path)) + ".json",
 	)
 	// file paths without the file name (for creating directories if they do not yet exist)
@@ -224,11 +223,9 @@ Params:
 Returns:
 	(error) : an error if one occurs, nil otherwise
 */
-func addAuthor(authorId int, projectId int) error {
+func addAuthor(authorId string, projectId int) error {
 	var err error
-	if authorId < 0 {
-		return errors.New(fmt.Sprintf("User IDs must be integers 0 or greater, not: %d", authorId))
-	} else if projectId < 0 {
+	if projectId < 0 {
 		return errors.New(fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
 	}
 
@@ -269,11 +266,9 @@ Params:
 Returns:
 	(error) : an error if one occurs, nil otherwise
 */
-func addReviewer(reviewerId int, projectId int) error {
+func addReviewer(reviewerId string, projectId int) error {
 	var err error
-	if reviewerId < 0 {
-		return errors.New(fmt.Sprintf("Reviewer IDs must be integers 0 or greater, not: %d", reviewerId))
-	} else if projectId < 0 {
+	if projectId < 0 {
 		return errors.New(fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
 	}
 
@@ -312,19 +307,19 @@ Params:
 	fileId (int) : the id of the file to add a comment to
 Returns:
 	(error) : an error if one occurs, nil otherwise
-*/ 
+*/
 func addComment(comment *Comment, fileId int) error {
 	var err error
 
 	// queries the database to get the file path so that the file's data file can be found
-	var projectId string 
+	var projectId string
 	var projectName string
 	var filePath string
 	// builds a query to get the file's name, project id, and it's project's name
 	columns := fmt.Sprintf(
-		"%s, %s, %s", 
-		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"), 
-		getDbTag(&Project{}, "Name"), 
+		"%s, %s, %s",
+		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
+		getDbTag(&Project{}, "Name"),
 		getDbTag(&File{}, "Path"),
 	)
 	queryPath := fmt.Sprintf(
@@ -332,8 +327,8 @@ func addComment(comment *Comment, fileId int) error {
 		columns,
 		TABLE_FILES,
 		TABLE_PROJECTS,
-		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"), 
-		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"), 
+		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"),
+		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
 		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
 	)
 	// executes the query
@@ -347,10 +342,10 @@ func addComment(comment *Comment, fileId int) error {
 		return err
 	}
 	dataFilePath := filepath.Join(
-		FILESYSTEM_ROOT, 
-		fmt.Sprint(projectId), 
-		DATA_DIR_NAME, 
-		projectName, 
+		FILESYSTEM_ROOT,
+		fmt.Sprint(projectId),
+		DATA_DIR_NAME,
+		projectName,
 		strings.TrimSuffix(filePath, filepath.Ext(filePath))+".json",
 	)
 
@@ -365,7 +360,7 @@ func addComment(comment *Comment, fileId int) error {
 	data.Comments = append(data.Comments, comment)
 	dataBytes, err := json.Marshal(data)
 	if err != nil {
-		return err 
+		return err
 	}
 
 	// if everything has gone correctly, the new data is written to the file
@@ -408,7 +403,7 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	// gets the file comments, and inserts them into the file structure
 	} else if err = getFileComments(file); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-	} 
+	}
 
 	// writes JSON data for the file to the HTTP connection if no error has occured
 	response, err := json.Marshal(file)
@@ -428,9 +423,9 @@ Returns:
 */
 func getFileData(file *File, fileId int) error {
 	// queries the file path, project ID, and project name from the database
-	queryColumns := fmt.Sprintf("%s, %s, %s", 
-		getDbTag(&File{}, "Path"), 
-		getDbTag(&File{}, "ProjectId"), 
+	queryColumns := fmt.Sprintf("%s, %s, %s",
+		getDbTag(&File{}, "Path"),
+		getDbTag(&File{}, "ProjectId"),
 		getDbTag(&Project{}, "Name"),
 	)
 	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
@@ -482,11 +477,12 @@ func getFileContent(file *File) error {
 }
 
 /*
-Helper function to get a file's comments from the filesystem, and use them to set the file's
-Comments field
+Helper function to get a file's comments from the filesystem, 
+and use them to set the file's Comments field
 
 Params:
-	file (*File) : a pointer to a valid File struct. All fields must be set except for content and comments
+	file (*File) : a pointer to a valid File struct. 
+	All fields must be set except for content and comments
 Returns:
 	(error) : if something goes wrong, nil otherwise
 */
@@ -568,7 +564,7 @@ This function does not return the content of the code files, rather it'll return
 the project name, ID and directory structure, so that the code files can be individually
 queried
 
-TEMP: figure out what URL to have as endpoint here
+TODO figure out what URL to have as endpoint here
 
 Response Codes:
 	200 : if the project exists and the request succeeded
@@ -625,7 +621,7 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	// writes JSON data for the project to the HTTP connection
 	response, err := json.Marshal(project)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 	}
 	w.Write(response)
@@ -640,11 +636,11 @@ Returns:
 	[]string of the author's names
 	error if something goes wrong during the query
 */
-func getProjectAuthors(projectId int) ([]int, error) {
+func getProjectAuthors(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
 		SELECT_ROW,
-		"userId", 
+		"userId",
 		TABLE_AUTHORS,
 		"projectId",
 	)
@@ -655,8 +651,8 @@ func getProjectAuthors(projectId int) ([]int, error) {
 	}
 
 	// builds the array
-	var author int
-	var authors []int
+	var author string
+	var authors []string
 	for rows.Next() {
 		// if there is an error returned by scanning the row, the error is returned
 		// without the array
@@ -677,11 +673,11 @@ Returns:
 	([]int) : of the reviewer's names
 	(error) : if something goes wrong during the query
 */
-func getProjectReviewers(projectId int) ([]int, error) {
+func getProjectReviewers(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
 		SELECT_ROW,
-		"userId", 
+		"userId",
 		TABLE_REVIEWERS,
 		"projectId",
 	)
@@ -692,8 +688,8 @@ func getProjectReviewers(projectId int) ([]int, error) {
 	}
 
 	// builds the array
-	var reviewer int
-	var reviewers []int
+	var reviewer string
+	var reviewers []string
 	for rows.Next() {
 		// if there is an error returned by scanning the row, the error is returned
 		// without the array
