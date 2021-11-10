@@ -23,7 +23,7 @@ const (
 	dbname   = "mydb"
 )
 
-var allowedOrigins = []string{"http://localhost:3333"}
+var allowedOrigins = []string{"http://localhost:3333", "http://localhost:23409"}
 
 func main() {
 	srv := setupCORSsrv()
@@ -60,7 +60,7 @@ func setupCORSsrv() *http.Server {
 	// Set up login and signup functions
 	router := mux.NewRouter()
 	router.HandleFunc("/login", logIn)
-	router.HandleFunc("/signup", signUp)
+	router.HandleFunc("/register", signUp)
 
 	// sets up handler for CORS
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})

@@ -55,6 +55,7 @@ class DataWriter {
         
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
+        console.log(JSON.stringify(data));
 
         // TEMP: return bool here to indicate success or failure#
     }
