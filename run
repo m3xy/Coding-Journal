@@ -1,0 +1,19 @@
+#! /bin/env bash
+# vim:ft=bash
+# run: Runs the project.
+
+docker start mariadb # Run database
+
+# Run backend directly if container already exists.
+if [ "$(docker container ls -a -q -f name="backend")" ]; then
+	docker start backend
+else
+	docker run --name backend --net host -d ci-backend
+fi
+
+# Run frontend directly if container already exists.
+if [ "$(docker container ls -a -q -f name="frontend")" ]; then
+	docker start frontend
+else
+	docker run --name frontend --net host -d ci-frontend
+fi

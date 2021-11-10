@@ -13,7 +13,7 @@ var db *sql.DB
 const (
 	// Constant for table operations.
 	TABLE_USERS      = "users"
-	TABLE_IDMAPPINGS = "id_mappings"
+	TABLE_IDMAPPINGS = "idMappings"
 	TEAM_ID          = "11"
 	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
 	INNER_JOIN       = "%s INNER JOIN %s"
@@ -57,7 +57,7 @@ type Credentials struct {
 // Structure for ID mappings.
 type IdMappings struct {
 	GlobalId int `json:"globalId" db:"globalId"`
-	Id       int `json:"userId" db:"id"`
+	Id       int `json:"userId" db:"localId"`
 }
 
 // Get the tag in a struct.

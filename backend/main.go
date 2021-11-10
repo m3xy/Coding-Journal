@@ -26,23 +26,10 @@ const (
 var allowedOrigins = []string{"http://localhost:3333"}
 
 func main() {
-	// Set up login and signup functions
-	router := mux.NewRouter()
-	router.HandleFunc("/login", logIn)
-	router.HandleFunc("/register", signUp)
-
-	// sets up handler for CORS
-	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
-	originsOk := handlers.AllowedOrigins(allowedOrigins)
-	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
+	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
 	dbInit(user, password, protocol, host, port, dbname)
-	// Setup HTTP server and shutdown signal notification
-	srv := &http.Server{
-		Addr:    ":3333",
-		Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
-	}
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
@@ -66,4 +53,23 @@ func main() {
 		log.Fatalf("Server Shutdown failed: %v\n", err)
 	}
 	log.Printf("Server shut down properly at %s\n", time.Now().String())
+}
+
+// Setup CORS-compatible server.
+func setupCORSsrv() *http.Server {
+	// Set up login and signup functions
+	router := mux.NewRouter()
+	router.HandleFunc("/login", logIn)
+	router.HandleFunc("/signup", signUp)
+
+	// sets up handler for CORS
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
+	originsOk := handlers.AllowedOrigins(allowedOrigins)
+	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
+
+	// Setup HTTP server and shutdown signal notification
+	return &http.Server{
+		Addr:    ":3333",
+		Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
+	}
 }

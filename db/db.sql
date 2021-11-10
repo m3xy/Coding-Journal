@@ -18,12 +18,13 @@ CREATE TABLE IF NOT EXISTS users (
   -- necessary user info
   firstName varchar(32) NOT NULL, -- first name of the user
   lastName varchar(32) NOT NULL, -- last name of the user
-  userType ENUM('publisher', 'reviewer', 'publisher-reviewer', 'user') NOT NULL DEFAULT 'user', -- role of the user in the organization
+  userType int NOT NULL DEFAULT 4, -- user type as an integer (mapped to constants in db.go)
 
   -- extra/optional user info
   phoneNumber varchar(11), -- user phone number, is optional, 11 chars to allow for + and 10 digits
   organization varchar(32), -- organization the user is associated with (research org or company)
 
+  CONSTRAINT userTypeCheck CHECK (userType IN (0, 1, 2, 3, 4)), -- makes userType into an integer backed enum
   PRIMARY KEY (id) -- makes the ID the primary key as we know it will be unique
 );
 
@@ -135,4 +136,5 @@ CREATE TABLE IF NOT EXISTS reviewers (
 /* Set view for users with global ID as ID. */
 CREATE VIEW IF NOT EXISTS globalLogins AS
 	SELECT globalId, email, password
-	FROM idMappings INNER JOIN users;
+	FROM idMappings INNER JOIN users
+	ON idMappings.localId = users.id;

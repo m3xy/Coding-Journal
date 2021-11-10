@@ -1,0 +1,10 @@
+#! /bin/env bash
+# vim:ft=bash
+
+# Go to script's directory for accurate file position.
+cd $(dirname "$(readlink -f "$0")")
+
+# Build all docker images.
+docker build -t ci-backend backend/ 
+docker build -t ci-frontend frontend/ 
+bash db/setupDB.sh
