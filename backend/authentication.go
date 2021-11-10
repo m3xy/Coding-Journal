@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//:"
-	ALPHANUMERICS = "a-zA-Z0-9"
+	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//://_//-//+//-//=//\"//'"
+	A_NUMS = "a-zA-Z0-9"
 	HASH_COST     = 8
 )
 
@@ -54,12 +54,10 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get credentials at given email, and assign it.
-	stmt := fmt.Sprintf(SELECT_ROW, "*", VIEW_LOGIN, getDbTag(&Credentials{}, "Email"))
-	res := db.QueryRow(stmt, creds.Email)
 	storedCreds := &Credentials{}
-	err = res.Scan(&storedCreds.Id, &storedCreds.Email, &storedCreds.Pw)
+	stmt := fmt.Sprintf(SELECT_ROW, "*", VIEW_LOGIN, getDbTag(&Credentials{}, "Email"))
+	err = db.QueryRow(stmt, creds.Email).Scan(&storedCreds.Id, &storedCreds.Email, &storedCreds.Pw)
 	if err != nil {
-		// Error in scan.
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusUnauthorized)
 		} else {
@@ -69,13 +67,11 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compare password to hash in database, and conclude status.
-	if comparePw(creds.Pw, storedCreds.Pw) {
-		w.WriteHeader(http.StatusOK)
-		respMap[getJsonTag(&Credentials{}, "Id")] = storedCreds.Id
-	} else {
+	if !comparePw(creds.Pw, storedCreds.Pw) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	respMap[getJsonTag(&Credentials{}, "Id")] = storedCreds.Id
 
 	// Marshal JSON and insert it into the response.
 	jsonResp, err := json.Marshal(respMap)
@@ -132,28 +128,27 @@ func registerUser(creds *Credentials) (string, error) {
 	hash := hashPw(creds.Pw)
 
 	// Make credentials insert statement for query.
-	stmt := fmt.Sprintf(INSERT_FULL,
-		TABLE_USERS,
-		getDbTag(&Credentials{}, "Pw"),
-		getDbTag(&Credentials{}, "Fname"),
-		getDbTag(&Credentials{}, "Lname"),
-		getDbTag(&Credentials{}, "Email"),
-		getDbTag(&Credentials{}, "Usertype"),
-		getDbTag(&Credentials{}, "PhoneNumber"),
-		getDbTag(&Credentials{}, "Organization"))
+	stmt := fmt.Sprintf(INSERT_FULL, TABLE_USERS,
+			getDbTag(&Credentials{}, "Email"),
+			getDbTag(&Credentials{}, "Pw"),
+			getDbTag(&Credentials{}, "Fname"),
+			getDbTag(&Credentials{}, "Lname"),
+			getDbTag(&Credentials{}, "Usertype"),
+			getDbTag(&Credentials{}, "PhoneNumber"),
+			getDbTag(&Credentials{}, "Organization"))
 
 	// Query full insert statement.
-	_, err := db.Exec(stmt,
-		hash, creds.Fname, creds.Lname, creds.Email,
+	_, err := db.Exec(stmt, creds.Email, hash, creds.Fname, creds.Lname,
 		creds.Usertype, creds.PhoneNumber, creds.Organization)
 	if err != nil {
 		return "", err
 	}
 
 	// Get new UUID from query 
-	res := db.QueryRow(
-		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email)
-	err = res.Scan(&creds.Id)
+	err = db.QueryRow(
+		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
+			TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email).
+		Scan(&creds.Id)
 	if err != nil {
 		return "", err
 	}
@@ -163,13 +158,10 @@ func registerUser(creds *Credentials) (string, error) {
 
 // Register local user to global ID mappings.
 func mapUserToGlobal(userId string) (string, error) {
-	// Check if ID exists in users table.
+	// Check if ID exists in users, and is unique in idMappings.
 	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), userId) {
 		return "", errors.New("No user with this ID!")
-	}
-
-	// Check if ID is unique in idMappings table.
-	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), userId) {
+	} else if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), userId) {
 		return "", errors.New("ID already exists in ID mappings!")
 	}
 
@@ -177,7 +169,8 @@ func mapUserToGlobal(userId string) (string, error) {
 	globalId := TEAM_ID + userId
 
 	// Insert new mapping to ID Mappings.
-	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
+	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS,
+	getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
 	_, err := db.Exec(stmt, globalId, userId)
 	if err != nil {
 		return "", err
@@ -263,13 +256,14 @@ func validpw(v interface{}, param string) error {
 	} else {
 		// Set password and character number.
 		pw := st.String()
-		restrictions := []*regexp.Regexp{regexp.MustCompile("[a-z]"), // Must contain lowercase.
-			regexp.MustCompile("^[" + ALPHANUMERICS + SPECIAL_CHARS + "]*$"), // Must contain only some characters.
-			regexp.MustCompile("[A-Z]"),                                      // Must contain uppercase.
-			regexp.MustCompile("[0-9]"),                                      // Must contain numerics.
-			regexp.MustCompile("[" + SPECIAL_CHARS + "]")}                    // Must contain special characters.
+		restrictions := []string{"[a-z]", // Must contain lowercase.
+			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
+			"[A-Z]",                               // Must contain uppercase.
+			"[0-9]",                               // Must contain numerics.
+			"[" + SPECIAL_CHARS + "]"}             // Must contain special characters.
 		for _, restriction := range restrictions {
-			if !restriction.MatchString(pw) {
+			matcher := regexp.MustCompile(restriction)
+			if !matcher.MatchString(pw) {
 				return errors.New("Restriction not matched!")
 			}
 		}
