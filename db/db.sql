@@ -9,7 +9,7 @@ table for storing basic user information and credentials. Other info like user d
 etc. can all be kept in other tables.
 */
 CREATE TABLE IF NOT EXISTS users (
-  id int NOT NULL AUTO_INCREMENT, -- id which is auto-generated during user registration
+  id varchar(64) NOT NULL DEFAULT UUID(), -- id which is auto-generated during user registration
 
   -- actual login credentials
   email varchar(100) NOT NULL UNIQUE, -- user email, functions as unique username
@@ -50,8 +50,8 @@ allows migrated users to be treated exactly the same as local users
 internal to our application.
 */
 CREATE TABLE IF NOT EXISTS idMappings (
-  localId int NOT NULL UNIQUE, -- ID stored locally in users table
-  globalId int NOT NULL UNIQUE, -- ID which gets sent to other Journals in the Federation
+  localId varchar(64) NOT NULL UNIQUE, -- ID stored locally in users table
+  globalId varchar(64) NOT NULL UNIQUE, -- ID which gets sent to other Journals in the Federation
 
   PRIMARY KEY (globalId),
   FOREIGN KEY (localId) REFERENCES users(id) -- makes local id track to the users table
@@ -97,7 +97,7 @@ exist for a given file/project
 */
 CREATE TABLE IF NOT EXISTS authors (
   projectId int NOT NULL,
-  userId int NOT NULL,
+  userId varchar(64) NOT NULL,
 
   PRIMARY KEY (projectId, userId),
   FOREIGN KEY (projectId) REFERENCES projects(id),
@@ -126,7 +126,7 @@ for a project, and be held separate from the authors.
 */
 CREATE TABLE IF NOT EXISTS reviewers (
   projectId int NOT NULL,
-  userId int NOT NULL,
+  userId varchar(64) NOT NULL,
 
   PRIMARY KEY (projectId, userId),
   FOREIGN KEY (projectId) REFERENCES projects(id),

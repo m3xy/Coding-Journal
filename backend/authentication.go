@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
-	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/validator.v2"
@@ -73,7 +72,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		// Password incorrect.
 		// Write JSON body for successful response return.
 		w.WriteHeader(http.StatusOK)
-		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.FormatInt(int64(storedCreds.Id), 10)
+		respMap[getJsonTag(&Credentials{}, "Id")] = storedCreds.Id
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -229,20 +228,19 @@ func registerUser(creds *Credentials) error {
 }
 
 // Register local user to global ID mappings.
-func mapUserToGlobal(userId int) error {
+func mapUserToGlobal(userId string) error {
 	// Check if ID exists in users table.
-	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), strconv.Itoa(userId)) {
+	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), userId) {
 		return errors.New("No user with this ID!")
 	}
 
 	// Check if ID is unique in idMappings table.
-	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), strconv.Itoa(userId)) {
+	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), userId) {
 		return errors.New("ID already exists in ID mappings!")
 	}
 
 	// Set new global ID for user.
-	globalId, _ := strconv.Atoi(TEAM_ID + strconv.Itoa(userId))
-	idMap := &IdMappings{Id: userId, GlobalId: globalId}
+	idMap := &IdMappings{Id: userId, GlobalId: TEAM_ID + userId}
 
 	// Insert new mapping to ID Mappings.
 	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
