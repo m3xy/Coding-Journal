@@ -33,6 +33,7 @@ NOTES:
 package main
 
 import (
+	"os"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -41,6 +42,7 @@ import (
 	"path/filepath"
 	"strings"
 	"strconv"
+	"errors"
 )
 
 // file constants, includes
@@ -56,99 +58,334 @@ const (
 
 ////////////////////////////////////////////////////////////////////////// HELPER FUNCTIONS FOR UPLOAD //////////////////////////////////////////////////////////////////////////
 
-// /*
-// helper function to add a project to the filesystem and database. Note that
-// the project id in this object should be set to -1 before this function is called
-// on it, because it will be set on addition to the db anyway.
+/*
+helper function to add a project to the filesystem and database. Note that
+the project id in this object should be set to -1 before this function is called
+on it, because it will be set on addition to the db anyway. The file
 
-// Params:
-// 	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
-// Returns:
-// 	(uint) : the id of the added project
-// 	(error) : if the operation fails
-// */
-// func (project *Project) Add() (uint, error) {
-// 	return 1, nil
-// }
+Params:
+	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
+Returns:
+	(int) : the id of the added project
+	(error) : if the operation fails
+*/
+func addProject(project *Project) (int, error) {
+	// error cases
+	if project.Authors == nil {
+		return 0, errors.New("Authors array cannot be nil")
+	} else if project.Reviewers == nil {
+		return 0, errors.New("Reviewers array cannot be nil")
+	}
 
-// /*
-// helper function to add a file to the filesystem and database. Note that every
-// file must have a valid project to be attached to or else the adding will fail
-// Note that when a file is added, no commments or other data are present yet, and
-// hence it's data file will be empty.
-// This function should only be accessed from inside this file.
+	// declares return values
+	var projectId int
+	var err error
 
-// Params:
-// 	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
-// 	projectId (uint) : the id of the project which the added file is to be linked 
-// 		to as an unsigned integer
-// Returns:
-// 	(uint) : the id of the added file (0 if an error occurs)
-// 	(error) : if the operation fails
-// */
-// func (file *File) AddTo(projectId uint) (uint, error) {
-// 	// declares return value variables 
-// 	var fileId int
-// 	var err error
+	// formats query to insert the project into the db
+	insertProject := fmt.Sprintf(
+		INSERT_PROJ, 
+		TABLE_PROJECTS,
+		getDbTag(&Project{}, "Name"),
+	)
 
-// 	// formats SQL query to insert the file into the db
-// 	insertFile := fmt.Sprintf(
-// 		INSERT_FILE,
-// 		TABLE_FILES,
-// 		getDbTag(&File{}, "ProjectId"),
-// 		getDbTag(&File{}, "Path"),
-// 	)
-// 	// executes the formatted query, returning the fileId 
-// 	// (note that here SQL implicitly checks that the projectId exists in the projects table via Foreign key constraint)
-// 	row := db.QueryRow(insertFile, projectId, file.Path)
-// 	if row.Err() != nil {
-// 		return 0, row.Err()
-// 	}
-// 	// gets the id from the just inserted file
-// 	if err = row.Scan(&fileId); err != nil {
-// 		return 0, err
-// 	}
+	// executes the query and gets the project id
+	row := db.QueryRow(insertProject, project.Name)
+	if row.Err() != nil {
+		return 0, row.Err()
+	}
+	// gets the id from the inserted project
+	if err = row.Scan(&projectId); err != nil {
+		return 0, err
+	}
 
-// 	// Adds the file to the filesystem
-// 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
-// 	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME, file.projectName, strings.TrimSuffix(file.Path, filepath.Ext(file.Path)) + ".json")
-// 	// file paths without the file name (for creating directories if they do not yet exist)
-// 	fileDirPath := filepath.Dir(filePath)
-// 	fileDataDirPath := filepath.Dir(fileDataPath)
+	// adds the authors and reviewers to their respective tables
+	// (here we work with the assumption that author and reviewer arrays are very small)
+	for _, authorId := range project.Authors {
+		if err = addAuthor(authorId, projectId); err != nil {
+			return 0, err
+		}
+	}
+	for _, reviewerId := range project.Reviewers {
+		if err = addReviewer(reviewerId, projectId); err != nil {
+			return 0, err
+		}
+	}
 
-// 	// populates the filesystem with a test file and data about said test file
-// 	testFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	testDataFile, err := os.OpenFile(fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// 	if err != nil {
-// 		return 0, err
-// 	}
+	// adds a project to the mock filesystem
+	projectPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), project.Name)
+	projectDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME, project.Name)
+	if err = os.MkdirAll(projectPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	}
+	if err = os.MkdirAll(projectDataPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	}
 
-// 	// writes data to the file
-// 	if _, err = testFile.Write([]byte(file.Content)); err != nil {
-// 		return 0, err
-// 	}
-// 	jsonString, err := json.Marshal(data)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	if _, err = testDataFile.Write([]byte(jsonString)); err != nil {
-// 		return 0, err
-// 	}
+	// if the action was successful, the project id of the project struct is set and returned
+	project.Id = projectId
+	return projectId, nil
+}
 
-// 	// if the operation was successful, the file id is set in the file object and the file is returned
-// 	file.Id = fileId
-// 	file.ProjectId = projectId
-// 	return fileId, nil
-// }
+/*
+helper function to add a file to the filesystem and database. Note that every
+file must have a valid project to be attached to or else the adding will fail
+Note that when a file is added, no commments or other data are present yet, and
+hence it's data file will be empty.
+This function should only be accessed from inside this file.
+
+Params:
+	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
+	projectId (int) : the id of the project which the added file is to be linked 
+		to as an unsigned integer
+Returns:
+	(int) : the id of the added file (0 if an error occurs)
+	(error) : if the operation fails
+*/
+func addFileTo(file *File, projectId int) (int, error) {
+	// declares return value variables 
+	var fileId int
+	var err error
+
+	// formats SQL query to insert the file into the db
+	insertFile := fmt.Sprintf(
+		INSERT_FILE,
+		TABLE_FILES,
+		getDbTag(&File{}, "ProjectId"),
+		getDbTag(&File{}, "Path"),
+	)
+	// executes the formatted query, returning the fileId 
+	// (note that here SQL implicitly checks that the projectId exists in the projects table via Foreign key constraint)
+	row := db.QueryRow(insertFile, projectId, file.Path)
+	if row.Err() != nil {
+		return 0, row.Err()
+	}
+	// gets the id from the just inserted file
+	if err = row.Scan(&fileId); err != nil {
+		return 0, err
+	}
+
+	// Adds the file to the filesystem
+	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
+	fileDataPath := filepath.Join(
+		FILESYSTEM_ROOT, 
+		fmt.Sprint(projectId), 
+		DATA_DIR_NAME, 
+		file.ProjectName, 
+		strings.TrimSuffix(file.Path, filepath.Ext(file.Path)) + ".json",
+	)
+	// file paths without the file name (for creating directories if they do not yet exist)
+	fileDirPath := filepath.Dir(filePath)
+	fileDataDirPath := filepath.Dir(fileDataPath)
+
+	// creates the directories for the files in case they do not yet exist
+	if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	}
+
+	// creates and opens the file and it's corresponding data file
+	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	if err != nil {
+		return 0, err
+	}
+	dataFile, err := os.OpenFile(fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	if err != nil {
+		return 0, err
+	}
+
+	// writes the file content
+	if _, err = codeFile.Write([]byte(file.Content)); err != nil {
+		return 0, err
+	}
+	// writes empty CodeFileData struct as json so that some comments and other data can be added later
+	jsonString, err := json.Marshal(&CodeFileData{})
+	if err != nil {
+		return 0, err
+	}
+	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+		return 0, err
+	}
+
+	// closes files
+	codeFile.Close()
+	dataFile.Close()
+
+	// if the operation was successful, the file id is set in the file object and the file is returned
+	file.Id = fileId
+	file.ProjectId = projectId
+	return fileId, nil
+}
+
+/*
+Adds a user to a project as an author
+
+Params:
+	authorId (int) : the id of the author to add to the project
+	projectId (int) : the id of the project to be added to
+Returns:
+	(error) : an error if one occurs, nil otherwise
+*/
+func addAuthor(authorId int, projectId int) error {
+	var err error
+	if authorId < 0 {
+		return errors.New(fmt.Sprintf("User IDs must be integers 0 or greater, not: %d", authorId))
+	} else if projectId < 0 {
+		return errors.New(fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
+	}
+
+	// checks that the author is a valid user with publisher or publisher-reviewer permissions
+	var permissions int
+	queryUserType := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&Credentials{}, "Usertype"),
+		TABLE_USERS,
+		getDbTag(&Credentials{}, "Id"),
+	)
+
+	// executes the query, only returning one row
+	row := db.QueryRow(queryUserType, authorId)
+	if row.Err() != nil {
+		return row.Err()
+	}
+	// gets the user's permissions 
+	if err := row.Scan(&permissions); err != nil {
+		return err
+	}
+
+	// checks permissions, and if they are correct, the author is added
+	if permissions != USERTYPE_PUBLISHER && permissions != USERTYPE_REVIEWER_PUBLISHER {
+		return errors.New("User must be authorized as a Publisher to be listed as a project Author")
+	} else {
+		_, err = db.Query(fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), projectId, authorId)
+		return err
+	}
+}
+
+/*
+Adds a user to a project as a reviewer
+
+Params:
+	reviewerId (int) : the id of the reviewer to add to the project
+	projectId (int) : the id of the project to be added to
+Returns:
+	(error) : an error if one occurs, nil otherwise
+*/
+func addReviewer(reviewerId int, projectId int) error {
+	var err error
+	if reviewerId < 0 {
+		return errors.New(fmt.Sprintf("Reviewer IDs must be integers 0 or greater, not: %d", reviewerId))
+	} else if projectId < 0 {
+		return errors.New(fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
+	}
+
+	// checks that the reviewer is a valid user with reviewer or publisher-reviewer permissions
+	var permissions int
+	queryUserType := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&Credentials{}, "Usertype"),
+		TABLE_USERS,
+		getDbTag(&Credentials{}, "Id"),
+	)
+	// executes the query, only returning one row
+	row := db.QueryRow(queryUserType, reviewerId)
+	if row.Err() != nil {
+		return row.Err()
+	}
+	// gets the user's permissions 
+	if err := row.Scan(&permissions); err != nil {
+		return err
+	}
+
+	// checks permissions, and if they are correct, the reviewer is added
+	if permissions != USERTYPE_REVIEWER && permissions != USERTYPE_REVIEWER_PUBLISHER {
+		return errors.New("User must be authorized as a Reviewer")
+	} else {
+		_, err = db.Query(fmt.Sprintf(INSERT_REVIEWER, TABLE_REVIEWERS), projectId, reviewerId)
+		return err
+	}
+}
+
+/*
+Adds a comment to a given file
+
+Params:
+	comment (*Comment) : The comment struct to add to the file
+	fileId (int) : the id of the file to add a comment to
+Returns:
+	(error) : an error if one occurs, nil otherwise
+*/ 
+func addComment(comment *Comment, fileId int) error {
+	var err error
+
+	// queries the database to get the file path so that the file's data file can be found
+	var projectId string 
+	var projectName string
+	var filePath string
+	// builds a query to get the file's name, project id, and it's project's name
+	columns := fmt.Sprintf(
+		"%s, %s, %s", 
+		getDbTag(&Project{}, "Id"), 
+		getDbTag(&Project{}, "Name"), 
+		getDbTag(&File{}, "Path"),
+	)
+	queryPath := fmt.Sprintf(
+		SELECT_ROW_INNER_JOIN,
+		columns,
+		TABLE_FILES,
+		TABLE_PROJECTS,
+		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"), 
+		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"), 
+		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
+	)
+	// executes the query
+	row := db.QueryRow(queryPath, fileId)
+	if row.Err() != nil {
+		return row.Err()
+	}
+
+	// if the query was successful, build the file path
+	if err = row.Scan(&projectId, &projectName, &filePath); err != nil {
+		return err
+	}
+	dataFilePath := filepath.Join(
+		FILESYSTEM_ROOT, 
+		fmt.Sprint(projectId), 
+		DATA_DIR_NAME, 
+		projectName, 
+		strings.TrimSuffix(filePath, filepath.Ext(filePath))+".json",
+	)
+
+	// reads the data file content and formats it into a CodeFileData struct
+	data := &CodeFileData{}
+	dataFileContent, err := ioutil.ReadFile(dataFilePath)
+	if err = json.Unmarshal(dataFileContent, data); err != nil {
+		return err
+	}
+
+	// adds the new comment and writes to the
+	data.Comments = append(data.Comments, *comment)
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return err 
+	}
+
+	// if everything has gone correctly, the new data is written to the file
+	return ioutil.WriteFile(dataFilePath, dataBytes, FILE_PERMISSIONS)
+}
+
 
 ////////////////////////////////////////////////////////////////////////////// FILES FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////
 
 /*
 Router function to retrieve go code files from the filesystem. This function returns
 the actual content of a code file along with comments and some data
+
+Response Codes:
+	200 : if the file exists, and no errors occurred while retrieving it
+	400 : otherwise
+Response Body:
+	A Json marshalled File struct (in db.go) with content being a Base64 string
 */
 func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
@@ -258,7 +495,7 @@ func getFileComments(file *File) error {
 	// builds the path to the file and reads its content
 	fullPath := filepath.Join(FILESYSTEM_ROOT,
 		fmt.Sprint(file.ProjectId),
-		".data", // TEMP: maybe don't hard code this?
+		DATA_DIR_NAME,
 		file.ProjectName,
 		strings.TrimSuffix(file.Path, filepath.Ext(file.Path))+".json",
 	)
@@ -283,6 +520,12 @@ func getFileComments(file *File) error {
 
 /*
 Router function to get the names and id's of every project currently saved
+
+Response Codes:
+	200 : if the action completed successfully
+	400 : otherwise
+Response Body:
+	A JSON object of form: {...<project id>:<project name>...}
 */
 func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	// set content type for return
@@ -329,6 +572,12 @@ the project name, ID and directory structure, so that the code files can be indi
 queried
 
 TEMP: figure out what URL to have as endpoint here
+
+Response Codes:
+	200 : if the project exists and the request succeeded
+	400 : otherwise
+Response Body:
+	A marshalled Project struct (contained in db.go) 
 */
 func getProject(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
@@ -394,15 +643,13 @@ Returns:
 	[]string of the author's names
 	error if something goes wrong during the query
 */
-func getProjectAuthors(projectId int) ([]string, error) {
+func getProjectAuthors(projectId int) ([]int, error) {
 	// builds the query
-	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
-		getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
-		TABLE_USERS,
+	stmt := fmt.Sprintf(
+		SELECT_ROW,
+		"userId", 
 		TABLE_AUTHORS,
-		TABLE_USERS+"."+getDbTag(&Credentials{}, "Id"),
-		TABLE_AUTHORS+"."+"userId",
-		TABLE_AUTHORS+"."+"projectId",
+		"projectId",
 	)
 	// executes query
 	rows, err := db.Query(stmt, projectId)
@@ -411,15 +658,15 @@ func getProjectAuthors(projectId int) ([]string, error) {
 	}
 
 	// builds the array
-	var fname, lname string
-	var authors []string
+	var author int
+	var authors []int
 	for rows.Next() {
 		// if there is an error returned by scanning the row, the error is returned
 		// without the array
-		if err := rows.Scan(&fname, &lname); err != nil {
+		if err := rows.Scan(&author); err != nil {
 			return nil, err
 		}
-		authors = append(authors, fname+" "+lname)
+		authors = append(authors, author)
 	}
 	return authors, nil
 }
@@ -430,18 +677,16 @@ Queries the reviewers of a given project from the database
 Params:
 	projectId (int) : the id of the project to get reviewers of
 Returns:
-	[]string of the reviewer's names
-	error if something goes wrong during the query
+	([]int) : of the reviewer's names
+	(error) : if something goes wrong during the query
 */
-func getProjectReviewers(projectId int) ([]string, error) {
+func getProjectReviewers(projectId int) ([]int, error) {
 	// builds the query
-	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
-		getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
-		TABLE_USERS,
+	stmt := fmt.Sprintf(
+		SELECT_ROW,
+		"userId", 
 		TABLE_REVIEWERS,
-		TABLE_USERS+"."+getDbTag(&Credentials{}, "Id"),
-		TABLE_REVIEWERS+"."+"userId",
-		TABLE_REVIEWERS+"."+"projectId",
+		"projectId",
 	)
 	// executes query
 	rows, err := db.Query(stmt, projectId)
@@ -450,15 +695,15 @@ func getProjectReviewers(projectId int) ([]string, error) {
 	}
 
 	// builds the array
-	var fname, lname string
-	var reviewers []string
+	var reviewer int
+	var reviewers []int
 	for rows.Next() {
 		// if there is an error returned by scanning the row, the error is returned
 		// without the array
-		if err := rows.Scan(&fname, &lname); err != nil {
+		if err := rows.Scan(&reviewer); err != nil {
 			return nil, err
 		}
-		reviewers = append(reviewers, fname+" "+lname)
+		reviewers = append(reviewers, reviewer)
 	}
 	return reviewers, nil
 }
@@ -470,8 +715,8 @@ Queries the database for file paths with the given project ID
 Params:
 	projectId (int) : the id of the project to get the files of
 Returns:
-	[]string of the file paths
-	error if something goes wrong during the query
+	([]int) : of the file paths
+	(error) : if something goes wrong during the query
 */
 func getProjectFiles(projectId int) ([]string, error) {
 	// builds the query

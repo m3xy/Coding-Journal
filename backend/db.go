@@ -26,8 +26,8 @@ const (
 	INSERT_CRED           = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
 	INSERT_PROJ           = "INSERT INTO %s (%s) VALUES (?) RETURNING id"
 	INSERT_FILE           = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
-	INSERT_AUTHOR         = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
-	INSERT_REVIEWER       = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
+	INSERT_AUTHOR         = "INSERT INTO %s VALUES (?, ?)"
+	INSERT_REVIEWER       = "INSERT INTO %s VALUES (?, ?)"
 	INSERT_FULL           = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
 	UPDATE_ROWS           = "UPDATE %s SET %s = ? WHERE %s = ?"
 	DELETE_ALL_ROWS       = "DELETE FROM %s"
@@ -48,18 +48,18 @@ type Credentials struct {
 	// Password - given as plaintext by front end, and as hash by the database.
 	Pw string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
 	// First Name.
-	Fname string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
+	Fname string `json:"firstname" db:"firstname" validate:"nonzero,max=32"`
 	// Last Name.
-	Lname string `json:"lastname" db:"lastName" validate:"nonzero,max=32"`
+	Lname string `json:"lastname" db:"lastname" validate:"nonzero,max=32"`
 	// Email Address.
 	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
 
 	// User auto incremented ID.
 	Id int `json:"userId" db:"id"`
 	// User role.
-	Usertype int `json:"usertype" db:"userType"`
+	Usertype int `json:"usertype" db:"usertype"`
 	// User phone number.
-	PhoneNumber string `json:"phonenumber" db:"phoneNumber" validate:"max=11"`
+	PhoneNumber string `json:"phonenumber" db:"phonenumber" validate:"max=11"`
 	// Organization name.
 	Organization string `json:"organization" db:"organization" validate:"max=32"`
 }
@@ -70,10 +70,10 @@ type Project struct {
 	Id int `json:"id" db:"id"`
 	// name of the project
 	Name string `json:"name" db:"projectName"` // TEMP: change to just "Name"
-	// the names of the project's reviewers
-	Reviewers []string `json:"reviewers"`
-	// the names of the project's authors
-	Authors []string `json:"authors"`
+	// the ids of the project's reviewers
+	Reviewers []int `json:"reviewers"`
+	// the ids of the project's authors
+	Authors []int `json:"authors"`
 	// file paths associated with the project
 	FilePaths []string `json:"files" db:"filePath"`
 
