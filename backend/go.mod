@@ -13,3 +13,5 @@ require (
 	github.com/gorilla/handlers v1.5.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
+
+require github.com/felixge/httpsnoop v1.0.1 // indirect

@@ -27,14 +27,12 @@ NOTES:
 - Maybe generalize the inner join query a bit more so that querying authors and reviewers is the same function?
 - refine error handling
 - Talk about what to store/return in structs for authors and reviewers (i.e. full name or ID)
-- Do we want to store base64 text or raw source code in the backend filesystem? storing base64 is more efficient
 */
 
 package main
 
 import (
 	"os"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -131,7 +129,7 @@ helper function to add a file to the filesystem and database. Note that every
 file must have a valid project to be attached to or else the adding will fail
 Note that when a file is added, no commments or other data are present yet, and
 hence it's data file will be empty.
-This function should only be accessed from inside this file.
+This function should only be accessed from inside this file (and CodeFiles_test.go).
 
 Params:
 	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
@@ -325,7 +323,7 @@ func addComment(comment *Comment, fileId int) error {
 	// builds a query to get the file's name, project id, and it's project's name
 	columns := fmt.Sprintf(
 		"%s, %s, %s", 
-		getDbTag(&Project{}, "Id"), 
+		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"), 
 		getDbTag(&Project{}, "Name"), 
 		getDbTag(&File{}, "Path"),
 	)
@@ -364,7 +362,7 @@ func addComment(comment *Comment, fileId int) error {
 	}
 
 	// adds the new comment and writes to the
-	data.Comments = append(data.Comments, *comment)
+	data.Comments = append(data.Comments, comment)
 	dataBytes, err := json.Marshal(data)
 	if err != nil {
 		return err 
@@ -385,7 +383,8 @@ Response Codes:
 	200 : if the file exists, and no errors occurred while retrieving it
 	400 : otherwise
 Response Body:
-	A Json marshalled File struct (in db.go) with content being a Base64 string
+	A Json marshalled File struct (in db.go) with content being a Base64 string (note, all
+		Base64 encoding is done on the frontend)
 */
 func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
@@ -403,7 +402,7 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	file := &File{Id: fileId}
 	if err = getFileData(file, fileId); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-	// gets the file contents, encodes it in Base64, and inserts it into the structure
+	// gets the file contents and inserts it into the structure
 	} else if err = getFileContent(file); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 	// gets the file comments, and inserts them into the file structure
@@ -457,13 +456,13 @@ func getFileData(file *File, fileId int) error {
 }
 
 /*
-Helper function to get a file's content from the filesystem, and return its Base64 encoding
+Helper function to get a file's content from the filesystem (encoded in base64), and use it to
+set the passed in *File's content field 
 
 Params:
 	file (*File) : a pointer to a valid File struct. All fields must be set except for content and comments
 Returns:
-	*string of the file's contents encoded in Base64 (uses pointer so that the file content is never
-		moved or copied)
+	(error) : if something goes wrong, nil otherwise
 */
 func getFileContent(file *File) error {
 	// builds the path to the file and reads its content
@@ -472,24 +471,24 @@ func getFileContent(file *File) error {
 		file.ProjectName,
 		file.Path,
 	)
+	// reads in the file's content
 	fileData, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		return err
 	}
-
-	// if no error occurred, encode and returns the file's content
-	file.Content = base64.StdEncoding.EncodeToString(fileData)
+	// if no error occurred, assigns file.Content a value
+	file.Content = string(fileData)
 	return nil
 }
 
 /*
-Helper function to get a file's content from the filesystem, and return its Base64 encoding
+Helper function to get a file's comments from the filesystem, and use them to set the file's
+Comments field
 
 Params:
 	file (*File) : a pointer to a valid File struct. All fields must be set except for content and comments
 Returns:
-	*string of the file's contents encoded in Base64 (uses pointer so that the file content is never
-		moved or copied)
+	(error) : if something goes wrong, nil otherwise
 */
 func getFileComments(file *File) error {
 	// builds the path to the file and reads its content
@@ -503,14 +502,12 @@ func getFileComments(file *File) error {
 	if err != nil {
 		return err
 	}
-
 	// fileData is parsed from json into the CodeFileData struct
 	codeFileData := &CodeFileData{}
 	err = json.Unmarshal(jsonData, codeFileData)
 	if err != nil {
 		return err
 	}
-
 	// if no error occurred, set the CodeFileData.comments field and return
 	file.Comments = codeFileData.Comments
 	return nil

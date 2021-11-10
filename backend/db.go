@@ -3,21 +3,28 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"reflect"
 	"time"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var db *sql.DB
 
 const (
+	TEAM_ID         = "11"
+
 	// Constant for table operations.
 	TABLE_USERS     = "users"
 	TABLE_PROJECTS  = "projects"
 	TABLE_FILES     = "files"
 	TABLE_AUTHORS   = "authors"
 	TABLE_REVIEWERS = "reviewers"
+	TABLE_CATEGORIES = "categories"
+	TABLE_IDMAPPINGS = "idMappings"
+
+	// TEMP: reconcile these
+	INNER_JOIN       = "%s INNER JOIN %s"
+	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
 
 	SELECT_ALL_ORDER_BY   = "SELECT %s FROM %s ORDER BY ?"
 	SELECT_ROW            = "SELECT %s FROM %s WHERE %s = ?"
@@ -45,23 +52,28 @@ var DB_PARAMS map[string]string = map[string]string{
 
 // Structure for user table.
 type Credentials struct {
+	// User auto incremented ID.
+	Id int `json:"userId" db:"id"`
+	// Email Address.
+	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
 	// Password - given as plaintext by front end, and as hash by the database.
 	Pw string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
 	// First Name.
-	Fname string `json:"firstname" db:"firstname" validate:"nonzero,max=32"`
+	Fname string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
 	// Last Name.
-	Lname string `json:"lastname" db:"lastname" validate:"nonzero,max=32"`
-	// Email Address.
-	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
-
-	// User auto incremented ID.
-	Id int `json:"userId" db:"id"`
+	Lname string `json:"lastname" db:"lastName" validate:"nonzero,max=32"`
 	// User role.
-	Usertype int `json:"usertype" db:"usertype"`
+	Usertype int `json:"usertype" db:"userType"`
 	// User phone number.
-	PhoneNumber string `json:"phonenumber" db:"phonenumber" validate:"max=11"`
+	PhoneNumber string `json:"phoneNumber" db:"phoneNumber" validate:"max=11"`
 	// Organization name.
 	Organization string `json:"organization" db:"organization" validate:"max=32"`
+}
+
+// Structure for ID mappings.
+type IdMappings struct {
+	GlobalId int `json:"globalId" db:"globalId"`
+	Id       int `json:"userId" db:"id"`
 }
 
 // Structure for code Projects
@@ -95,24 +107,26 @@ type File struct {
 	// content of the file encoded as a Base64 string
 	Content string `json:"content"`
 	// user comments on the file
-	Comments []Comment `json:"comments"`
+	Comments []*Comment `json:"comments"`
 	// TEMP: add more fields (i.e. reviewer comments)
 }
 
 // Structure for user comments on code
 type Comment struct {
 	// author of the comment as an id
-	AuthorID int `json:"author"`
+	AuthorId int `json:"author"`
 	// time that the comment was recorded as a string TEMP: add functionality to decode to datetime here
 	Time string `json:"time"`
+	// content of the comment as a string
+	Content string `json:"content"`
 	// replies TEMP: maybe don't allow nested replies?
-	Replies []Comment `json:"replies"`
+	Replies []*Comment `json:"replies"`
 }
 
 // structure to hold json data from data files
 type CodeFileData struct {
 	// TEMP: add IsReviewed field
-	Comments []Comment `json:"comments"`
+	Comments []*Comment `json:"comments"`
 }
 
 // Get the tag in a struct.
@@ -122,6 +136,23 @@ func getTag(v interface{}, structVar string, tag string) string {
 		return ""
 	} else {
 		return field.Tag.Get(tag)
+	}
+}
+
+// Check if a value is unique in a given table.
+func checkUnique(table string, varName string, val string) bool {
+	// Query prepared and formatted statement.
+	stmt := fmt.Sprintf(SELECT_ROW, varName, table, varName)
+	query := db.QueryRow(stmt, val)
+
+	// Scan query and check for existing rows.
+	var res interface{}
+	err := query.Scan(&res)
+	if err != sql.ErrNoRows {
+		// Table isn't empty or error occured, return false.
+		return false
+	} else {
+		return true
 	}
 }
 
@@ -166,6 +197,32 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 	db.SetConnMaxLifetime(time.Minute * 3)
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(10)
+	return nil
+}
+
+/*
+CAUTION: this function clears all data from the database, setting it
+back to the state it'd be in 
+*/
+func dbClear() error {
+	// db tables to clear ORDER MATTERS HERE
+	tablesToClear := []string{
+		TABLE_CATEGORIES,
+		TABLE_AUTHORS,
+		TABLE_REVIEWERS,
+		TABLE_FILES,
+		TABLE_PROJECTS,
+		TABLE_IDMAPPINGS,
+		TABLE_USERS,
+	}
+	// formats and executes a delete command for each table
+	for _, table := range tablesToClear {
+		stmt := fmt.Sprintf(DELETE_ALL_ROWS, table)
+		_, err := db.Exec(stmt)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
