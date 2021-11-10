@@ -3,56 +3,65 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"time"
-	"reflect"
 	_ "github.com/go-sql-driver/mysql"
+	"reflect"
+	"time"
 )
 
 var db *sql.DB
 
 const (
 	// Constant for table operations.
-	TABLE_USERS = "users"
-	SELECT_ROW  = "SELECT %s FROM %s WHERE %s = ?"
-	INSERT_CRED = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_FULL = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	UPDATE_ROWS = "UPDATE %s SET %s = ? WHERE %s = ?"
-	DELETE_ALL_ROWS = "DELETE FROM %s"
+	TABLE_USERS      = "users"
+	TABLE_IDMAPPINGS = "id_mappings"
+	TEAM_ID          = "11"
+	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
+	INNER_JOIN       = "%s INNER JOIN %s"
+	INSERT_CRED      = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
+	INSERT_FULL      = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
+	UPDATE_ROWS      = "UPDATE %s SET %s = ? WHERE %s = ?"
+	DELETE_ALL_ROWS  = "DELETE FROM %s"
 
-	USERTYPE_NIL 				= 0
-	USERTYPE_PUBLISHER 			= 1
-	USERTYPE_REVIEWER 			= 2
+	USERTYPE_NIL                = 0
+	USERTYPE_PUBLISHER          = 1
+	USERTYPE_REVIEWER           = 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
-	USERTYPE_USER 				= 4
-
+	USERTYPE_USER               = 4
 )
-var DB_PARAMS map[string]string = map[string]string {
-	"interpolateParams" : "true",
+
+var DB_PARAMS map[string]string = map[string]string{
+	"interpolateParams": "true",
 }
 
 // Structure for user table.
 type Credentials struct {
-	// Password - given as plaintext by front end, and as hash by the database.
-	Pw       		string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
-	// First Name.
-	Fname    		string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
-	// Last Name.
-	Lname    		string `json:"lastname" db:"lastName" validate:"nonzero,max=32"`
-	// Email Address.
-	Email    		string `json:"email" db:"email" validate:"nonzero,max=100"`
-
 	// User auto incremented ID.
-	Id 				int `json:"userId" db:"id"`
+	Id int `json:"userId" db:"id"`
+	// Email Address.
+	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
+	// Password - given as plaintext by front end, and as hash by the database.
+	Pw string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
+	// First Name.
+	Fname string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
+	// Last Name.
+	Lname string `json:"lastname" db:"lastName" validate:"nonzero,max=32"`
 	// User role.
-	Usertype 		int `json:"usertype" db:"userType"`
+	Usertype int `json:"usertype" db:"userType"`
 	// User phone number.
-	PhoneNumber 	string `json:"phonenumber" db:"phoneNumber" validate:"max=11"`
+	PhoneNumber string `json:"phoneNumber" db:"phoneNumber" validate:"max=11"`
 	// Organization name.
-	Organization 	string `json:"organization" db:"organization" validate:"max=32"`
+	Organization string `json:"organization" db:"organization" validate:"max=32"`
+}
+
+// Structure for ID mappings.
+type IdMappings struct {
+	GlobalId int `json:"globalId" db:"globalId"`
+	Id       int `json:"userId" db:"id"`
 }
 
 // Get the tag in a struct.
-func getTag(v interface {}, structVar string, tag string) string {
+func getTag(v interface{}, structVar string, tag string) string {
 	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
 	if !ok {
 		return ""
@@ -61,9 +70,26 @@ func getTag(v interface {}, structVar string, tag string) string {
 	}
 }
 
+// Check if a value is unique in a given table.
+func checkUnique(table string, varName string, val string) bool {
+	// Query prepared and formatted statement.
+	stmt := fmt.Sprintf(SELECT_ROW, varName, table, varName)
+	query := db.QueryRow(stmt, val)
+
+	// Scan query and check for existing rows.
+	var res interface{}
+	err := query.Scan(&res)
+	if err != sql.ErrNoRows {
+		// Table isn't empty or error occured, return false.
+		return false
+	} else {
+		return true
+	}
+}
+
 // Get the database tag for a struct.
 func getDbTag(v interface{}, structVar string) string {
-	return getTag(v, structVar , "db")
+	return getTag(v, structVar, "db")
 }
 
 // Get the database tag for a struct.
@@ -104,8 +130,6 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 	db.SetMaxIdleConns(10)
 	return nil
 }
-
-
 
 func dbCloseConnection() {
 	db.Close()

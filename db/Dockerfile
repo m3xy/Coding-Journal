@@ -1,3 +1,11 @@
+# -------
+# Dockerfile: image to create
+# Author(s):
+# ------
+
+# ------
+# Database stage
+# ------
 # Build from latest mariadb image
 FROM mariadb:latest
 
@@ -13,5 +21,5 @@ ENV MARIADB_ROOT_PASSWORD secret
 ENV MARIADB_USER myuser
 ENV MARIADB_PASSWORD mypass
 
-#Exposes Port: TCP 3306
-EXPOSE 3306
+#Exposes Port: TCP 3307
+EXPOSE 3307
