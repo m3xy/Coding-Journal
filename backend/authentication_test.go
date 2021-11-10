@@ -39,29 +39,19 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 	{Email: "test.wrongchars@test.com", Pw: "Tho/se]chars|ille\"gal", Fname: "test", Lname: "wrongchars"},
 }
 
-// Purge the database.
-func purgeDB() {
-	stmts := make([]string, 2)
-	stmts[0] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_IDMAPPINGS)
-	stmts[1] = fmt.Sprintf(DELETE_ALL_ROWS, TABLE_USERS)
-	for i := range stmts {
-		_, err := db.Query(stmts[i])
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
-}
-
 // Initialise the database for testing.
 func testInit() {
 	dbInit(user, password, protocol, host, port, TEST_DB)
-
-	purgeDB()
+	if err := dbClear(); err != nil {
+		fmt.Printf("Error occurred while clearing Db: %v", err)
+	}
 }
 
 // Close database at the end of test.
 func testEnd() {
-	purgeDB()
+	if err := dbClear(); err != nil {
+		fmt.Printf("Error occurred while clearing Db: %v", err)
+	}
 	db.Close()
 }
 
