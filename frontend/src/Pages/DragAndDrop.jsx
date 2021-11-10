@@ -1,3 +1,10 @@
+/**
+ * DragAndDrop.jsx
+ * author: 190019931
+ * 
+ * (page) Component for dragging and dropping files
+ */
+
 import React, { Component } from 'react'
 
 class DragAndDrop extends Component {

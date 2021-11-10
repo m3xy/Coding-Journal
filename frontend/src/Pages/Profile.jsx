@@ -1,3 +1,9 @@
+/**
+ * Profile.jsx
+ * author: 190019931
+ * 
+ * User's profile page
+ */
 import React from "react";
 import {Tabs, Tab} from "react-bootstrap";
 

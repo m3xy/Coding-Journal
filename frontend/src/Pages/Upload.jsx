@@ -1,6 +1,13 @@
+/**
+ * Upload.jsx
+ * author: 190019931
+ * 
+ * Page for uploading files
+ */
+
 import React from "react";
 import DragAndDrop from "./DragAndDrop";
-import {Form, Button, Card} from "react-bootstrap"
+import {Form, Button, Card, ListGroup, CloseButton} from "react-bootstrap"
 
 class Upload extends React.Component {
 
@@ -44,6 +51,7 @@ class Upload extends React.Component {
             }
         );
 
+        document.getElementById("formFile").files = new DataTransfer().files;
         this.setState({
             files: []
         });
@@ -52,8 +60,9 @@ class Upload extends React.Component {
     }
 
     handleDrop(files) {
-        console.log(files);
-        console.log( this.state.files);
+        // console.log(files);
+        // console.log(this.state.files);
+        // console.log(document.getElementById("formFile").files);
 
         let formFileList = new DataTransfer();
         let fileList = this.state.files;
@@ -63,6 +72,15 @@ class Upload extends React.Component {
                 console.log("Invalid file");
                 return;
             } 
+
+            for(var j = 0; j < fileList.length; j++){
+                if(files[i].name === fileList[j].name){
+                    console.log("Duplicate file");
+                    return;
+                }
+                
+            }
+
             fileList.push(files[i]);
             formFileList.items.add(files[i]);
         }
@@ -74,11 +92,29 @@ class Upload extends React.Component {
         
     }
 
+    removeFile(key) {
+        let formFileList = new DataTransfer();
+        let fileList = this.state.files;
+
+        for(var i = 0; i < this.state.files.length; i++){
+            formFileList.items.add(this.state.files[i]);
+        }
+        formFileList.items.remove(key);
+        fileList.splice(key, 1);
+
+        document.getElementById("formFile").files = formFileList.files;
+        this.setState({
+            files: fileList
+        });
+    }
+
 	render() {
 
         const files = this.state.files.map((file, i) => {
             return (
-                <button type="button" className="list-group-item list-group-item-action" disabled key={i}>
+                <ListGroup.Item as="li" key={i} action onClick={() => {}}>
+                    <CloseButton onClick={() => {this.removeFile(i)}}/>
+                    <br/>
                     <label>File name: {file.name}</label>
                     <br/>
                     <label>File type: {file.type}</label>
@@ -86,7 +122,7 @@ class Upload extends React.Component {
                     <label>File Size: {file.size} bytes</label>
                     <br/>
                     <label>Last modified: {new Date(file.lastModified).toUTCString()}</label>
-                </button>
+                </ListGroup.Item>
             );
         });
 
@@ -96,16 +132,6 @@ class Upload extends React.Component {
 
                 <form name="form" onSubmit={this.handleSubmit}>
                 <DragAndDrop handleDrop={this.handleDrop}>
-                    {/* <div className="custom-file">
-                        <label className="custom-file-label" htmlFor="uploadFiles">Choose/Drop files (.zip)</label>
-                        <input type="file" className="custom-file-input" id="uploadFiles" name="uploadFiles" accept=".zip" onChange={this.handleChange} multiple/>
-                    </div> */}
-
-                    {/* <label htmlFor="uploadFiles" style={lblCSS}>Choose file(s) to upload (.zip)</label>
-                    <input type="file" id="uploadFiles" name="uploadFiles" accept=".zip" onChange={this.handleChange} style={{opacity:0}} multiple/> */}
-
-
-
                     <Card style={{ width: '18rem' }}>
                     <Card.Header className="text-center"><h5>Upload Files</h5></Card.Header>
                         <Form.Group controlId="formFile" className="mb-3">
@@ -114,9 +140,9 @@ class Upload extends React.Component {
                         <Card.Body>
 
                             {this.state.files.length > 0 ? (
-                                <ul className="list-group">{files}</ul>
+                                <ListGroup>{files}</ListGroup>
                             ) : (
-                                <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><p/></Card.Text>
+                                <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><br/><br/></Card.Text>
                             )}
                         </Card.Body>
                         <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload files</Button>{' '}</Card.Footer>
