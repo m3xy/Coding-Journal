@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
-	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/validator.v2"
@@ -72,7 +71,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	// Compare password to hash in database, and conclude status.
 	if comparePw(creds.Pw, storedCreds.Pw) {
 		w.WriteHeader(http.StatusOK)
-		respMap[getJsonTag(&Credentials{}, "Id")] = strconv.Itoa(storedCreds.Id)
+		respMap[getJsonTag(&Credentials{}, "Id")] = storedCreds.Id
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -122,11 +121,11 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 
 // Register a user to the database.
 // Returns user global ID.
-func registerUser(creds *Credentials) (int, error) {
+func registerUser(creds *Credentials) (string, error) {
 	// Check email uniqueness.
 	unique := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
 	if !unique {
-		return -1, errors.New(getDbTag(&Credentials{}, "Email") + " is not unique!")
+		return "", errors.New(getDbTag(&Credentials{}, "Email") + " is not unique!")
 	}
 
 	// Hash password and store new credentials to database.
@@ -144,37 +143,44 @@ func registerUser(creds *Credentials) (int, error) {
 		getDbTag(&Credentials{}, "Organization"))
 
 	// Query full insert statement.
-	res, err := db.Exec(stmt,
+	_, err := db.Exec(stmt,
 		hash, creds.Fname, creds.Lname, creds.Email,
 		creds.Usertype, creds.PhoneNumber, creds.Organization)
 	if err != nil {
-		return -1, err
+		return "", err
 	}
-	id, err := res.LastInsertId()
-	return mapUserToGlobal(int(id))
+
+	// Get new UUID from query 
+	res := db.QueryRow(
+		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email)
+	err = res.Scan(&creds.Id)
+	if err != nil {
+		return "", err
+	}
+	return mapUserToGlobal(creds.Id)
 
 }
 
 // Register local user to global ID mappings.
-func mapUserToGlobal(userId int) (int, error) {
+func mapUserToGlobal(userId string) (string, error) {
 	// Check if ID exists in users table.
-	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), strconv.Itoa(userId)) {
-		return -1, errors.New("No user with this ID!")
+	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), userId) {
+		return "", errors.New("No user with this ID!")
 	}
 
 	// Check if ID is unique in idMappings table.
-	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), strconv.Itoa(userId)) {
-		return -1, errors.New("ID already exists in ID mappings!")
+	if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), userId) {
+		return "", errors.New("ID already exists in ID mappings!")
 	}
 
 	// Set new global ID for user.
-	globalId, _ := strconv.Atoi(TEAM_ID + strconv.Itoa(userId))
+	globalId := TEAM_ID + userId
 
 	// Insert new mapping to ID Mappings.
 	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
 	_, err := db.Exec(stmt, globalId, userId)
 	if err != nil {
-		return -1, err
+		return "", err
 	} else {
 		return globalId, nil
 	}

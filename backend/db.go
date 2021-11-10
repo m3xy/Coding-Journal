@@ -39,7 +39,7 @@ var DB_PARAMS map[string]string = map[string]string{
 // Structure for user table.
 type Credentials struct {
 	// User auto incremented ID.
-	Id int `json:"userId" db:"id"`
+	Id string `json:"userId" db:"id"`
 	// Email Address.
 	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
 	// Password - given as plaintext by front end, and as hash by the database.
@@ -58,8 +58,8 @@ type Credentials struct {
 
 // Structure for ID mappings.
 type IdMappings struct {
-	GlobalId int `json:"globalId" db:"globalId"`
-	Id       int `json:"userId" db:"localId"`
+	GlobalId string `json:"globalId" db:"globalId"`
+	Id       string `json:"userId" db:"localId"`
 }
 
 // Get the tag in a struct.

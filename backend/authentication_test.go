@@ -8,11 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"testing"
 	"time"
-
-	"github.com/gorilla/mux"
 	"gopkg.in/validator.v2"
 )
 
@@ -197,10 +194,7 @@ func TestCheckUnique(t *testing.T) {
 func TestSignUp(t *testing.T) {
 	// Set up test
 	testInit()
-	// Set up server to listen with the signup function.
-	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/signup", signUp)
-	srv := &http.Server{Addr: ":8080", Handler: muxRouter}
+	srv := setupCORSsrv()
 
 	// Start server.
 	go srv.ListenAndServe()
@@ -213,7 +207,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/signup", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/signup", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Error in request: %v/n", err)
 			return
@@ -238,7 +232,7 @@ func TestSignUp(t *testing.T) {
 
 		// Check if global ID exists for user.
 		stmt = fmt.Sprintf(SELECT_ROW, getDbTag(&IdMappings{}, "GlobalId"), TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"))
-		res = db.QueryRow(stmt, strconv.Itoa(storedCreds.Id))
+		res = db.QueryRow(stmt, storedCreds.Id)
 
 		storedMapping := &IdMappings{Id: storedCreds.Id}
 		err = res.Scan(storedMapping.GlobalId)
@@ -254,7 +248,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/signup", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/signup", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error in already registered user: %v\n", err)
 			return
@@ -275,7 +269,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/signup", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/signup", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Response error: %v\n", err.Error())
 			return
@@ -299,10 +293,7 @@ func TestSignUp(t *testing.T) {
 func TestLogIn(t *testing.T) {
 	// Set up test
 	testInit()
-	// Set up server to listen with the signup function.
-	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/login", logIn)
-	srv := &http.Server{Addr: ":8080", Handler: muxRouter}
+	srv := setupCORSsrv()
 
 	// Start server.
 	go srv.ListenAndServe()
@@ -330,8 +321,7 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/login",
-			"application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/login", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
@@ -351,7 +341,7 @@ func TestLogIn(t *testing.T) {
 		}
 
 		// Check if gotten 
-		storedId, _ := strconv.Atoi(respMap[getJsonTag(&Credentials{}, "Id")])
+		storedId, _ := respMap[getJsonTag(&Credentials{}, "Id")]
 		if (storedId != testUsers[i].Id) {
 			t.Error("IDs don't correspond!")
 			return
@@ -368,7 +358,7 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/login", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/login", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
@@ -389,7 +379,7 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:8080/login", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/login", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
