@@ -18,15 +18,6 @@ notice that in the filesystem, the .data dir structure mirrors the
 project, so that each file in the project can have a .json file storing
 its data which is named in the same way as the source code (the only difference
 being the extension)
-
-
-NOTES:
-- make function to query all project ids
-- Talk with Manuel about enpoints for the project/files (i.e. w/ ids in URL)
-- Maybe config path to dir holding projects with an environment variable?
-- Maybe generalize the inner join query a bit more so that querying authors and reviewers is the same function?
-- refine error handling
-- Talk about what to store/return in structs for authors and reviewers (i.e. full name or ID)
 */
 
 package main
@@ -53,6 +44,65 @@ const (
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for project files
 )
+
+////////////////////////////////////////////////////////////////////////// ROUTER FUNCTIONS FOR UPLOAD //////////////////////////////////////////////////////////////////////////
+
+/*
+ Router function to upload a single code file. This function is to upload code files
+ which are not members of projects. Files like this are wrapped in a dummy project with
+ the same name as the file so that they can be stored along side other projects
+
+ Responses:
+	- 200 : if action completes successfully
+*/
+func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
+	// Set up writer response.
+	w.Header().Set("Content-Type", "application/json")
+
+	// here the request should be in the form of a single depth map[string]string
+	var request map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&request)
+
+	// parses data into local variables
+	fileName := request[getJsonTag(&File{}, "Name")] // file name as a string
+	fileAuthor := request["author"] // author's user Id
+	fileContent := request[getJsonTag(&File{}, "Content")] // base64 encoding of file content
+
+	// puts parsed values into a file object and a project object
+	wrapperProject := &Project{
+		Name: fileName.(string),
+		Authors: []int{fileAuthor.(int)},
+		FilePaths: []string{fileName.(string)},
+	}
+	file := &File{
+		ProjectName: fmt.Sprint(fileName),
+		Path: fileName.(string),
+		Name: fileName.(string),
+		Content: fileContent.(string),
+	}
+
+	// adds file to the db and filesystem
+	projectId, err := addProject(wrapperProject)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	fileId, err := addFileTo(file, projectId)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	// formats json response
+	response := map[string]string {
+		"file": string(fileId),
+	}
+
+	// writes fileId as response
+	jsonString, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	w.Write([]byte(jsonString))
+}
 
 ////////////////////////////////////////////////////////////////////////// HELPER FUNCTIONS FOR UPLOAD //////////////////////////////////////////////////////////////////////////
 
