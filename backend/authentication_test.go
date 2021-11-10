@@ -210,7 +210,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/signup", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/register", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Error in request: %v/n", err)
 			return
@@ -251,7 +251,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/signup", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/register", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error in already registered user: %v\n", err)
 			return
@@ -272,7 +272,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/signup", "application/json", bytes.NewBuffer(buffer))
+		resp, err := http.Post("http://localhost:3333/register", "application/json", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Response error: %v\n", err.Error())
 			return
