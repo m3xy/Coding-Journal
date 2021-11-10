@@ -62,6 +62,13 @@ type IdMappings struct {
 	Id       int `json:"userId" db:"localId"`
 }
 
+// Structure for servers.
+type Servers struct {
+	GroupNb	int `json:"gropNumber" db:"groupNumber"`
+	Token	string `json:"token" db:"token"`
+	Url		string `json:"url" db:"url"`
+}
+
 // Get the tag in a struct.
 func getTag(v interface{}, structVar string, tag string) string {
 	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
