@@ -25,8 +25,6 @@ import (
 	"testing"
 	"errors"
 	"reflect"
-
-	"github.com/gorilla/mux"
 )
 
 const (
@@ -675,9 +673,7 @@ func TestGetAllProjects(t *testing.T) {
 	var err error
 
 	// Set up server to listen with the getFile() function.
-	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/projects", getAllProjects) // TEMP: this path could change
-	srv := &http.Server{Addr: ":"+TEST_SERVER_PORT, Handler: muxRouter}
+	srv := setupCORSsrv()
 
 	// Start server.
 	go srv.ListenAndServe()
@@ -752,9 +748,7 @@ func TestGetProject(t *testing.T) {
 	var err error
 
 	// Set up server to listen with the getFile() function.
-	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/project", getProject) // TEMP: this path could change
-	srv := &http.Server{Addr: ":"+TEST_SERVER_PORT, Handler: muxRouter}
+	srv := setupCORSsrv()
 
 	// Start server.
 	go srv.ListenAndServe()
@@ -873,9 +867,7 @@ func TestGetFile(t *testing.T) {
 	var err error
 
 	// Set up server to listen with the getFile() function.
-	muxRouter := mux.NewRouter()
-	muxRouter.HandleFunc("/project/file", getFile) // TEMP: this path could change
-	srv := &http.Server{Addr: ":"+TEST_SERVER_PORT, Handler: muxRouter}
+	srv := setupCORSsrv()
 
 	// Start server.
 	go srv.ListenAndServe()

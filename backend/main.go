@@ -61,6 +61,9 @@ func setupCORSsrv() *http.Server {
 	router := mux.NewRouter()
 	router.HandleFunc("/login", logIn)
 	router.HandleFunc("/signup", signUp)
+	router.HandleFunc("/projects", getAllProjects)
+	router.HandleFunc("/project", getProject)
+	router.HandleFunc("/project/file", getFile)
 
 	// sets up handler for CORS
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
