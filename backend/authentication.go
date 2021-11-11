@@ -149,6 +149,10 @@ func registerUser(creds *Credentials) (string, error) {
 		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
 			TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email).
 		Scan(&creds.Id)
+	// Query UUID
+	query := db.QueryRow(fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
+		TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email)
+	err = query.Scan(&creds.Id)
 	if err != nil {
 		return "", err
 	}
@@ -165,17 +169,16 @@ func mapUserToGlobal(userId string) (string, error) {
 		return "", errors.New("ID already exists in ID mappings!")
 	}
 
-	// Set new global ID for user.
-	globalId := TEAM_ID + userId
+	// Insert new mapping to ID Mappings.
+	idMap := &IdMappings{Id: userId, GlobalId: TEAM_ID + userId}
 
 	// Insert new mapping to ID Mappings.
-	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS,
-	getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
-	_, err := db.Exec(stmt, globalId, userId)
+	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
+	_, err := db.Query(stmt, idMap.GlobalId, idMap.Id)
 	if err != nil {
 		return "", err
 	} else {
-		return globalId, nil
+		return idMap.GlobalId, nil
 	}
 }
 

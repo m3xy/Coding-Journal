@@ -331,9 +331,9 @@ func TestLogIn(t *testing.T) {
 		}
 
 		// Check if gotten 
-		storedId, _ := respMap[getJsonTag(&Credentials{}, "Id")]
+		storedId := respMap[getJsonTag(&Credentials{}, "Id")]
 		if (storedId != testUsers[i].Id) {
-			t.Error("IDs don't correspond!")
+			t.Errorf("IDs don't correspond! %s vs %s", storedId, testUsers[i].Id)
 			return
 		}
 	}

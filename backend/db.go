@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	_ "github.com/go-sql-driver/mysql"
 	"reflect"
 	"time"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var db *sql.DB
@@ -15,8 +15,9 @@ const (
 	TEAM_ID         = "11"
 
 	// Constant for table operations.
-	VIEW_LOGIN		 = "globalLogins"
 	VIEW_PERMISSIONS = "globalPermissions"
+	TABLE_SERVERS	 = "servers"
+	VIEW_LOGIN		 = "globalLogins"
 	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
 	TABLE_USERS     = "users"
 	TABLE_PROJECTS  = "projects"
@@ -118,7 +119,8 @@ type File struct {
 type Comment struct {
 	// author of the comment as an id
 	AuthorId string `json:"author"`
-	// time that the comment was recorded as a string TEMP: add functionality to decode to datetime here
+	// time that the comment was recorded as a string 
+	// TEMP: add functionality to decode to datetime here
 	Time string `json:"time"`
 	// content of the comment as a string
 	Content string `json:"content"`
@@ -136,6 +138,13 @@ type AuthorsReviewers struct {
 type CodeFileData struct {
 	// TEMP: add IsReviewed field
 	Comments []*Comment `json:"comments"`
+}
+
+// Structure for servers.
+type Servers struct {
+	GroupNb	int `json:"groupNumber" db:"groupNumber"`
+	Token	string `json:"token" db:"token"`
+	Url		string `json:"url" db:"url"`
 }
 
 // Get the tag in a struct.
