@@ -21,6 +21,16 @@ const (
 	protocol = "tcp"
 	password = "secret"
 	dbname   = "mydb"
+
+	// end points for URLs
+	ENDPOINT_LOGIN = "/login"
+	ENDPOINT_SIGNUP = "/signup"
+	ENDPOINT_ALL_PROJECTS = "/projects"
+	ENDPOINT_PROJECT = "/project"
+	ENDPOINT_FILE = "/project/file"
+	ENDPOINT_NEWFILE = "/project/upload"
+	ENDPOINT_NEWCOMMENT = "/project/file/newcomment"
+	ENDPOINT_VALIDATE = "/validate"	
 )
 
 var allowedOrigins = []string{"http://localhost:3333"}
@@ -60,12 +70,14 @@ func main() {
 func setupCORSsrv() *http.Server {
 	// Set up login and signup functions
 	router := mux.NewRouter()
-	router.HandleFunc("/login", logIn)
-	router.HandleFunc("/signup", signUp)
-	router.HandleFunc("/projects", getAllProjects)
-	router.HandleFunc("/project", getProject)
-	router.HandleFunc("/project/file", getFile)
-	router.HandleFunc("/validate", tokenValidation)
+	router.HandleFunc(ENDPOINT_LOGIN, logIn)
+	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
+	router.HandleFunc(ENDPOINT_ALL_PROJECTS, getAllProjects)
+	router.HandleFunc(ENDPOINT_PROJECT, getProject)
+	router.HandleFunc(ENDPOINT_FILE, getFile)
+	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment)
+	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile)
+	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation)
 
 	// sets up handler for CORS
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})

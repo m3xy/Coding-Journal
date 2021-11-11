@@ -25,6 +25,7 @@ import (
 	"testing"
 	"errors"
 	"reflect"
+	"bytes"
 )
 
 const (
@@ -76,6 +77,12 @@ var testComments []*Comment = []*Comment{
 		AuthorId: "",
 		Time: fmt.Sprint(time.Now()),
 		Content: "Hello World",
+		Replies: []*Comment{},
+	},
+	{
+		AuthorId: "",
+		Time: fmt.Sprint(time.Now()),
+		Content: "Goodbye World",
 		Replies: []*Comment{},
 	},
 }
@@ -214,11 +221,35 @@ func TestCreateProjects(t *testing.T) {
 		return nil
 	}
 
+	testAddNilProject := func() error {
+		// initializes the test environment, returning an error if any occurs
+		if err = initTestEnvironment(); err != nil {
+			return errors.New(
+				fmt.Sprintf("error while initializing the test environment db: %v", err))
+		}
+		// tries to add a nil project
+		if _, err = addProject(nil); err == nil {
+			return errors.New("nil project added without error")
+		}
+		// tears down the test environment
+		if err = clearTestEnvironment(); err != nil {
+			return errors.New(fmt.Sprintf("error while tearing down db: %v", err))
+		}
+		return nil		
+	}
+
 	// runs tests
 	if err = testAddSingleProj(testProjects[0]); err != nil {
 		t.Errorf("testAddSingleProj failed for testProjects[0]: %v", err)
 	} else if err = testAddNProjects(testProjects[0:2]); err != nil {
 		t.Errorf("testAddNProjects failed for testProjects[0:2]: %v", err)
+	} else if err = testAddNilProject(); err != nil {
+		t.Errorf("testAddNilProject failed: %v", err)
+	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
 	}
 }
 
@@ -228,6 +259,7 @@ func TestCreateProjects(t *testing.T) {
 //	- TestCreateProject()
 //	- TestRegisterUser() (in authentication.go)
 func TestAddAuthors(t *testing.T) {
+	var err error
 	testProject := testProjects[0]
 
 	// test to add a single valid author
@@ -319,13 +351,48 @@ func TestAddAuthors(t *testing.T) {
 		return nil
 	}
 
+	// tests that a user must be registered with the db before being and author
+	testAddNonUserAuthor := func() error {
+		// initializes the test environment, returning an error if any occurs
+		if err := initTestEnvironment(); err != nil {
+			return errors.New(fmt.Sprintf("Error in test environment init: %v", err))
+		}
+
+		// declares test variables
+		var projectId int
+		authorId := "u881jafjka" // non-user fake id
+
+		// adds a valid project and user to the db and filesystem so that an author can be added
+		projectId, err := addProject(testProject)
+		if err != nil {
+			return err
+		}
+		// if adding the author is successful, throw an error
+		if err = addAuthor(authorId, projectId); err == nil {
+			return errors.New("Added unregistered user id as author.")
+		}
+
+		// clears the test environment and returns nil because the test has passed
+		if err = clearTestEnvironment(); err != nil {
+			return errors.New(fmt.Sprintf("Error on db teardown: %v", err))
+		}
+		return nil
+	}
+
 	// runs tests
 	if err := testSingleValidAuthor(testAuthors[0]); err != nil {
 		t.Errorf("Failure on testAuthors[0]: %v", err)
 	} else if err = testSingleValidAuthor(testAuthors[3]); err != nil {
 		t.Errorf("Failure on testAuthors[3]: %v", err)
 	} else if err = testAddInvalidAuthor(testAuthors[1]); err != nil {
-		t.Errorf("Failure on testAuthors[1]: %v", err)
+		t.Errorf("Added invalid author testAuthors[1]: %v", err)
+	} else if err = testAddNonUserAuthor(); err != nil {
+		t.Errorf("Added non-user author: %v", err)
+	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
 	}
 }
 
@@ -430,6 +497,34 @@ func TestAddReviewers(t *testing.T) {
 		return nil
 	}
 
+	// tests that a user must be registered with the db before being and reviewer
+	testAddNonUserReviewer := func() error {
+		// initializes the test environment, returning an error if any occurs
+		if err := initTestEnvironment(); err != nil {
+			return errors.New(fmt.Sprintf("Error in test environment init: %v", err))
+		}
+
+		// declares test variables
+		var projectId int
+		authorId := "u881jafjka" // non-user fake id
+
+		// adds a valid project and user to the db and filesystem so that an author can be added
+		projectId, err := addProject(testProject)
+		if err != nil {
+			return err
+		}
+		// if adding the author is successful, throw an error
+		if err = addReviewer(authorId, projectId); err == nil {
+			return errors.New("Added unregistered user id as reviewer.")
+		}
+
+		// clears the test environment and returns nil because the test has passed
+		if err = clearTestEnvironment(); err != nil {
+			return errors.New(fmt.Sprintf("Error on db teardown: %v", err))
+		}
+		return nil
+	}
+
 	// runs tests
 	if err = testSingleValidReviewer(testReviewers[0]); err != nil {
 		t.Errorf("testSingleValidAuthor failed for testAuthors[0]: %v", err)
@@ -437,6 +532,13 @@ func TestAddReviewers(t *testing.T) {
 		t.Errorf("testSingleValidAuthor failed for testAuthors[3]: %v", err)
 	} else if err = testAddInvalidReviewer(testReviewers[1]); err != nil {
 		t.Errorf("testAddInvalidAuthor failed for testAuthors[1]: %v", err)
+	} else if err = testAddNonUserReviewer(); err != nil {
+		t.Errorf("Added non-user reviewer: %v", err)
+	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
 	}
 }
 
@@ -577,6 +679,11 @@ func TestAddFiles(t *testing.T) {
 	} else if err = testAddNValidFiles(testFiles[0:2]); err != nil {
 		t.Errorf("testAddNValidFiles failed for testFiles[0:2]")
 	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
 }
 
 /*
@@ -661,6 +768,11 @@ func TestAddComment(t *testing.T) {
 	if err = testAddSingleValidComment(testComments[0]); err != nil {
 		t.Errorf("testAddSingleValidComment failed for testComments[0]: %v", err)
 	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
 }
 
 /*
@@ -733,6 +845,11 @@ func TestGetAllProjects(t *testing.T) {
 	if err = srv.Shutdown(context.Background()); err != nil {
 		t.Errorf("HTTP server shutdown: %v", err)
 	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
 }
 
 /*
@@ -799,7 +916,7 @@ func TestGetProject(t *testing.T) {
 
 		// creates a request to get a project of a given id
 		client := &http.Client{}
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/project", TEST_URL, TEST_SERVER_PORT), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), nil)
 		if err != nil {
 			t.Errorf("Error Retrieving Project: %v", err)
 		}
@@ -854,6 +971,11 @@ func TestGetProject(t *testing.T) {
 	if err = srv.Shutdown(context.Background()); err != nil {
 		fmt.Printf("HTTP server shutdown: %v", err)
 	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
 }
 
 /*
@@ -872,13 +994,10 @@ func TestGetFile(t *testing.T) {
 	// Start server.
 	go srv.ListenAndServe()
 
-	/*
-	Tests the basic ability of the CodeFiles module to load the data from a
-	valid file id passed to it. Simple valid one code file project
-	*/
-	func() {
+	// Tests the basic ability of the CodeFiles module to load the data from a
+	// valid file path passed to it. Simple valid one code file project
+	testGetSingleFile := func() {
 		var projectId int // stores project id returned by addProject()
-		var fileId int // stores the file id returned by addFile()
 		testFile := testFiles[0] // the test file to be added to the db and filesystem (saved here so it can be easily changed)
 		testProject := testProjects[0] // the test project to be added to the db and filesystem (saved here so it can be easily changed)
 
@@ -892,21 +1011,22 @@ func TestGetFile(t *testing.T) {
 			t.Errorf("Error adding project %s: %v", testProject.Name, err)
 		}
 		// adds a file to the database and filesystem
-		fileId, err = addFileTo(testFile, projectId)
+		_, err = addFileTo(testFile, projectId)
 		if err != nil {
 			t.Errorf("Error adding file %s: %v", testFile.Name, err)
 		}
 		// sets the project id of the added file to link it with the project on this end (just in case. This should happen in addFileTo)
 		testFile.ProjectId = projectId
 
-		// creates a request to get a file of a given id
+		// creates a request to get a file of a given path in a given project
 		client := &http.Client{}
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/project/file", TEST_URL, TEST_SERVER_PORT), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), nil)
 		if err != nil {
 			t.Errorf("Error creating request: %v\n", err)
 		}
-		// sets a custom header "file": file id to indicate which file is being queried to the server
-		req.Header.Set("file", fmt.Sprint(fileId))
+		// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
+		req.Header.Set("file", testFile.Path)
+		req.Header.Set("project", fmt.Sprint(projectId))
 		resp, err := client.Do(req)
 		if err != nil {
 			t.Error(err)
@@ -924,10 +1044,10 @@ func TestGetFile(t *testing.T) {
 			t.Error(err)
 		}
 
-		// tests that the file id is correct
-		if (testFile.Id != file.Id) {
-			t.Errorf("File ID %d != %d", file.Id, testFile.Id)
-		// tests for file name correctness
+		// tests that the file path
+		if (testFile.Path != file.Path) {
+			t.Errorf("File Path %d != %d", file.Id, testFile.Id)
+		// tests for project id correctness
 		} else if (testFile.ProjectId != file.ProjectId) {
 			t.Errorf("File Project Id %d != %d", file.ProjectId, testFile.ProjectId)
 		// tests if the file paths are identical
@@ -942,10 +1062,225 @@ func TestGetFile(t *testing.T) {
 		if err = clearTestEnvironment(); err != nil {
 			t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
 		}
-	}()
+	}
+
+	// runs tests
+	testGetSingleFile()
 
 	// Close server.
 	if err = srv.Shutdown(context.Background()); err != nil {
 		fmt.Printf("HTTP server shutdown: %v", err)
+	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
+}
+
+/*
+tests uploading single files via HTTP
+
+Test Depends on:
+	- TestCreateProject() 
+	- TestAddFile()
+*/
+func TestUploadSingleFile(t *testing.T) {
+
+	var err error
+
+	// the test values added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0] 
+	testAuthor := testAuthors[0]
+
+	// Set up server to listen with the getFile() function.
+	srv := setupCORSsrv()
+
+	// Start server.
+	go srv.ListenAndServe()
+
+	// Tests the basic ability of the CodeFiles module to upload a single file
+	// code project
+	testAddSingleFile := func() {
+		// initializes the filesystem and db
+		if err = initTestEnvironment(); err != nil {
+			t.Errorf("Error initializing the test environment %s", err)
+		}
+
+		// registers test author
+		testAuthor.Id, err = registerUser(testAuthor)
+		if err != nil {
+			t.Errorf("failed to add test author: %v", err)
+		}
+
+		// formats the request body to send to the server to add a comment
+		client := &http.Client{}
+		reqBody, err := json.Marshal(map[string]string {
+			"author": testAuthor.Id,
+			getJsonTag(&File{}, "Name"): testFile.Name,
+			getJsonTag(&File{}, "Content"): testFile.Content,
+		})
+		if err != nil {
+			t.Errorf("Error formatting request body: %v", err)
+		}
+
+		// formats and executes the request
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWFILE), bytes.NewBuffer(reqBody))
+		if err != nil {
+			t.Errorf("Error creating request: %v", err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Errorf("Error executing request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// tests that the result is as desired
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Error: %d", resp.StatusCode)
+		}
+
+		// destroys the filesystem and db
+		if err = clearTestEnvironment(); err != nil {
+			t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
+		}
+	}
+
+	// runs tests
+	testAddSingleFile()
+
+	// Close server.
+	if err = srv.Shutdown(context.Background()); err != nil {
+		fmt.Printf("HTTP server shutdown: %v", err)
+	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
+}
+
+/*
+Tests router function to upload comments to a given file
+
+Test Depends On:
+	- TestAddComment()
+	- TestCreateProject()
+	- TestAddFiles()
+*/
+func TestUploadUserComment(t *testing.T) {
+	var err error
+
+	// the test values added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0] 
+	testProject := testProjects[0]
+	testAuthor := testAuthors[0]
+	testComment := testComments[0] 
+
+	// Set up server to listen with the getFile() function.
+	srv := setupCORSsrv()
+
+	// Start server.
+	go srv.ListenAndServe()
+
+	// adds a comment to a test project
+
+	// Tests the basic ability of the CodeFiles module to add a comment to a file
+	// given file path and project id
+	testAddSingleComment := func() {
+		var projectId int // stores project id returned by addProject()
+
+		// initializes the filesystem and db
+		if err = initTestEnvironment(); err != nil {
+			t.Errorf("Error initializing the test environment %s", err)
+		}
+
+		// adds test values to the db and filesystem
+		projectId, err = addProject(testProject)
+		if err != nil {
+			t.Errorf("error occurred while adding testProject: %v", err)
+		}
+		_, err = addFileTo(testFile, projectId)
+		if err != nil {
+			t.Errorf("error occurred while adding testProject: %v", err)
+		}
+		testAuthor.Id, err = registerUser(testAuthor)
+		if err != nil {
+			t.Errorf("error occurred while adding testAuthor: %v", err)
+		}
+		testComment.AuthorId = testAuthor.Id // sets test comment author
+
+		// formats the request body to send to the server to add a comment
+		client := &http.Client{}
+		reqBody, err := json.Marshal(map[string]string {
+			"projectId":fmt.Sprint(projectId),
+			"filePath":testFile.Path,
+			"author":testAuthor.Id,
+			"content":testComment.Content,
+		})
+		if err != nil {
+			t.Errorf("Error formatting request body: %v", err)
+		}
+
+		// formats and executes the request
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWCOMMENT), bytes.NewBuffer(reqBody))
+		if err != nil {
+			t.Errorf("Error creating request: %v", err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Errorf("Error executing request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// tests that the result is as desired
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Error: %d", resp.StatusCode)
+		}
+
+		// tests that the comment was added properly
+		fileDataPath := filepath.Join(
+			TEST_FILES_DIR,
+			fmt.Sprint(testProject.Id),
+			DATA_DIR_NAME,
+			testProject.Name,
+			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path)) + ".json",
+		)
+		fileBytes, err := ioutil.ReadFile(fileDataPath)
+		if err != nil {
+			t.Errorf("failed to read data file: %v", err)
+		}
+		codeData := &CodeFileData{}
+		err = json.Unmarshal(fileBytes, codeData)
+		if err != nil {
+			t.Errorf("failed to unmarshal code file data: %v", err)
+		}
+
+		// extracts the last comment (most recently added) from the comments and checks for equality with 
+		// the passed in comment
+		addedComment := codeData.Comments[len(codeData.Comments) - 1]
+		if testComment.AuthorId != addedComment.AuthorId {
+			t.Errorf("Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
+		} else if testComment.Content != addedComment.Content {
+			t.Errorf("Comment content mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
+		}
+
+		// destroys the filesystem and db
+		if err = clearTestEnvironment(); err != nil {
+			t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
+		}
+	}
+
+	// runs tests
+	testAddSingleComment()
+
+	// Close server.
+	if err = srv.Shutdown(context.Background()); err != nil {
+		fmt.Printf("HTTP server shutdown: %v", err)
+	}
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
 	}
 }

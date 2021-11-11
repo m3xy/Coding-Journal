@@ -33,6 +33,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // file constants, includes
@@ -68,10 +69,11 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	wrapperProject := &Project{
 		Name: fileName.(string),
 		Authors: []string{fileAuthor.(string)},
+		Reviewers: []string{},
 		FilePaths: []string{fileName.(string)},
 	}
 	file := &File{
-		ProjectName: fmt.Sprint(fileName),
+		ProjectName: fileName.(string),
 		Path: fileName.(string),
 		Name: fileName.(string),
 		Content: fileContent.(string),
@@ -81,24 +83,75 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	projectId, err := addProject(wrapperProject)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
-	fileId, err := addFileTo(file, projectId)
+	_, err = addFileTo(file, projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-	}
-
-	// formats json response
-	response := map[string]string {
-		"file": fmt.Sprint(fileId),
+		return
 	}
 
 	// writes fileId as response
-	jsonString, err := json.Marshal(response)
+	jsonString, err := json.Marshal(wrapperProject)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	w.Write([]byte(jsonString))
 }
+
+// upload comment router function. Takes in a POST request and
+// uses it to add a comment to the given file
+//
+// Responses:
+// 	200 : comment was added succesfully
+// 	400 : if the comment was not sent in the proper format
+func uploadUserComment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var request map[string]interface{}
+	json.NewDecoder(r.Body).Decode(&request)
+
+	// gets project Id and file path
+	filePath := request["filePath"].(string)
+	projectId, err := strconv.Atoi(request["projectId"].(string))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	// Parse data into Comment structure
+	comment := &Comment{
+		AuthorId: request[getJsonTag(&Comment{}, "AuthorId")].(string), // authors user id
+		Time: fmt.Sprint(time.Now()),
+		Content: request[getJsonTag(&Comment{}, "Content")].(string),
+		Replies: nil, // replies are nil upon insertion
+	}
+
+	// gets the fileId from the database
+	var fileId int
+	queryFileId := fmt.Sprintf(
+		SELECT_ROW_TWO_CONDITION,
+		getDbTag(&File{}, "Id"),
+		TABLE_FILES,
+		getDbTag(&File{}, "ProjectId"),
+		getDbTag(&File{}, "Path"),
+	)
+	row := db.QueryRow(queryFileId, projectId, filePath)
+	if row.Err() != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else if err = row.Scan(&fileId); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// adds the comment to the file, returns code OK if successful
+	if err = addComment(comment, fileId); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 
 // -----
 // Upload Helper Functions
@@ -113,7 +166,11 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 //	(error) : if the operation fails
 func addProject(project *Project) (int, error) {
 	// error cases
-	if project.Authors == nil {
+	if project == nil {
+		return 0, errors.New("Project cannot be nil")
+	} else if project.Name == "" {
+		return 0, errors.New("Project.Name must be set to a valid string")
+	} else if project.Authors == nil {
 		return 0, errors.New("Authors array cannot be nil")
 	} else if project.Reviewers == nil {
 		return 0, errors.New("Reviewers array cannot be nil")
@@ -201,13 +258,9 @@ func addFileTo(file *File, projectId int) (int, error) {
 
 	// Add file to filesystem
 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
-	fileDataPath := filepath.Join(
-		FILESYSTEM_ROOT,
-		fmt.Sprint(projectId),
-		DATA_DIR_NAME,
-		file.ProjectName,
-		strings.TrimSuffix(file.Path, filepath.Ext(file.Path)) + ".json",
-	)
+	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
+		file.ProjectName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
+
 	// file paths without the file name (to create dirs if they don't exist yet)
 	fileDirPath := filepath.Dir(filePath)
 	fileDataDirPath := filepath.Dir(fileDataPath)
@@ -274,7 +327,6 @@ func addAuthor(authorId string, projectId int) error {
 		VIEW_PERMISSIONS,
 		getDbTag(&IdMappings{}, "GlobalId"),
 	)
-
 	// executes the query, only returning one row
 	row := db.QueryRow(queryUserType, authorId)
 	if row.Err() != nil {
@@ -345,6 +397,22 @@ func addReviewer(reviewerId string, projectId int) error {
 //	(error) : an error if one occurs, nil otherwise
 func addComment(comment *Comment, fileId int) error {
 	var err error
+	// error cases
+	if comment == nil {
+		return errors.New("Comment cannot be nil")
+	} else if fileId < 0 {
+		return errors.New("File Id must be > 0")
+	}
+
+	// // checks that the author of the comment is a registered user (either here or in another journal)
+	// var authorExists bool
+	// queryAuthorExists := fmt.Sprintf(
+	// 	SELECT_EXISTS,
+	// 	"*",
+	// 	TABLE_IDMAPPINGS,
+	// 	getDbTag(&IdMappings{}, "globalId"),
+	// )
+	// row := db.QueryRow(queryAuthorExists, comment.AuthorId)
 
 	// queries the database to get the file path so that the file's data file can be found
 	var projectId string
@@ -376,13 +444,8 @@ func addComment(comment *Comment, fileId int) error {
 	if err = row.Scan(&projectId, &projectName, &filePath); err != nil {
 		return err
 	}
-	dataFilePath := filepath.Join(
-		FILESYSTEM_ROOT,
-		fmt.Sprint(projectId),
-		DATA_DIR_NAME,
-		projectName,
-		strings.TrimSuffix(filePath, filepath.Ext(filePath))+".json",
-	)
+	dataFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
+		projectName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
 
 	// reads the data file content and formats it into a CodeFileData struct
 	data := &CodeFileData{}
@@ -404,11 +467,13 @@ func addComment(comment *Comment, fileId int) error {
 
 
 // -----
-// File functionality
+// Retrieve File functionality
 // -----
 
 // Retrieve code files from filesystem. Returns
-// file content with comments and metadata.
+// file content with comments and metadata. Recieves
+// a FilePath and projectId as header strings in 
+// the request
 // 
 // Response Codes:
 //	200 : File exists, getter success.
@@ -416,128 +481,153 @@ func addComment(comment *Comment, fileId int) error {
 // Response Body:
 // 		file: object
 // 			fileName: string
-// 			base64value: string
+//			filePath: string
+//			projectName: string
+//			projectId: int
+// 			content: string
+// 			comments: object
+// 				author: int
+//				time: datetime string
+//				content: string
+//				replies: object (same as comments)			
 func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// creates an empty project and gets the project id from the Get request header. If the header
-	// does not contain an int value, return BadRequest header
-	fileId, err := strconv.Atoi(r.Header.Get("file")) // TEMP: don't hard code this
+	// gets the file path and project Id from the header
+	filePath := string(r.Header.Get("file"))
+	projectId, err := strconv.Atoi(r.Header.Get("project")) // TEMP: don't hard code this
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
-	// TEMP: add different responses for error handling here
-	// populates all fields for the file except content and comments by querying the db
-	file := &File{Id: fileId}
-	if err = getFileData(file, fileId); err != nil {
+	// queries the project name from the database
+	var projectName string
+	queryProjectName := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&Project{}, "Name"),
+		TABLE_PROJECTS,
+		getDbTag(&Project{}, "Id"),
+	)
+	row := db.QueryRow(queryProjectName, projectId)
+	if row.Err() != nil {
 		w.WriteHeader(http.StatusBadRequest)
-	// gets the file contents and inserts it into the structure
-	} else if err = getFileContent(file); err != nil {
+		return
+	} else if err = row.Scan(&projectName); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-	// gets the file comments, and inserts them into the file structure
-	} else if err = getFileComments(file); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// builds path to the file and it's corresponding data file using the queried project name
+	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), projectName, filePath)
+	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
+		projectName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
+
+	// constructs a file object to return to the frontend
+	file := &File{
+		ProjectId: projectId,
+		ProjectName: projectName,
+		Path: filePath,
+		Name: filepath.Base(filePath),
+	}
+	// gets file content and comments
+	file.Content, err = getFileContent(fullFilePath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	file.Comments, err = getFileComments(fullDataPath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	// writes JSON data for the file to the HTTP connection if no error has occured
 	response, err := json.Marshal(file)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	w.Write(response)
 }
 
-// Populate File instance's fields by querying the SQL database
-//
-// Params:
-//	file (*File) : a File structure instance to populate the fields of
-// Returns:
-//	error if something goes wrong while querying the DB
-func getFileData(file *File, fileId int) error {
-	// queries the file path, project ID, and project name from the database
-	queryColumns := fmt.Sprintf("%s, %s, %s",
-		getDbTag(&File{}, "Path"),
-		getDbTag(&File{}, "ProjectId"),
-		getDbTag(&Project{}, "Name"),
-	)
-	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
-		queryColumns,
-		TABLE_FILES,
-		TABLE_PROJECTS,
-		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"),
-		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
-		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
-	)
+// // Populate File instance's fields by querying the SQL database
+// //
+// // Params:
+// //	file (*File) : a File structure instance to populate the fields of
+// // Returns:
+// //	error if something goes wrong while querying the DB
+// func getFileData(file *File, fileId int) error {
+// 	// queries the file path, project ID, and project name from the database
+// 	queryColumns := fmt.Sprintf("%s, %s, %s",
+// 		getDbTag(&File{}, "Path"),
+// 		getDbTag(&File{}, "ProjectId"),
+// 		getDbTag(&Project{}, "Name"),
+// 	)
+// 	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
+// 		queryColumns,
+// 		TABLE_FILES,
+// 		TABLE_PROJECTS,
+// 		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"),
+// 		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
+// 		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
+// 	)
 
-	// executes query (should only return 1 row via unique constraint on file ids)
-	row := db.QueryRow(stmt, fileId)
-	if err := row.Scan(&file.Path, &file.ProjectId, &file.ProjectName); err != nil {
-		return err
-	}
+// 	// executes query (should only return 1 row via unique constraint on file ids)
+// 	row := db.QueryRow(stmt, fileId)
+// 	if err := row.Scan(&file.Path, &file.ProjectId, &file.ProjectName); err != nil {
+// 		return err
+// 	}
 
-	// sets the file name in the object using the path
-	file.Name = filepath.Base(file.Path)
+// 	// sets the file name in the object using the path
+// 	file.Name = filepath.Base(file.Path)
 
-	// if no error has occurred, return nil
-	return nil
-}
+// 	// if no error has occurred, return nil
+// 	return nil
+// }
 
 // Get file content from filesystem. 
 // Params:
-// 	file (*File): pointer to File struct. All fields but content & comments must be set.
+// 	filePath (string): an absolute path to the file
 // Returns:
 // 	(error) : if something goes wrong, nil otherwise
-func getFileContent(file *File) error {
-	// builds the path to the file and reads its content
-	fullPath := filepath.Join(FILESYSTEM_ROOT,
-		fmt.Sprint(file.ProjectId),
-		file.ProjectName,
-		file.Path,
-	)
+func getFileContent(filePath string) (string, error) {
 	// reads in the file's content
-	fileData, err := ioutil.ReadFile(fullPath)
+	fileData, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// if no error occurred, assigns file.Content a value
-	file.Content = string(fileData)
-	return nil
+	return string(fileData), nil
 }
 
-// Get a file's comments from filesystem, and set Comments field
+// Get a file's comments from filesystem, and returns a []*Comments
+// array
 // 
 // Params:
-//	file (*File) : a pointer to a valid File struct. 
-//	All fields must be set except for content and comments
+//	dataPath (string) : a path to the data file containing a given file's meta-data
 //Returns:
+//  ([]*Comment) : the file's comments
 //	(error) : if something goes wrong, nil otherwise
-func getFileComments(file *File) error {
-	// builds the path to the file and reads its content
-	fullPath := filepath.Join(FILESYSTEM_ROOT,
-		fmt.Sprint(file.ProjectId),
-		DATA_DIR_NAME,
-		file.ProjectName,
-		strings.TrimSuffix(file.Path, filepath.Ext(file.Path))+".json",
-	)
-	jsonData, err := ioutil.ReadFile(fullPath)
+func getFileComments(dataPath string) ([]*Comment, error) {
+	// reads the file contents into a json string
+	jsonData, err := ioutil.ReadFile(dataPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// fileData is parsed from json into the CodeFileData struct
 	codeFileData := &CodeFileData{}
 	err = json.Unmarshal(jsonData, codeFileData)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// if no error occurred, set the CodeFileData.comments field and return
-	file.Comments = codeFileData.Comments
-	return nil
+	// if no error occurred, return comments
+	return codeFileData.Comments, nil
 }
 
 // -----
-// Project functionality
+// Retreieve Project functionality
 // -----
 
 // Router function to get the names and id's of every project currently saved
@@ -560,6 +650,7 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(stmt, getDbTag(&Project{}, "Name"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	// parses query result into { id : project name } mappings
@@ -571,6 +662,7 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 		// without the array
 		if err := rows.Scan(&id, &projectName); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		projects[id] = projectName
 	}
@@ -579,6 +671,7 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	jsonString, err := json.Marshal(projects)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	// writes json string
@@ -603,6 +696,7 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	projectId, err := strconv.Atoi(r.Header.Get("project")) // TEMP: don't hard code this
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	// creates a project with the given ID
 	project := &Project{Id: projectId}
@@ -619,25 +713,30 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	if row.Err() != nil {
 		fmt.Println(row.Err())
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	// if no project name was returned for the given project id
 	if err := row.Scan(&project.Name); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	// gets project authors, reviewers, and file paths (as relpaths from the root of the project)
 	project.Authors, err = getProjectAuthors(projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	project.Reviewers, err = getProjectReviewers(projectId)
 	if err != nil {
 		fmt.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	project.FilePaths, err = getProjectFiles(projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	// writes JSON data for the project to the HTTP connection
@@ -645,6 +744,7 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	w.Write(response)
 }

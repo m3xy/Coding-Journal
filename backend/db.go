@@ -31,6 +31,8 @@ const (
 	INNER_JOIN       = "%s INNER JOIN %s"
 	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
 
+	SELECT_EXISTS         = "EXISTS (SELECT %s FROM %s WHERE %s = ?)"
+	SELECT_ROW_TWO_CONDITION = "SELECT %s FROM %s WHERE %s = ? AND %s = ?"
 	SELECT_ALL_ORDER_BY   = "SELECT %s FROM %s ORDER BY ?"
 	SELECT_ROW_INNER_JOIN = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"
 	SELECT_ROW_ORDER_BY   = "SELECT %s FROM %s ORDER BY ? WHERE %s = ?"
@@ -120,7 +122,6 @@ type Comment struct {
 	// author of the comment as an id
 	AuthorId string `json:"author"`
 	// time that the comment was recorded as a string 
-	// TEMP: add functionality to decode to datetime here
 	Time string `json:"time"`
 	// content of the comment as a string
 	Content string `json:"content"`
