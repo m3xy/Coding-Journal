@@ -140,11 +140,6 @@ class Code extends React.Component {
   render() {
     return (
     <div className="renderCode">
-        <Helmet>
-            <meta charSet="utf-8" />
-            <title>My Title</title>
-            <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
-        </Helmet>
         <h2 style={{textAlign: 'center',}} >Circular Queue</h2>
         <h4 style={{textAlign: 'center',}}>Author:  </h4>
         <CommentModal/>

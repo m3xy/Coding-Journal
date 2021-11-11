@@ -98,6 +98,8 @@ class DataWriter {
         request.send(JSON.stringify(data))
     }
 
+    
+
 
     /**
      * Sends a POST request to the go server to upload (project) files
