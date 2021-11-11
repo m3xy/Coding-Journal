@@ -141,9 +141,9 @@ class DataWriter {
             Promise.all(filePromises) //Encode all files to upload into base 64 before uploading
                 .then(() => {
                     let data = {
-                        authorID : authorID,
-                        projectName : projectName,
-                        base64Value : files[0]
+                        author : authorID,
+                        name : projectName,
+                        content : files[0]
                     }
     
                     console.log(data);

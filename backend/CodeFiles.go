@@ -83,11 +83,13 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	projectId, err := addProject(wrapperProject)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println(err)
 		return
 	}
 	_, err = addFileTo(file, projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println(err)
 		return
 	}
 
