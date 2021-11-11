@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { Button } from 'react-bootstrap';
 import  { Redirect } from 'react-router-dom'
 
 class Home extends React.Component {
@@ -14,35 +15,53 @@ class Home extends React.Component {
         super(props);
 
         this.state = {
-            userID: null
+            userID: this.getUserID()
         }
+
+        this.logout= this.logout.bind(this);
     }
 
     componentDidMount() {
         
+    }
+
+    getUserID() {
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
         for(let i = 0; i < cookies.length; i++){    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
             if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
-                this.setState({
-                    userID: cookie[1].trim()
-                })
-                break;
+                return JSON.parse(cookie[1].trim()).userId;
             }
         }
+        return null;
+    }
+
+    logout() {
+        var cookies = document.cookie.split(';'); 
+    
+        // The "expire" attribute of every cookie is set to "Thu, 01 Jan 1970 00:00:00 GMT".
+        for (var i = 0; i < cookies.length; i++) {
+            document.cookie = cookies[i] + "=;expires=" + new Date(0).toUTCString();  //Setting all cookies expiry date to be a past date.
+        }
+
+        this.setState({
+            userID : null
+        })
     }
 
     render() {
+    
+        console.log(this.state.userID);
 
-        const userLoggedIn = this.state.userID;
-
-        if(userLoggedIn === null) {
+        if(this.getUserID() === null) {
             return (<Redirect to ='/login' />);
         }
 
         return (
-            <div className="col-md-6 col-md-offset-3">
+            <div>
                 Logged in.
+                <br/>
+                <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
             </div>
         );
     }

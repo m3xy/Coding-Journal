@@ -13,6 +13,7 @@ import { history } from "../_helpers"
 const loginEndpoint = '/login'
 const registerEndpoint = '/register'
 const uploadEndpoint = '/upload'
+const profileEndpoint = '/profile'
 
 /**
  * Utility class with methods to send data to the backend via HTTP request
@@ -101,8 +102,6 @@ class DataWriter {
         request.send(JSON.stringify(data))
     }
 
-    
-
 
     /**
      * Sends a POST request to the go server to upload (project) files
@@ -166,6 +165,39 @@ class DataWriter {
                     console.log(error);
                 })
         })
+    }
+
+
+    getProfile(userID) {
+        return new Promise((resolve, reject) => {
+
+
+            // return resolve({                 //Testing
+            //     firstName: "John",
+            //     lastName: "Doe",
+            //     email: "JohnDoe@gmail.com",
+            //     userType: 4,
+            //     phoneNumber: "012345678910",
+            //     organisation: "Lonely guy",
+            //     projects : {
+            //         1: "proj1",
+            //         2 : "proj2"
+            //     }
+            // });
+
+            var request = new XMLHttpRequest();
+            request.open('GET', this.backend_host + ':' + this.backend_port + profileEndpoint + "/" + userID);
+
+            // get a callback when the server responds
+            request.addEventListener('load', () => {
+                //Return response for code page
+                resolve(request.responseText);
+            })
+
+            request.onerror = reject;
+            request.send();
+        }) 
+
     }
 
 
