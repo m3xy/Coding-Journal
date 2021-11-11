@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import  { Redirect } from 'react-router-dom'
 
 class Home extends React.Component {
 
@@ -30,8 +30,6 @@ class Home extends React.Component {
                 break;
             }
         }
-
-        console.log("Not logged in");
     }
 
     render() {
@@ -39,19 +37,12 @@ class Home extends React.Component {
         const userLoggedIn = this.state.userID;
 
         if(userLoggedIn === null) {
-            return (<div>
-                
-            </div>);
+            return (<Redirect to ='/login' />);
         }
 
         return (
             <div className="col-md-6 col-md-offset-3">
-                
-                <h1>Hi</h1>
-                <p>You're logged in with React!!</p>
-                <p>
-                    <Link to="/login">Logout</Link>
-                </p>
+                Logged in.
             </div>
         );
     }
