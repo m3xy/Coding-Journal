@@ -30,6 +30,7 @@ func main() {
 
 	// Initialise database with production credentials.
 	dbInit(user, password, protocol, host, port, dbname)
+	securityCheck()
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
