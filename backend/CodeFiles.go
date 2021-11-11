@@ -38,7 +38,7 @@ import (
 // file constants, includes
 const (
 	// TEMP: hard coded for testing
-	FILESYSTEM_ROOT = "/home/ewp3/Documents/CS3099/project-code/testProjects/" // path to the root directory holding all project directories TEMP: maybe set with an env variable?
+	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all project directories TEMP: maybe set with an env variable?
 	DATA_DIR_NAME = ".data" // name of the hidden data dir to be put into the project directory structure
 
 	// File Mode Constants
@@ -46,33 +46,28 @@ const (
 	FILE_PERMISSIONS = 0644 // permissions for project files
 )
 
-////////////////////////////////////////////////////////////////////////// ROUTER FUNCTIONS FOR UPLOAD //////////////////////////////////////////////////////////////////////////
+// -----
+// Upload router functions
+// -----
 
-/*
- Router function to upload a single code file. This function is to upload code files
- which are not members of projects. Files like this are wrapped in a dummy project with
- the same name as the file so that they can be stored along side other projects
-
- Responses:
-	- 200 : if action completes successfully
-*/
+// Upload lone code file to system. File is wrapped to dummy project with same name.
+//
+// Responses:
+//	- 200 : if action completes successfully
 func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
-	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
-
-	// here the request should be in the form of a single depth map[string]string
 	var request map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&request)
 
-	// parses data into local variables
+	// Parse data into local variables
 	fileName := request[getJsonTag(&File{}, "Name")] // file name as a string
 	fileAuthor := request["author"] // author's user Id
 	fileContent := request[getJsonTag(&File{}, "Content")] // base64 encoding of file content
 
-	// puts parsed values into a file object and a project object
+	// Put parsed values into a file object and a project object
 	wrapperProject := &Project{
 		Name: fileName.(string),
-		Authors: []int{fileAuthor.(int)},
+		Authors: []string{fileAuthor.(string)},
 		FilePaths: []string{fileName.(string)},
 	}
 	file := &File{
@@ -94,7 +89,7 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 
 	// formats json response
 	response := map[string]string {
-		"file": string(fileId),
+		"file": fmt.Sprint(fileId),
 	}
 
 	// writes fileId as response
@@ -105,19 +100,17 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(jsonString))
 }
 
-////////////////////////////////////////////////////////////////////////// HELPER FUNCTIONS FOR UPLOAD //////////////////////////////////////////////////////////////////////////
+// -----
+// Upload Helper Functions
+// -----
 
-/*
-helper function to add a project to the filesystem and database. Note that
-the project id in this object should be set to -1 before this function is called
-on it, because it will be set on addition to the db anyway. The file
-
-Params:
-	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
-Returns:
-	(int) : the id of the added project
-	(error) : if the operation fails
-*/
+// Add project to filesystem and database. 
+// Note: project ID is set by this function.
+// Params:
+//	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
+// Returns:
+//	(int) : the id of the added project
+//	(error) : if the operation fails
 func addProject(project *Project) (int, error) {
 	// error cases
 	if project.Authors == nil {
@@ -173,21 +166,16 @@ func addProject(project *Project) (int, error) {
 	return projectId, nil
 }
 
-/*
-helper function to add a file to the filesystem and database. Note that every
-file must have a valid project to be attached to or else the adding will fail
-Note that when a file is added, no commments or other data are present yet, and
-hence it's data file will be empty.
-This function should only be accessed from inside this file (and CodeFiles_test.go).
-
-Params:
-	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
-	projectId (int) : the id of the project which the added file is to be linked 
-		to as an unsigned integer
-Returns:
-	(int) : the id of the added file (0 if an error occurs)
-	(error) : if the operation fails
-*/
+// Add file into project, and store it to FS and DB.
+// Note: Need valid project. No comments on file creation.
+//
+// Params:
+//	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
+//	projectId (int) : the id of the project which the added file is to be linked 
+//		to as an unsigned integer
+// Returns:
+//	(int) : the id of the added file (0 if an error occurs)
+//	(error) : if the operation fails
 func addFileTo(file *File, projectId int) (int, error) {
 	// declares return value variables 
 	var fileId int
@@ -211,7 +199,7 @@ func addFileTo(file *File, projectId int) (int, error) {
 		return 0, err
 	}
 
-	// Adds the file to the filesystem
+	// Add file to filesystem
 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
 	fileDataPath := filepath.Join(
 		FILESYSTEM_ROOT,
@@ -220,23 +208,24 @@ func addFileTo(file *File, projectId int) (int, error) {
 		file.ProjectName,
 		strings.TrimSuffix(file.Path, filepath.Ext(file.Path)) + ".json",
 	)
-	// file paths without the file name (for creating directories if they do not yet exist)
+	// file paths without the file name (to create dirs if they don't exist yet)
 	fileDirPath := filepath.Dir(filePath)
 	fileDataDirPath := filepath.Dir(fileDataPath)
 
-	// creates the directories for the files in case they do not yet exist
+	// mkdir files's dir in case they don't yet exist
 	if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
 	} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
 	}
 
-	// creates and opens the file and it's corresponding data file
+	// Create and open file and it's corresponding data file
 	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
 		return 0, err
 	}
-	dataFile, err := os.OpenFile(fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	dataFile, err := os.OpenFile(
+		fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
 		return 0, err
 	}
@@ -245,7 +234,7 @@ func addFileTo(file *File, projectId int) (int, error) {
 	if _, err = codeFile.Write([]byte(file.Content)); err != nil {
 		return 0, err
 	}
-	// writes empty CodeFileData struct as json so that some comments and other data can be added later
+	// Write empty CodeFileData as json so comments and other data can be added later.
 	jsonString, err := json.Marshal(&CodeFileData{})
 	if err != nil {
 		return 0, err
@@ -258,25 +247,23 @@ func addFileTo(file *File, projectId int) (int, error) {
 	codeFile.Close()
 	dataFile.Close()
 
-	// if the operation was successful, the file id is set in the file object and the file is returned
+	// Operation was successful ==> file Id set in file object and file returned.
 	file.Id = fileId
 	file.ProjectId = projectId
 	return fileId, nil
 }
 
-/*
-Adds a user to a project as an author
-
-Params:
-	authorId (int) : the id of the author to add to the project
-	projectId (int) : the id of the project to be added to
-Returns:
-	(error) : an error if one occurs, nil otherwise
-*/
+// Add a user to a project as an author.
+//
+// Params:
+//	authorId (int) : the id of the author to add to the project
+//	projectId (int) : the id of the project to be added to
+// Returns:
+//	(error) : an error if one occurs, nil otherwise
 func addAuthor(authorId string, projectId int) error {
-	var err error
 	if projectId < 0 {
-		return errors.New(fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
+		return errors.New(
+			fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
 	}
 
 	// checks that the author is a valid user with publisher or publisher-reviewer permissions
@@ -284,8 +271,8 @@ func addAuthor(authorId string, projectId int) error {
 	queryUserType := fmt.Sprintf(
 		SELECT_ROW,
 		getDbTag(&Credentials{}, "Usertype"),
-		TABLE_USERS,
-		getDbTag(&Credentials{}, "Id"),
+		VIEW_PERMISSIONS,
+		getDbTag(&IdMappings{}, "GlobalId"),
 	)
 
 	// executes the query, only returning one row
@@ -300,22 +287,22 @@ func addAuthor(authorId string, projectId int) error {
 
 	// checks permissions, and if they are correct, the author is added
 	if permissions != USERTYPE_PUBLISHER && permissions != USERTYPE_REVIEWER_PUBLISHER {
-		return errors.New("User must be authorized as a Publisher to be listed as a project Author")
+		return errors.New("User must be authorized as Publisher" +
+		"to be listed as project Author")
 	} else {
-		_, err = db.Query(fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), projectId, authorId)
+		_, err := db.Query(
+			fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), projectId, authorId)
 		return err
 	}
 }
 
-/*
-Adds a user to a project as a reviewer
-
-Params:
-	reviewerId (int) : the id of the reviewer to add to the project
-	projectId (int) : the id of the project to be added to
-Returns:
-	(error) : an error if one occurs, nil otherwise
-*/
+// Add a user to a project as a reviewer
+// 
+// Params:
+//	reviewerId (int) : the id of the reviewer to add to the project
+//	projectId (int) : the id of the project to be added to
+// Returns:
+//	(error) : an error if one occurs, nil otherwise
 func addReviewer(reviewerId string, projectId int) error {
 	var err error
 	if projectId < 0 {
@@ -327,8 +314,8 @@ func addReviewer(reviewerId string, projectId int) error {
 	queryUserType := fmt.Sprintf(
 		SELECT_ROW,
 		getDbTag(&Credentials{}, "Usertype"),
-		TABLE_USERS,
-		getDbTag(&Credentials{}, "Id"),
+		VIEW_PERMISSIONS,
+		getDbTag(&IdMappings{}, "GlobalId"),
 	)
 	// executes the query, only returning one row
 	row := db.QueryRow(queryUserType, reviewerId)
@@ -349,15 +336,13 @@ func addReviewer(reviewerId string, projectId int) error {
 	}
 }
 
-/*
-Adds a comment to a given file
-
-Params:
-	comment (*Comment) : The comment struct to add to the file
-	fileId (int) : the id of the file to add a comment to
-Returns:
-	(error) : an error if one occurs, nil otherwise
-*/
+// Add a comment to a given file
+//
+// Params:
+//	comment (*Comment) : The comment struct to add to the file
+//	fileId (int) : the id of the file to add a comment to
+// Returns:
+//	(error) : an error if one occurs, nil otherwise
 func addComment(comment *Comment, fileId int) error {
 	var err error
 
@@ -418,19 +403,20 @@ func addComment(comment *Comment, fileId int) error {
 }
 
 
-////////////////////////////////////////////////////////////////////////////// FILES FUNCTIONALITY //////////////////////////////////////////////////////////////////////////////
+// -----
+// File functionality
+// -----
 
-/*
-Router function to retrieve go code files from the filesystem. This function returns
-the actual content of a code file along with comments and some data
-
-Response Codes:
-	200 : if the file exists, and no errors occurred while retrieving it
-	400 : otherwise
-Response Body:
-	A Json marshalled File struct (in db.go) with content being a Base64 string (note, all
-		Base64 encoding is done on the frontend)
-*/
+// Retrieve code files from filesystem. Returns
+// file content with comments and metadata.
+// 
+// Response Codes:
+//	200 : File exists, getter success.
+//	400 : otherwise
+// Response Body:
+// 		file: object
+// 			fileName: string
+// 			base64value: string
 func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
@@ -463,14 +449,12 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-/*
-Function to populate File instance's fields by querying the SQL database
-
-Params:
-	file (*File) : a File structure instance to populate the fields of
-Returns:
-	error if something goes wrong while querying the DB
-*/
+// Populate File instance's fields by querying the SQL database
+//
+// Params:
+//	file (*File) : a File structure instance to populate the fields of
+// Returns:
+//	error if something goes wrong while querying the DB
 func getFileData(file *File, fileId int) error {
 	// queries the file path, project ID, and project name from the database
 	queryColumns := fmt.Sprintf("%s, %s, %s",
@@ -500,15 +484,11 @@ func getFileData(file *File, fileId int) error {
 	return nil
 }
 
-/*
-Helper function to get a file's content from the filesystem (encoded in base64), and use it to
-set the passed in *File's content field 
-
-Params:
-	file (*File) : a pointer to a valid File struct. All fields must be set except for content and comments
-Returns:
-	(error) : if something goes wrong, nil otherwise
-*/
+// Get file content from filesystem. 
+// Params:
+// 	file (*File): pointer to File struct. All fields but content & comments must be set.
+// Returns:
+// 	(error) : if something goes wrong, nil otherwise
 func getFileContent(file *File) error {
 	// builds the path to the file and reads its content
 	fullPath := filepath.Join(FILESYSTEM_ROOT,
@@ -526,16 +506,13 @@ func getFileContent(file *File) error {
 	return nil
 }
 
-/*
-Helper function to get a file's comments from the filesystem, 
-and use them to set the file's Comments field
-
-Params:
-	file (*File) : a pointer to a valid File struct. 
-	All fields must be set except for content and comments
-Returns:
-	(error) : if something goes wrong, nil otherwise
-*/
+// Get a file's comments from filesystem, and set Comments field
+// 
+// Params:
+//	file (*File) : a pointer to a valid File struct. 
+//	All fields must be set except for content and comments
+//Returns:
+//	(error) : if something goes wrong, nil otherwise
 func getFileComments(file *File) error {
 	// builds the path to the file and reads its content
 	fullPath := filepath.Join(FILESYSTEM_ROOT,
@@ -559,17 +536,17 @@ func getFileComments(file *File) error {
 	return nil
 }
 
-////////////////////////////////////////////////////////// PROJECTS FUNCTIONALITY ///////////////////////////////////////////////////////////
+// -----
+// Project functionality
+// -----
 
-/*
-Router function to get the names and id's of every project currently saved
-
-Response Codes:
-	200 : if the action completed successfully
-	400 : otherwise
-Response Body:
-	A JSON object of form: {...<project id>:<project name>...}
-*/
+// Router function to get the names and id's of every project currently saved
+//
+// Response Codes:
+//	200 : if the action completed successfully
+//	400 : otherwise
+// Response Body:
+//	A JSON object of form: {...<project id>:<project name>...}
 func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
@@ -608,20 +585,15 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonString)
 }
 
-/*
-Router function to retrieve a code project to be displayed on the web interface.
-This function does not return the content of the code files, rather it'll return
-the project name, ID and directory structure, so that the code files can be individually
-queried
-
-TODO figure out what URL to have as endpoint here
-
-Response Codes:
-	200 : if the project exists and the request succeeded
-	400 : otherwise
-Response Body:
-	A marshalled Project struct (contained in db.go) 
-*/
+// Get project for display on frontend. ID included for file and comment queries.
+//
+// TODO figure out what URL to have as endpoint here
+//
+// Response Codes:
+//	200 : if the project exists and the request succeeded
+//	400 : otherwise
+// Response Body:
+//	A marshalled Project struct (contained in db.go) 
 func getProject(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
@@ -677,22 +649,20 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-/*
-Queries the authors of a given project from the database
-
-Params:
-	projectId (int) : the id of the project to get authors of
-Returns:
-	[]string of the author's names
-	error if something goes wrong during the query
-*/
+// Query the authors of a given project from the database
+//
+// Params:
+//	projectId (int) : the id of the project to get authors of
+// Returns:
+//	[]string of the author's names
+//	error if something goes wrong during the query
 func getProjectAuthors(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
 		SELECT_ROW,
-		"userId",
+		getDbTag(&AuthorsReviewers{}, "Id"),
 		TABLE_AUTHORS,
-		"projectId",
+		getDbTag(&AuthorsReviewers{}, "ProjectId"),
 	)
 	// executes query
 	rows, err := db.Query(stmt, projectId)
@@ -714,22 +684,20 @@ func getProjectAuthors(projectId int) ([]string, error) {
 	return authors, nil
 }
 
-/*
-Queries the reviewers of a given project from the database
-
-Params:
-	projectId (int) : the id of the project to get reviewers of
-Returns:
-	([]int) : of the reviewer's names
-	(error) : if something goes wrong during the query
-*/
+// Query the reviewers of a given project from the database
+//
+// Params:
+//	projectId (int) : the id of the project to get reviewers of
+// Returns:
+//	([]int) : of the reviewer's names
+//	(error) : if something goes wrong during the query
 func getProjectReviewers(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
 		SELECT_ROW,
-		"userId",
+		getDbTag(&AuthorsReviewers{}, "Id"),
 		TABLE_REVIEWERS,
-		"projectId",
+		getDbTag(&AuthorsReviewers{}, "ProjectId"),
 	)
 	// executes query
 	rows, err := db.Query(stmt, projectId)
@@ -751,16 +719,14 @@ func getProjectReviewers(projectId int) ([]string, error) {
 	return reviewers, nil
 }
 
-/*
-Queries the database for file paths with the given project ID
-(i.e. files in the project)
-
-Params:
-	projectId (int) : the id of the project to get the files of
-Returns:
-	([]int) : of the file paths
-	(error) : if something goes wrong during the query
-*/
+// Queries the database for file paths with the given project ID
+// (i.e. files in the project)
+//
+// Params:
+//	projectId (int) : the id of the project to get the files of
+//Returns:
+//	([]int) : of the file paths
+//	(error) : if something goes wrong during the query
 func getProjectFiles(projectId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(SELECT_ROW,

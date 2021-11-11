@@ -16,6 +16,7 @@ const (
 
 	// Constant for table operations.
 	VIEW_LOGIN		 = "globalLogins"
+	VIEW_PERMISSIONS = "globalPermissions"
 	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
 	TABLE_USERS     = "users"
 	TABLE_PROJECTS  = "projects"
@@ -85,9 +86,9 @@ type Project struct {
 	// name of the project
 	Name string `json:"name" db:"projectName"` // TEMP: change to just "Name"
 	// the ids of the project's reviewers
-	Reviewers []int `json:"reviewers"`
+	Reviewers []string `json:"reviewers"`
 	// the ids of the project's authors
-	Authors []int `json:"authors"`
+	Authors []string `json:"authors"`
 	// file paths associated with the project
 	FilePaths []string `json:"files" db:"filePath"`
 
@@ -116,13 +117,19 @@ type File struct {
 // Structure for user comments on code
 type Comment struct {
 	// author of the comment as an id
-	AuthorId int `json:"author"`
+	AuthorId string `json:"author"`
 	// time that the comment was recorded as a string TEMP: add functionality to decode to datetime here
 	Time string `json:"time"`
 	// content of the comment as a string
 	Content string `json:"content"`
 	// replies TEMP: maybe don't allow nested replies?
 	Replies []*Comment `json:"replies"`
+}
+
+// Structure for authors and reviewers
+type AuthorsReviewers struct {
+	ProjectId int `json:"projectId" db:"projectId"`
+	Id string `json:"id" db:"userId"`
 }
 
 // structure to hold json data from data files
@@ -206,10 +213,8 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 }
 
 // Close a database connection.
-/*
-CAUTION: this function clears all data from the database, setting it
-back to the state it'd be in 
-*/
+// WARNING: this function clears all data from the database, setting it
+// back to the state it'd be in 
 func dbClear() error {
 	// db tables to clear ORDER MATTERS HERE
 	tablesToClear := []string{
@@ -232,6 +237,7 @@ func dbClear() error {
 	return nil
 }
 
+// Close database connection.
 func dbCloseConnection() {
 	db.Close()
 }

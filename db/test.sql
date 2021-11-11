@@ -49,7 +49,7 @@ allows migrated users to be treated exactly the same as local users
 internal to our application.
 */
 CREATE TABLE IF NOT EXISTS idMappings (
-  localId varchar(64) NOT NULL UNIQUE, -- ID stored locally in users table
+  localId varchar(64) UNIQUE, -- ID stored locally in users table
   globalId varchar(64) NOT NULL UNIQUE, -- ID which gets sent to other Journals in the Federation
 
   PRIMARY KEY (globalId),
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS authors (
 
   PRIMARY KEY (projectId, userId),
   FOREIGN KEY (projectId) REFERENCES projects(id),
-  FOREIGN KEY (userId) REFERENCES users(id)
+  FOREIGN KEY (userId) REFERENCES idMappings(globalId)
 );
 
 
@@ -129,11 +129,17 @@ CREATE TABLE IF NOT EXISTS reviewers (
 
   PRIMARY KEY (projectId, userId),
   FOREIGN KEY (projectId) REFERENCES projects(id),
-  FOREIGN KEY (userId) REFERENCES users(id)
+  FOREIGN KEY (userId) REFERENCES idMappings(globalId)
 );
 
 /* Set view for users with global ID as ID. */
 CREATE VIEW IF NOT EXISTS globalLogins AS
 	SELECT globalId, email, password
+	FROM idMappings INNER JOIN users
+	ON idMappings.localId = users.id;
+
+/* View for user permissions linked with global ID. */
+CREATE VIEW IF NOT EXISTS globalPermissions AS
+	SELECT globalId, userType
 	FROM idMappings INNER JOIN users
 	ON idMappings.localId = users.id;

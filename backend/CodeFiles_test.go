@@ -34,7 +34,7 @@ const (
 	// TEST_DB = "testdb" // TEMP: declared in authentication_test.go
 
 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
-	TEST_FILES_DIR = "/home/ewp3/Documents/CS3099/project-code/testProjects/" // environment variable set to this value
+	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
 
 	TEST_URL = "http://localhost"
 	TEST_SERVER_PORT = "3333"
@@ -42,10 +42,10 @@ const (
 
 // Constants for testing
 var testProjects []*Project = []*Project{
-	{Id: -1, Name: "testProject1", Reviewers: []int{},
-		Authors: []int{}, FilePaths: []string{"testFile1.txt"}},
-	{Id: -1, Name: "testProject2", Reviewers: []int{},
-		Authors: []int{}, FilePaths: []string{"testFile2.txt"}},
+	{Id: -1, Name: "testProject1", Reviewers: []string{},
+		Authors: []string{}, FilePaths: []string{"testFile1.txt"}},
+	{Id: -1, Name: "testProject2", Reviewers: []string{},
+		Authors: []string{}, FilePaths: []string{"testFile2.txt"}},
 }
 var testFiles []*File = []*File{
 	{Id: -1, ProjectId: -1, ProjectName: "testProject1", Path: "testFile1.txt",
@@ -75,7 +75,7 @@ var testReviewers []*Credentials = []*Credentials {
 }
 var testComments []*Comment = []*Comment{
 	{
-		AuthorId: -1,
+		AuthorId: "",
 		Time: fmt.Sprint(time.Now()),
 		Content: "Hello World",
 		Replies: []*Comment{},
@@ -85,36 +85,25 @@ var testFileData []*CodeFileData = []*CodeFileData{
 	{Comments: testComments},
 }
 
-/*
-initializes and clears the test database and filesystem, deleting and pre-existing entries
-*/
+// Initialise and clear filesystem and database.
 func initTestEnvironment() error {
-	// initializes the database
 	dbInit(user, password, protocol, host, port, TEST_DB)
-	// empties all db tables
-	if err := dbClear(); err != nil {
-		return err
+	dbClear()
+	if _, err := os.Stat(TEST_FILES_DIR); err == nil {
+		os.RemoveAll(TEST_FILES_DIR)
 	}
-	// initializes the test filesystem
 	if err := os.Mkdir(TEST_FILES_DIR, DIR_PERMISSIONS); err != nil {
 		return err
 	}
 	return nil
 }
 
-/*
-Function to remove the test filesystem and clear the database for the next test
-*/
+// Clear filesystem and database before closing connections.
 func clearTestEnvironment() error {
-	// deletes the test filesystem
 	if err := os.RemoveAll(TEST_FILES_DIR); err != nil {
 		return err
 	}
-	// empties all db tables
-	if err := dbClear(); err != nil {
-		return err
-	}
-	// closes the connection to the db
+	dbClear()
 	db.Close()
 	return nil
 }
@@ -139,44 +128,34 @@ func TestCreateProjects(t *testing.T) {
 
 		// checks manually that the project was added correctly
 		var projectName string
-		authors := []int{}
-		reviewers := []int{}
+		authors := []string{}
+		reviewers := []string{}
 		// builds SQL Queries for testing the added values
-		queryProjectName := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Project{}, "Name"),
-			TABLE_PROJECTS,
-			getDbTag(&Project{}, "Id"),
-		)
-		queryAuthors := fmt.Sprintf(
-			SELECT_ROW,
-			"userId",
-			TABLE_AUTHORS,
-			"projectId",
-		)
-		queryReviewers := fmt.Sprintf(
-			SELECT_ROW,
-			"userId",
-			TABLE_REVIEWERS,
-			"projectId",
-		)
+		queryProjectName := fmt.Sprintf( SELECT_ROW, getDbTag(&Project{}, "Name"),
+			TABLE_PROJECTS, getDbTag(&Project{}, "Id"))
+		queryAuthors := fmt.Sprintf( SELECT_ROW, "userId",
+			TABLE_AUTHORS, "projectId")
+		queryReviewers := fmt.Sprintf( SELECT_ROW, "userId",
+		TABLE_REVIEWERS, "projectId")
 
 		// tests that the project name was added correctly
 		row := db.QueryRow(queryProjectName, projectId)
 		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error querying project name: %v", row.Err()))
+			return errors.New(fmt.Sprintf("Error in project name query: %v", row.Err()))
 		} else if err = row.Scan(&projectName); err != nil {
 			return err
 		} else if testProject.Name != projectName {
-			return errors.New(fmt.Sprintf("project names do not match. Entered: %s Gotten Back: %s", testProject.Name, projectName))
+			return errors.New(
+				fmt.Sprintf("Project name mismatch. %s vs %s",
+				testProject.Name, projectName))
 		}
 
 		// tests that the authors were added correctly
 		rows, err := db.Query(queryAuthors, projectId)
 		if err != nil {
-			return errors.New(fmt.Sprintf("error querying project Authors: %v", err))
+			return errors.New(fmt.Sprintf("Error querying project Authors: %v", err))
 		}
-		var author int
+		var author string
 		for rows.Next() {
 			rows.Scan(&author)
 			authors = append(authors, author)
@@ -190,7 +169,7 @@ func TestCreateProjects(t *testing.T) {
 		if err != nil {
 			return errors.New(fmt.Sprintf("error querying project Reviewers: %v", err))
 		}
-		var reviewer int
+		var reviewer string
 		for rows.Next() {
 			rows.Scan(&reviewer)
 			reviewers = append(reviewers, reviewer)
@@ -205,7 +184,7 @@ func TestCreateProjects(t *testing.T) {
 	testAddSingleProj := func(project *Project) error {
 		// initializes the test environment, returning an error if any occurs
 		if err = initTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
+			return errors.New(fmt.Sprintf("Error in testdb init: %v", err))
 		}
 		// adds the project and tests that it was added properly
 		if err = testAddProject(project); err != nil {
@@ -213,7 +192,7 @@ func TestCreateProjects(t *testing.T) {
 		}
 		// tears down the test environment
 		if err = clearTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while tearing down db: %v", err))
+			return errors.New(fmt.Sprintf("Error in db teardown: %v", err))
 		}
 		return nil
 	}
@@ -222,7 +201,8 @@ func TestCreateProjects(t *testing.T) {
 	testAddNProjects := func(projects []*Project) error {
 		// initializes the test environment, returning an error if any occurs
 		if err = initTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
+			return errors.New(
+				fmt.Sprintf("error while initializing the test environment db: %v", err))
 		}
 		for _, project := range projects {
 			if err = testAddProject(project); err != nil {
@@ -244,65 +224,61 @@ func TestCreateProjects(t *testing.T) {
 	}
 }
 
-/*
- This function tests adding authors to a given project.
-
- Test Depends on:
-	- TestCreateProject()
-	- TestRegisterUser() (in authentication.go)
-*/
+// This function tests adding authors to a given project.
+//
+// Test Depends on:
+//	- TestCreateProject()
+//	- TestRegisterUser() (in authentication.go)
 func TestAddAuthors(t *testing.T) {
-	var err error
 	testProject := testProjects[0]
 
 	// test to add a single valid author
 	testSingleValidAuthor := func (author *Credentials) error {
 		// initializes the test environment, returning an error if any occurs
-		if err = initTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
+		if err := initTestEnvironment(); err != nil {
+			return errors.New( fmt.Sprintf("Error in testdb init: %v", err))
 		}
 
 		// declares test variables
-		var projectId int
-		var authorId string
 		var queriedProjectId int   // gotten from db after adding author
 		var queriedAuthorId string // gotten from db after adding author
 
 		// adds a valid project and user to the db and filesystem so that an author can be added
-		projectId, err = addProject(testProject)
+		projectId, err := addProject(testProject)
 		if err != nil {
 			return err
 		}
-		authorId, err = registerUser(author)
+		authorId, err := registerUser(author)
 		if err != nil {
-			return errors.New(fmt.Sprintf("error registering the author: %v", err))
+			return errors.New(fmt.Sprintf("Error in author registration: %v", err))
 		}
 
 		// adds the author to the database
 		if err = addAuthor(authorId, projectId); err != nil {
-			return errors.New(fmt.Sprintf("error adding the author to the db: %v", err))
+			return errors.New(fmt.Sprintf("Error adding the author to the db: %v", err))
 		}
 
 		// checks the author ID and project ID for matches
-		queryAuthor := fmt.Sprintf(
-			SELECT_ROW,
-			"*",
-			TABLE_AUTHORS,
-			"userId",
-		)
+		queryAuthor := fmt.Sprintf( SELECT_ROW, "*", TABLE_AUTHORS, "userId")
 		// executes query
 		row := db.QueryRow(queryAuthor, authorId)
 		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error while querying db for authors: %v", row.Err()))
+			return errors.New(
+				fmt.Sprintf("error while querying db for authors: %v", row.Err()))
 		} else if err = row.Scan(&queriedProjectId, &queriedAuthorId); err != nil {
-			return errors.New(fmt.Sprintf("error while querying db for authors: %v", row.Err()))
+			return errors.New(
+				fmt.Sprintf("error while querying db for authors: %v", row.Err()))
 		}
 
 		// checks data returned from the database
 		if projectId != queriedProjectId {
-			return errors.New(fmt.Sprintf("Author added to the wrong project: Wanted: %d Got: %d", projectId, queriedProjectId))
+			return errors.New(
+				fmt.Sprintf("Author added to the wrong project: Wanted: %d Got: %d",
+				projectId, queriedProjectId))
 		} else if authorId != queriedAuthorId {
-			return errors.New(fmt.Sprintf("Author Ids do not match: Added: %d Gotten Back: %d", authorId, queriedAuthorId))
+			return errors.New(
+				fmt.Sprintf("Author Ids do not match: Added: %s Gotten Back: %s",
+				authorId, queriedAuthorId))
 		}
 
 		// clears the test environment and returns nil because the test has passed
@@ -315,8 +291,8 @@ func TestAddAuthors(t *testing.T) {
 	// attemps to add an author without the correct permissions, if addAuthor succeeds, an error is thrown
 	testAddInvalidAuthor := func(author *Credentials) error {
 		// initializes the test environment, returning an error if any occurs
-		if err = initTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
+		if err := initTestEnvironment(); err != nil {
+			return errors.New(fmt.Sprintf("Error in test environment init: %v", err))
 		}
 
 		// declares test variables
@@ -324,34 +300,34 @@ func TestAddAuthors(t *testing.T) {
 		var authorId string
 
 		// adds a valid project and user to the db and filesystem so that an author can be added
-		projectId, err = addProject(testProject)
+		projectId, err := addProject(testProject)
 		if err != nil {
 			return err
 		}
 		authorId, err = registerUser(author)
 		if err != nil {
-			return errors.New(fmt.Sprintf("error registering the author: %v", err))
+			return errors.New(fmt.Sprintf("Error registering author: %v", err))
 		}
 
 		// if adding the author is successful, throw an error
 		if err = addAuthor(authorId, projectId); err == nil {
-			return errors.New("author with permissions incorrect permissions added to authors table")
+			return errors.New("Incorrect permissions added to authors table.")
 		}
 
 		// clears the test environment and returns nil because the test has passed
 		if err = clearTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while tearing down db: %v", err))
+			return errors.New(fmt.Sprintf("Error on db teardown: %v", err))
 		}
 		return nil
 	}
 
 	// runs tests
-	if err = testSingleValidAuthor(testAuthors[0]); err != nil {
-		t.Errorf("testSingleValidAuthor failed for testAuthors[0]: %v", err)
+	if err := testSingleValidAuthor(testAuthors[0]); err != nil {
+		t.Errorf("Failure on testAuthors[0]: %v", err)
 	} else if err = testSingleValidAuthor(testAuthors[3]); err != nil {
-		t.Errorf("testSingleValidAuthor failed for testAuthors[3]: %v", err)
+		t.Errorf("Failure on testAuthors[3]: %v", err)
 	} else if err = testAddInvalidAuthor(testAuthors[1]); err != nil {
-		t.Errorf("testAddInvalidAuthor failed for testAuthors[1]: %v", err)
+		t.Errorf("Failure on testAuthors[1]: %v", err)
 	}
 }
 
@@ -405,15 +381,15 @@ func TestAddReviewers(t *testing.T) {
 		// executes query
 		row := db.QueryRow(queryReviewers, reviewerId)
 		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("error while querying db for reviewers: %v", row.Err()))
+			return errors.New(fmt.Sprintf("Error on reviewer query: %v", row.Err()))
 		} else if err = row.Scan(&queriedProjectId, &queriedReviewerId); err != nil {
-			return errors.New(fmt.Sprintf("error while querying db for reviewers: %v", row.Err()))
+			return errors.New(fmt.Sprintf("Error on reviewer query: %v", row.Err()))
 		}
 		// checks data returned from the database
 		if projectId != queriedProjectId {
-			return errors.New(fmt.Sprintf("Reviewer added to the wrong project: Wanted: %d Got: %d", projectId, queriedProjectId))
+			return errors.New(fmt.Sprintf("Reviewer added to wrong project: %d vs %d", projectId, queriedProjectId))
 		} else if reviewerId != queriedReviewerId {
-			return errors.New(fmt.Sprintf("Reviewer Ids do not match: Added: %d Gotten Back: %d", reviewerId, queriedReviewerId))
+			return errors.New(fmt.Sprintf("Reviewer ID mismatch: %s vs %s", reviewerId, queriedReviewerId))
 		}
 
 		// clears the test environment and returns nil because the test has passed
@@ -439,7 +415,7 @@ func TestAddReviewers(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		reviewId, err = registerUser(reviewer)
+		reviewerId, err = registerUser(reviewer)
 		if err != nil {
 			return errors.New(fmt.Sprintf("error registering the reviewer: %v", err))
 		}
@@ -502,9 +478,10 @@ func TestAddFiles(t *testing.T) {
 		// executes the query
 		row := db.QueryRow(queryProjectName, projectId)
 		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("failed to query the name of the project being added to: %v", row.Err()))
+			return errors.New(
+				fmt.Sprintf("Query failure on project name: %v", row.Err()))
 		} else if err = row.Scan(&projectName); err != nil {
-			return errors.New(fmt.Sprintf("failed to query the name of the project being added to: %v", err))
+			return errors.New(fmt.Sprintf("Query failure on project name: %v", err))
 		}
 
 		// gets the file data from the db
@@ -517,16 +494,19 @@ func TestAddFiles(t *testing.T) {
 		// executes query
 		row = db.QueryRow(queryFileData, fileId)
 		if row.Err() != nil {
-			return errors.New(fmt.Sprintf("failed to query the name of the project being added to: %v", row.Err()))
+			return errors.New(
+				fmt.Sprintf("Failed query for project name : %v", row.Err()))
 		} else if err = row.Scan(&queriedProjectId, &queriedFilePath); err != nil {
-			return errors.New(fmt.Sprintf("failed to query the name of the project being added to: %v", err))
+			return errors.New(
+				fmt.Sprintf("Failed to query project name after db: %v", err))
 		}
 
 		// gets the file content from the filesystem
 		filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(projectId), projectName, queriedFilePath)
 		fileBytes, err := ioutil.ReadFile(filePath)
 		if err != nil {
-			return errors.New(fmt.Sprintf("failed to read file after it was added to the filesystem: %v", err))
+			return errors.New(
+				fmt.Sprintf("File read failure after added to filesystem: %v", err))
 		}
 		queriedFileContent = string(fileBytes)
 
@@ -541,15 +521,15 @@ func TestAddFiles(t *testing.T) {
 		_, err = os.Stat(fileDataPath)
 		if err != nil && errors.Is(err, os.ErrNotExist) {
 			return errors.New("Data file not generated during file upload")
-		}
-
-		// compares test values
-		if projectId != queriedProjectId {
-			return errors.New(fmt.Sprintf("given project id and the project id queried from the database do not match: expected: %d got back: %d", projectId, queriedProjectId))
+		} else if projectId != queriedProjectId { // Compare  test values.
+			return errors.New(fmt.Sprintf("Project ID mismatch: %d vs %d",
+			projectId, queriedProjectId))
 		} else if file.Path != queriedFilePath {
-			return errors.New(fmt.Sprintf("path given by file.Path != path added to the db: Expected: %s Given: %s", file.Path, queriedFilePath))
+			return errors.New(fmt.Sprintf("File path mismatch:  %s vs %s",
+			file.Path, queriedFilePath))
 		} else if file.Content != queriedFileContent {
-			return errors.New(fmt.Sprintf("file content was not written to the filesystem properly"))
+			return errors.New(
+				fmt.Sprintf("file content not written to filesystem properly"))
 		}
 
 		return nil
@@ -557,49 +537,36 @@ func TestAddFiles(t *testing.T) {
 
 	// tests that a single given valid file will be uploaded to the db and filesystem properly
 	testAddSingleValidFile := func(file *File) error {
-		// initializes the test environment, returning an error if any occurs
 		if err = initTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
 		}
-
-		// adds a valid project and user to the db and filesystem so that a file can be added
 		projectId, err := addProject(testProject)
 		if err != nil {
 			return err
-		}
-
-		// tests that the given file can be added to the filesystem
-		if err = testAddSingleFile(file, projectId); err != nil {
+		} else if err = testAddSingleFile(file, projectId); err != nil {
 			return err
-		}
-
-		// clears the test environment and returns nil because the test has passed
-		if err = clearTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while tearing down test environment: %v", err))
+		} else if err = clearTestEnvironment(); err != nil {
+			return errors.New(
+				fmt.Sprintf("error while tearing down test environment: %v", err))
 		}
 		return nil
 	}
 
 	testAddNValidFiles := func(files []*File) error {
-		// initializes the test environment, returning an error if any occurs
 		if err = initTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
 		}
 
-		// adds a valid project and user to the db and filesystem so that a file can be added
 		projectId, err := addProject(testProject)
 		if err != nil {
 			return err
 		}
-
-		// adds each file one after another
+		// Test adding file for every file in array.
 		for _, file := range files {
 			if err = testAddSingleFile(file, projectId); err != nil {
 				return err
 			}
 		}
-
-		// clears the test environment and returns nil because the test has passed
 		if err = clearTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while tearing down test environment: %v", err))
 		}
@@ -654,8 +621,8 @@ func TestAddComment(t *testing.T) {
 		// the passed in comment
 		addedComment := codeData.Comments[len(codeData.Comments) - 1]
 		if comment.AuthorId != addedComment.AuthorId {
-			return errors.New(fmt.Sprintf(
-				"read in comment author which is different from that which was given. Given: %d Returned: %d", comment.AuthorId, addedComment.AuthorId))
+			return errors.New(fmt.Sprintf( "Comment author ID mismatch: %s vs %s",
+				comment.AuthorId, addedComment.AuthorId))
 		}
 		return nil
 	}
@@ -673,7 +640,8 @@ func TestAddComment(t *testing.T) {
 		}
 		fileId, err := addFileTo(testFile, projectId)
 		if err != nil {
-			return errors.New(fmt.Sprintf("failed to add a file to the project: %v", err))
+			return errors.New(
+				fmt.Sprintf("failed to add a file to the project: %v", err))
 		}
 		testProject.Id = projectId
 		testFile.Id = fileId
@@ -685,7 +653,8 @@ func TestAddComment(t *testing.T) {
 
 		// clears the test environment and returns nil because the test has passed
 		if err = clearTestEnvironment(); err != nil {
-			return errors.New(fmt.Sprintf("error while tearing down test environment: %v", err))
+			return errors.New(
+				fmt.Sprintf("error while tearing down test environment: %v", err))
 		}
 		return nil
 	}
@@ -947,10 +916,10 @@ func TestGetFile(t *testing.T) {
 		// sets a custom header "file": file id to indicate which file is being queried to the server
 		req.Header.Set("file", fmt.Sprint(fileId))
 		resp, err := client.Do(req)
-		defer resp.Body.Close()
 		if err != nil {
 			t.Error(err)
 		}
+		defer resp.Body.Close()
 		// if an error occurred while querying, it's status code is printed here
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Error: %d", resp.StatusCode)
