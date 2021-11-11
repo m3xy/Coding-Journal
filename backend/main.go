@@ -64,6 +64,7 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc("/projects", getAllProjects)
 	router.HandleFunc("/project", getProject)
 	router.HandleFunc("/project/file", getFile)
+	router.HandleFunc("/validate", tokenValidation)
 
 	// sets up handler for CORS
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})

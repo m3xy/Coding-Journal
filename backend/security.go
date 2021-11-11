@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"time"
 )
 
 const (
 	BASE64_CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/"
+	SECURITY_TOKEN_KEY = "X-FOREIGNJOURNAL-SECURITY-TOKEN"
 	SECURITY_KEY_SIZE = 128
 )
 
@@ -47,5 +49,34 @@ func securityCheck() error {
 		}
 	} else {
 		return nil
+	}
+}
+
+
+// Validate the given security token's authenticity.
+func validateToken(token string) bool {
+	// Query token from servers table.
+	storedToken := ""
+	err := db.QueryRow(fmt.Sprintf(
+		SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
+		getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
+		Scan(&storedToken)
+	if err != nil || storedToken != token {
+		return false
+	} else  {
+		return true
+	}
+}
+
+// Validate if given security token works.
+// Params:
+// 	Header: securityToken
+// Return:
+//  200: Success - security token valid.
+//  401: Failure - security token invalid.
+func tokenValidation(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get(SECURITY_TOKEN_KEY)
+	if !validateToken(token) {
+		w.WriteHeader(http.StatusUnauthorized)
 	}
 }
