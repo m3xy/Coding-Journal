@@ -83,15 +83,16 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	projectId, err := addProject(wrapperProject)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	_, err = addFileTo(file, projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
+	wrapperProject.Id = projectId
 
 	// writes fileId as response
 	jsonString, err := json.Marshal(wrapperProject)
@@ -114,8 +115,8 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&request)
 
 	// gets project Id and file path
-	filePath := request["filePath"].(string)
-	projectId, err := strconv.Atoi(request["projectId"].(string))
+	filePath := request[getJsonTag(&File{}, "Path")].(string)
+	projectId, err := strconv.Atoi(request[getJsonTag(&File{}, "ProjectId")].(string))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -341,8 +342,8 @@ func addAuthor(authorId string, projectId int) error {
 
 	// checks permissions, and if they are correct, the author is added
 	if permissions != USERTYPE_PUBLISHER && permissions != USERTYPE_REVIEWER_PUBLISHER {
-		return errors.New("User must be authorized as Publisher" +
-		"to be listed as project Author")
+		return errors.New("User must be authorized as Publisher " +
+			"to be listed as project Author" + fmt.Sprint(permissions))
 	} else {
 		_, err := db.Query(
 			fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), projectId, authorId)

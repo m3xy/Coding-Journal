@@ -285,7 +285,9 @@ func exportUser(w http.ResponseWriter, r *http.Request) {
 
 // Set new user credentials
 func newUser() *Credentials {
-	return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
+	// return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
+	// TODO: fix permissions later
+	return &Credentials{Usertype: USERTYPE_REVIEWER_PUBLISHER, PhoneNumber: "", Organization: ""}
 }
 
 // Checks if a password contains upper case, lower case, numbers, and special characters.

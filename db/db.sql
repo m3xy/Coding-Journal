@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   -- necessary user info
   firstName varchar(32) NOT NULL, -- first name of the user
   lastName varchar(32) NOT NULL, -- last name of the user
-  userType int NOT NULL DEFAULT 3, -- user type as an integer (mapped to constants in db.go)
+  userType int NOT NULL DEFAULT 4, -- user type as an integer (mapped to constants in db.go)
 
   -- extra/optional user info
   phonenumber varchar(11), -- user phone number, is optional, 11 chars to allow for + and 10 digits

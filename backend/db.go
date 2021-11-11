@@ -18,7 +18,6 @@ const (
 	VIEW_PERMISSIONS = "globalPermissions"
 	TABLE_SERVERS	 = "servers"
 	VIEW_LOGIN		 = "globalLogins"
-	SELECT_ROW       = "SELECT %s FROM %s WHERE %s = ?"
 	TABLE_USERS     = "users"
 	TABLE_PROJECTS  = "projects"
 	TABLE_FILES     = "files"
@@ -32,19 +31,20 @@ const (
 	INNER_JOIN       = "%s INNER JOIN %s"
 	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
 
-	SELECT_EXISTS         = "SELECT EXISTS (SELECT %s FROM %s WHERE %s = ?)"
+	SELECT_ROW               = "SELECT %s FROM %s WHERE %s = ?"
+	SELECT_EXISTS            = "SELECT EXISTS (SELECT %s FROM %s WHERE %s = ?)"
 	SELECT_ROW_TWO_CONDITION = "SELECT %s FROM %s WHERE %s = ? AND %s = ?"
-	SELECT_ALL_ORDER_BY   = "SELECT %s FROM %s ORDER BY ?"
-	SELECT_ROW_INNER_JOIN = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"
-	SELECT_ROW_ORDER_BY   = "SELECT %s FROM %s ORDER BY ? WHERE %s = ?"
-	INSERT_CRED           = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_PROJ           = "INSERT INTO %s (%s) VALUES (?) RETURNING id"
-	INSERT_FILE           = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
-	INSERT_AUTHOR         = "INSERT INTO %s VALUES (?, ?)"
-	INSERT_REVIEWER       = "INSERT INTO %s VALUES (?, ?)"
-	INSERT_FULL           = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	UPDATE_ROWS           = "UPDATE %s SET %s = ? WHERE %s = ?"
-	DELETE_ALL_ROWS       = "DELETE FROM %s"
+	SELECT_ALL_ORDER_BY      = "SELECT %s FROM %s ORDER BY ?"
+	SELECT_ROW_INNER_JOIN    = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"
+	SELECT_ROW_ORDER_BY      = "SELECT %s FROM %s ORDER BY ? WHERE %s = ?"
+	INSERT_CRED              = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
+	INSERT_PROJ              = "INSERT INTO %s (%s) VALUES (?) RETURNING id"
+	INSERT_FILE              = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
+	INSERT_AUTHOR            = "INSERT INTO %s VALUES (?, ?)"
+	INSERT_REVIEWER          = "INSERT INTO %s VALUES (?, ?)"
+	INSERT_FULL              = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	UPDATE_ROWS              = "UPDATE %s SET %s = ? WHERE %s = ?"
+	DELETE_ALL_ROWS          = "DELETE FROM %s"
 
 	USERTYPE_NIL                = 0
 	USERTYPE_PUBLISHER          = 1
@@ -104,7 +104,7 @@ type File struct {
 	// unique id of the file as maintained in the db
 	Id int `json:"id" db:"id"`
 	// id of the project this file is a part of
-	ProjectId int `json:"project_id" db:"projectId"`
+	ProjectId int `json:"projectId" db:"projectId"`
 	// name of the project this file is a part of
 	ProjectName string `json:"projectName"`
 	// relative path to the file from the root of the project
