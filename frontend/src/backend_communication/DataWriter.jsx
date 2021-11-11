@@ -1,6 +1,6 @@
 /**
  * DataWriter.jsx
- * author: 190010425
+ * author: 190010425, 190019931
  * created: October 26, 2021
  * 
  * This file contains a class to send data to the Go backend code via http
@@ -10,7 +10,7 @@
 // URL endpoints for backend functions
 const loginEndpoint = '/login'
 const registerEndpoint = '/register'
-// const uploadEndpoint = '/upload'
+const uploadEndpoint = '/upload'
 
 /**
  * Utility class with methods to send data to the backend via HTTP request
@@ -22,8 +22,9 @@ const registerEndpoint = '/register'
 class DataWriter {
 
     constructor(backend_host, backend_port) {
-        this.backend_host = backend_host
-        this.backend_port = backend_port
+        this.backend_host = backend_host;
+        this.backend_port = backend_port;
+        // this.userID = null;
     }
 
     /**
@@ -47,6 +48,9 @@ class DataWriter {
         request.addEventListener('load', () => {
             // update the state of the component with the result here
             console.log(request.responseText)
+            // this.userID = request.responseText;
+
+            document.cookie = "userID=" + request.responseText + "; SameSite=Lax"; //Set a session cookie for logged in user
 
             // TEMP: return response here, set the state of the login widget to be login approved
         })
@@ -55,7 +59,6 @@ class DataWriter {
         
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
-        console.log(JSON.stringify(data));
 
         // TEMP: return bool here to indicate success or failure#
     }
@@ -96,10 +99,68 @@ class DataWriter {
     }
 
 
+    /**
+     * Sends a POST request to the go server to upload (project) files
+     * 
+     * @param {JSON} userID Project files' Author's User ID
+     * @param {Array.<File>} files Project files
+     * @returns 
+     */
+    uploadFiles(userID, files) {
 
-    // uploadFiles() {
-        
-    // }
+        if(userID === null) {
+            console.log("not logged in!");
+            return;
+        }
+       
+        const authorID = JSON.parse(userID).userId;  //Extract author's userID
+
+        const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = function(e){
+                    files[i] = e.target.result;
+                    resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
+                } 
+                reader.onerror = function() {
+                    reject();
+                }
+            });
+        })
+
+        return new Promise ( (resolve, reject) => {
+
+            var request = new XMLHttpRequest();
+
+            Promise.all(filePromises) //Encode all files to upload into base 64 before uploading
+                .then(() => {
+                    let data = {
+                        authorID : authorID,
+                        base64Value : files[0]
+                    }
+    
+                    console.log(data);
+            
+                    // get a callback when the server responds
+                    request.addEventListener('load', () => {
+                        //Return response for code page
+                        resolve(request.responseText);
+                    })
+
+                    request.onerror = reject;
+            
+                    // open the request with the verb and the url TEMP: this will potentially change with actual URL
+                    request.open('POST', this.backend_host + ':' + this.backend_port + uploadEndpoint)
+            
+                    // send the request with the JSON data as body
+                    request.send(JSON.stringify(data))
+                })
+                .catch((error) => {
+                    console.log(error);
+                })
+        })
+    }
 
 
     // add more writing functions here

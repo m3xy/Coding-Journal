@@ -35,22 +35,29 @@ class Upload extends React.Component {
             return;
         }
 
-        //Printing contents of each file
-        this.state.files.forEach(
-            file => {
-                if (file) {
-                    var reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = function (e) {
-                        console.log(e.target.result);
-                        this.props.uploadFiles();
-                    }
-                    reader.onerror = function (e) {
-                        console.log("Error reading file");
-                    }
-                }
+        let userID = null;                          //Preparing to get userID from session cookie
+        let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
+        for(let i = 0; i < cookies.length; i++){    //For each cookie,
+            let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
+            if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
+                userID = cookie[1].trim();
+                break;
             }
-        );
+        }
+
+        if(userID === null){                        //If user has not logged in, disallow submit
+            console.log("Not logged in");
+            return;
+        }
+
+        this.props.upload(userID, this.state.files).then((projectID) => {
+            console.log("Project ID: " + projectID);
+            var codePage = window.open("/code");
+            codePage.projectID = projectID;
+        }, (error) => {
+            console.log(error);
+        });
+        
 
         document.getElementById("formFile").files = new DataTransfer().files;
         this.setState({
@@ -66,6 +73,11 @@ class Upload extends React.Component {
         // console.log(document.getElementById("formFile").files);
 
         if(this.state.files.length === 1) return; /* Remove later for multiple files */
+
+        // if(this.writer.userID === null){
+        //     console.log("Not logged in!");
+        //     return;
+        // }
 
         let formFileList = new DataTransfer();
         let fileList = this.state.files;
@@ -133,7 +145,7 @@ class Upload extends React.Component {
             <div className="col-md-6 offset-md-5">
                 <br/>
 
-                <form name="form" onSubmit={this.handleSubmit}>
+                <Form onSubmit={this.handleSubmit}>
                 <DragAndDrop handleDrop={this.handleDrop}>
                     <Card style={{ width: '18rem' }}>
                     <Card.Header className="text-center"><h5>Upload Files</h5></Card.Header>
@@ -152,7 +164,7 @@ class Upload extends React.Component {
                         
                     </Card>
                     </DragAndDrop>
-                </form>
+                </Form>
                 
             </div>
         )

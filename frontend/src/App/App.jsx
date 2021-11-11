@@ -52,6 +52,22 @@ class App extends React.Component {
         });
     }
 
+    componentDidMount() {
+        // this.deleteCookies();
+    }
+
+    /**
+     * Deletes all cookies
+     */
+    deleteCookies() {
+        var cookies = document.cookie.split(';'); 
+    
+        // The "expire" attribute of every cookie is set to "Thu, 01 Jan 1970 00:00:00 GMT".
+        for (var i = 0; i < cookies.length; i++) {
+            document.cookie = cookies[i] + "=;expires=" + new Date(0).toUTCString();  //Setting all cookies expiry date to be a past date.
+        }
+    }
+
     render() {
         const { alert } = this.props;
         return (
@@ -69,7 +85,8 @@ class App extends React.Component {
                                 <Route path="/code" exact component={() => <Code />} />
                                 <Route path="/contact" exact component={() => <Contact />} />
                                 <Route path="/commentModal" exact component={() => <CommentModal />} />
-                                <Route path="/upload" exact component={() => <Upload />} />
+                                <Route path="/upload" exact component={() => <Upload 
+                                    upload={(userID, files) => this.writer.uploadFiles(userID, files)}/>} />
                                 <Route path="/profile" exact component={() => <Profile />} />
                                 <Redirect from="*" to="/" />
                             </Switch>
