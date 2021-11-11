@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -67,6 +68,25 @@ func TestValidateToken (t *testing.T) {
 	testEnd()
 }
 
+// Send a given request using needed authentication.
+func sendSecureRequest(req *http.Request) (*http.Response, error) {
+	if req == nil {
+		return nil, errors.New("Request nil!")
+	}
+	// Fetch valid security token from database.
+	storedToken := ""
+	err := db.QueryRow(fmt.Sprintf(
+		SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
+		getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
+		Scan(&storedToken)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{}
+	req.Header.Set(SECURITY_TOKEN_KEY, storedToken)
+	return client.Do(req)
+}
+
 func TestTokenValidation(t *testing.T) {
 	testInit()
 	securityCheck()
@@ -75,33 +95,17 @@ func TestTokenValidation(t *testing.T) {
 	// Start server
 	go srv.ListenAndServe()
 
-	// Fetch valid security token from database.
-	storedToken := ""
-	err := db.QueryRow(fmt.Sprintf(
-		SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
-		getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
-		Scan(&storedToken)
-	if err != nil {
-		t.Errorf("Token query error: %v\n", err)
-	}
-
-	client := &http.Client{}
-
 	// Write valid security token response
 	validReq, err := http.NewRequest("GET", "http://localhost:3333/validate", nil)
-	if err != nil {
-		t.Errorf("Request creation error: %v\n", err)
-	}
-	validReq.Header.Set(SECURITY_TOKEN_KEY, storedToken)
-	res, err := client.Do(validReq)
+	res, err := sendSecureRequest(validReq)
 	if err != nil {
 		t.Errorf("HTTP request error: %v\n", err)
-	}
-	if res.StatusCode != http.StatusOK  {
+	} else if res.StatusCode != http.StatusOK  {
 		t.Errorf("Response Status code should be OK, but is %d", res.StatusCode)
 	}
 
 	// Write invalid security token response
+	client := http.Client{}
 	validReq, err = http.NewRequest("GET", "http://localhost:3333/validate", nil)
 	if err != nil {
 		t.Errorf("Request creation error: %v\n", err)
@@ -110,8 +114,7 @@ func TestTokenValidation(t *testing.T) {
 	res, err = client.Do(validReq)
 	if err != nil {
 		t.Errorf("HTTP request error: %v\n", err)
-	}
-	if res.StatusCode != http.StatusUnauthorized {
+	} else if res.StatusCode != http.StatusUnauthorized {
 		t.Errorf("Response Status code should be 401, but is %d", res.StatusCode)
 	}
 }

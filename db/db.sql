@@ -140,3 +140,9 @@ CREATE VIEW IF NOT EXISTS globalPermissions AS
 	SELECT globalId, userType
 	FROM idMappings INNER JOIN users
 	ON idMappings.localId = users.id;
+
+/* View for user credentials linked to global ID. */
+CREATE VIEW IF NOT EXISTS globalUserInfo AS
+	SELECT globalId, email, firstName, lastName, userType, phoneNumber, organization
+	FROM idMappings INNER JOIN users
+	ON idMappings.localId = users.id;

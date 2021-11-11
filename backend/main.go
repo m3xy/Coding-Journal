@@ -30,7 +30,7 @@ const (
 	ENDPOINT_FILE = "/project/file"
 	ENDPOINT_NEWFILE = "/project/upload"
 	ENDPOINT_NEWCOMMENT = "/project/file/newcomment"
-	ENDPOINT_VALIDATE = "/validate"	
+	ENDPOINT_VALIDATE = "/validate"
 )
 
 var allowedOrigins = []string{"http://localhost:3333",
@@ -79,6 +79,7 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment)
 	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation)
+	router.HandleFunc("/users/{"+getJsonTag(&Credentials{},"Id")+"}", getUserProfile)
 
 	// sets up handler for CORS
 	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
