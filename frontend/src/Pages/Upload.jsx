@@ -7,7 +7,7 @@
 
 import React from "react";
 import DragAndDrop from "./DragAndDrop";
-import {Form, Button, Card, ListGroup, CloseButton} from "react-bootstrap"
+import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel} from "react-bootstrap"
 
 class Upload extends React.Component {
 
@@ -15,16 +15,24 @@ class Upload extends React.Component {
         super(props);
 
         this.state = {
-            files: []
+            files: [],
+            projectName: ""
         };
 
-        this.handleChange = this.handleChange.bind(this);
+        this.dropFiles = this.dropFiles.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
         this.handleDrop = this.handleDrop.bind(this);
+        this.setProjectName = this.setProjectName.bind(this);
     }
 
-    handleChange(e) {
+    dropFiles(e) {
         this.handleDrop(e.target.files);
+    }
+
+    setProjectName(e) {
+        this.setState({
+            projectName: e.target.value
+        })
     }
 
     handleSubmit(e) {
@@ -50,9 +58,10 @@ class Upload extends React.Component {
             return;
         }
 
-        let projectName = this.state.files[0].name;     //Temp, 1 file uploads
+        // this.state.projectName = this.state.files[0].name;     //Temp, 1 file uploads
+        // console.log(this.state.projectName);
 
-        this.props.upload(userID, projectName, this.state.files).then((projectID) => {
+        this.props.upload(userID, this.state.projectName, this.state.files).then((projectID) => {
             console.log("Project ID: " + projectID);
             var codePage = window.open("/code");
             codePage.projectID = projectID;
@@ -62,8 +71,10 @@ class Upload extends React.Component {
         
 
         document.getElementById("formFile").files = new DataTransfer().files;
+        document.getElementById("projectName").value = "";
         this.setState({
-            files: []
+            files: [],
+            projectName: ""
         });
 
         console.log("Files submitted");
@@ -152,7 +163,7 @@ class Upload extends React.Component {
                     <Card style={{ width: '18rem' }}>
                     <Card.Header className="text-center"><h5>Upload Files</h5></Card.Header>
                         <Form.Group controlId="formFile" className="mb-3">
-                            <Form.Control type="file" accept=".css,.java,.js" onChange={this.handleChange}/>{/* multiple later */}
+                            <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later */}
                         </Form.Group>
                         <Card.Body>
 
@@ -162,6 +173,11 @@ class Upload extends React.Component {
                                 <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><br/><br/></Card.Text>
                             )}
                         </Card.Body>
+
+                        <FloatingLabel controlId="projectName" label="Project name" className="mb-0">
+                            <Form.Control type="text" placeholder="My_Project" required onChange={this.setProjectName}/>
+                        </FloatingLabel>
+                        
                         <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload files</Button>{' '}</Card.Footer>
                         
                     </Card>
