@@ -11,16 +11,19 @@ import (
 	"testing"
 	"time"
 	"gopkg.in/validator.v2"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
-	VALID_PW       = "aB12345$"
-	PW_NO_UC       = "a123456$"
-	PW_NO_LC       = "B123456$"
-	PW_NO_NUM      = "aBcdefg$"
-	PW_NO_SC       = "aB123456"
-	PW_WRONG_CHARS = "asbd/\\s@!"
-	TEST_DB        = "testdb"
+	VALID_PW        = "aB12345$"
+	PW_NO_UC        = "a123456$"
+	PW_NO_LC        = "B123456$"
+	PW_NO_NUM       = "aBcdefg$"
+	PW_NO_SC        = "aB123456"
+	PW_WRONG_CHARS  = "asbd/\\s@!"
+	TEST_DB         = "testdb"
+	JSON_TAG_PW		= "password"
+	INVALID_ID		= "invalid-always"
 )
 
 var testUsers []*Credentials = []*Credentials{
@@ -305,7 +308,7 @@ func TestLogIn(t *testing.T) {
 		// Create a request for user login.
 		loginMap := make(map[string]string)
 		loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[i].Email
-		loginMap[getJsonTag(&Credentials{}, "Pw")] = testUsers[i].Pw
+		loginMap[JSON_TAG_PW] = testUsers[i].Pw
 		buffer, err := json.Marshal(loginMap)
 		if err != nil {
 			t.Errorf("JSON Marshal Error: %v\n", err)
@@ -342,7 +345,7 @@ func TestLogIn(t *testing.T) {
 	func() {
 		loginMap := make(map[string]string)
 		loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[0].Email
-		loginMap[getJsonTag(&Credentials{}, "Pw")] = testUsers[1].Pw
+		loginMap[JSON_TAG_PW] = testUsers[1].Pw
 		buffer, err := json.Marshal(loginMap)
 		if err != nil {
 			t.Errorf("JSON Marshal Error: %v\n", err)
@@ -363,7 +366,7 @@ func TestLogIn(t *testing.T) {
 	func() {
 		loginMap := make(map[string]string)
 		loginMap[getJsonTag(&Credentials{}, "Email")] = wrongCredsUsers[0].Email
-		loginMap[getJsonTag(&Credentials{}, "Pw")] = testUsers[0].Pw
+		loginMap[JSON_TAG_PW] = testUsers[0].Pw
 		buffer, err := json.Marshal(loginMap)
 		if err != nil {
 			t.Errorf("JSON Marshal Error: %v\n", err)
@@ -379,6 +382,71 @@ func TestLogIn(t *testing.T) {
 		}
 
 	}()
+
+	// Close server.
+	if err := srv.Shutdown(context.Background()); err != nil {
+		fmt.Printf("HTTP server shutdown: %v", err)
+	}
+	testEnd()
+}
+
+// Test user info getter.
+func TestGetUserProfile (t *testing.T) {
+	testInit()
+	srv := setupCORSsrv()
+
+	// Start server.
+	go srv.ListenAndServe()
+
+	// Populate database for testing and test valid user.
+	for i := range testUsers {
+		testUsers[i].Id, _ = registerUser(testUsers[i])
+		validReq, err := http.NewRequest("GET", "http://localhost:3333/users/" +
+			testUsers[i].Id, nil)
+		if err != nil {
+			t.Errorf("Request making error: %v\n", err)
+			return
+		}
+		res, err := sendSecureRequest(validReq)
+		if err != nil {
+			t.Errorf("Error in request sending: %v\n", err)
+			return
+		}
+		assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
+		resCreds := Credentials{}
+		err = json.NewDecoder(res.Body).Decode(&resCreds)
+		if err != nil {
+			t.Errorf("JSON decoding error: %v\n", err)
+			return
+		}
+		// Check equality for all user info.
+		assert.Equal(t, testUsers[i].Email, resCreds.Email,
+			"Email should be equal.")
+		assert.Equal(t, testUsers[i].Fname, resCreds.Fname,
+			"First name should be equal.")
+		assert.Equal(t, testUsers[i].Lname, resCreds.Lname,
+			"Last name should be equal.")
+		assert.Equal(t, testUsers[i].Usertype, resCreds.Usertype,
+			"Usertype should be equal.")
+		assert.Equal(t, testUsers[i].PhoneNumber, resCreds.PhoneNumber,
+			"Phone number should be equal.")
+		assert.Equal(t, testUsers[i].Organization, resCreds.Organization,
+			"Organization should be equal.")
+	}
+
+	// Test invalid users.
+	invalidReq, err := http.NewRequest("GET", "http://localhost:3333/users/" +
+		INVALID_ID, nil)
+	if err != nil {
+		t.Errorf("Request making error: %v\n", err)
+		return
+	}
+	res, err := sendSecureRequest(invalidReq)
+	if err != nil {
+		t.Errorf("Response error: %v\n", err)
+		return
+	}
+	assert.Equal(t, res.StatusCode, http.StatusNotFound, "Status should be 404.")
 
 	// Close server.
 	if err := srv.Shutdown(context.Background()); err != nil {

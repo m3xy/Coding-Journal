@@ -19,6 +19,7 @@ import (
 	"reflect"
 	"regexp"
 
+	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/validator.v2"
 )
@@ -34,9 +35,9 @@ const (
 // ----
 
 /*
- Router function to log in to website.
+ Log in to website, check credentials correctness.
  Content type: application/json
- Sucess: 200, Credentials are correct
+ Success: 200, Credentials are correct
  Failure: 401, Unauthorized
  Returns: userId
 */
@@ -78,6 +79,41 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 	} else {
 		w.Write(jsonResp)
+	}
+}
+
+/*
+	Get user profile info for a user.
+	Content type: application/json
+	Success: 200, Credentials can be passed down.
+	Failure: 404, User not found.
+*/
+func getUserProfile(w http.ResponseWriter, r *http.Request) {
+	// Check security token.
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Get user from parameters.
+	vars := mux.Vars(r)
+	if checkUnique(TABLE_IDMAPPINGS,
+	getDbTag(&IdMappings{}, "GlobalId"), vars[getJsonTag(&Credentials{}, "Id")]) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Get user details from user ID.
+	info := &Credentials{ Pw: ""}
+	err := db.QueryRow(fmt.Sprintf(SELECT_ROW, "*", VIEW_USER_INFO,
+	getDbTag(&IdMappings{}, "GlobalId")), vars[getJsonTag(&Credentials{}, "Id")]).
+	Scan(&info.Id, &info.Email, &info.Fname, &info.Lname, &info.Usertype,
+	&info.PhoneNumber, &info.Organization)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		json.NewEncoder(w).Encode(info)
 	}
 }
 

@@ -26,6 +26,7 @@ const (
 	TABLE_REVIEWERS = "reviewers"
 	TABLE_CATEGORIES = "categories"
 	TABLE_IDMAPPINGS = "idMappings"
+	VIEW_USER_INFO	= "globalUserInfo"
 
 	// TEMP: reconcile these
 	INNER_JOIN       = "%s INNER JOIN %s"
@@ -63,7 +64,7 @@ type Credentials struct {
 	// Email Address.
 	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
 	// Password - given as plaintext by front end, and as hash by the database.
-	Pw string `json:"password" db:"password" validate:"min=8,max=64,validpw"`
+	Pw string `json:"password,omitempty" db:"password" validate:"min=8,max=64,validpw"`
 	// First Name.
 	Fname string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
 	// Last Name.
@@ -71,7 +72,7 @@ type Credentials struct {
 	// User role.
 	Usertype int `json:"usertype" db:"userType"`
 	// User phone number.
-	PhoneNumber string `json:"phoneNumber" db:"phoneNumber" validate:"max=11"`
+	PhoneNumber string `json:"phonenumber" db:"phoneNumber" validate:"max=11"`
 	// Organization name.
 	Organization string `json:"organization" db:"organization" validate:"max=32"`
 }
