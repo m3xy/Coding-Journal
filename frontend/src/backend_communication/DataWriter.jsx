@@ -106,13 +106,13 @@ class DataWriter {
      * @param {Array.<File>} files Project files
      * @returns 
      */
-    uploadFiles(userID, files) {
+    uploadFiles(userID, projectName, files) {
 
         if(userID === null) {
             console.log("not logged in!");
             return;
         }
-       
+
         const authorID = JSON.parse(userID).userId;  //Extract author's userID
 
         const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
@@ -137,6 +137,7 @@ class DataWriter {
                 .then(() => {
                     let data = {
                         authorID : authorID,
+                        projectName : projectName,
                         base64Value : files[0]
                     }
     
