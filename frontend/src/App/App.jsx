@@ -86,7 +86,7 @@ class App extends React.Component {
                                 <Route path="/contact" exact component={() => <Contact />} />
                                 <Route path="/commentModal" exact component={() => <CommentModal />} />
                                 <Route path="/upload" exact component={() => <Upload 
-                                    upload={(userID, files) => this.writer.uploadFiles(userID, files)}/>} />
+                                    upload={(userID, projectName, files) => this.writer.uploadFiles(userID, projectName, files)}/>} />
                                 <Route path="/profile" exact component={() => <Profile />} />
                                 <Redirect from="*" to="/" />
                             </Switch>
