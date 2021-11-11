@@ -10,7 +10,12 @@ module.exports = {
             {
                 test: /\.jsx?$/,
                 loader: 'babel-loader'
+            },
+            {
+                test: /\.css/,
+                loader: 'style-loader!css-loader'
             }
+
         ]
     },
     plugins: [new HtmlWebpackPlugin({
@@ -18,7 +23,7 @@ module.exports = {
     })],
     devServer: {
         historyApiFallback: true,
-	port: 23409
+	    port: 23409
     },
     externals: {
         // global app config object

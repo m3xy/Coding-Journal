@@ -8,6 +8,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { connect } from 'react-redux';
+import { Helmet } from 'react-helmet';
 
 import { userActions } from '../_actions';
 
@@ -55,6 +56,11 @@ class Register extends React.Component {
         const { user, submitted } = this.state;
         return (
             <div className="col-md-6 col-md-offset-3">
+                <Helmet>
+                    <meta charSet="utf-8" />
+                    <title>My Title</title>
+                    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+                </Helmet>
                 <h2>Register</h2>
                 <form name="form" onSubmit={this.handleSubmit}>
                     <div className={'form-group' + (submitted && !user.firstName ? ' has-error' : '')}>

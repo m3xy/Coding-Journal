@@ -20,7 +20,10 @@ import { alertActions } from '../_actions';
 import { PrivateRoute } from '../_components';
 
 import { DataWriter } from '../backend_communication';
-import { Navigation, Home, Login, Register, About, Contact, Footer } from '../Pages'
+import { Navigation, CommentModal, Home, Login, Register, About, Contact, Footer, Code, Upload, Profile } from '../Pages'
+
+
+// import 'bootstrap/dist/css/bootstrap.min.css'
 
 // defines website constants here for ease of configuration. 
 // TEMP: could be moved to another file
@@ -49,19 +52,29 @@ class App extends React.Component {
         });
     }
 
+    componentDidMount() {
+        // this.deleteCookies();
+    }
+
+    /**
+     * Deletes all cookies
+     */
+    deleteCookies() {
+        var cookies = document.cookie.split(';'); 
+    
+        // The "expire" attribute of every cookie is set to "Thu, 01 Jan 1970 00:00:00 GMT".
+        for (var i = 0; i < cookies.length; i++) {
+            document.cookie = cookies[i] + "=;expires=" + new Date(0).toUTCString();  //Setting all cookies expiry date to be a past date.
+        }
+    }
+
     render() {
         const { alert } = this.props;
         return (
-            <div className="jumbotron">
-                <div className="container">
-                    <div className="col-sm-8 col-sm-offset-2">
-                        {alert.message &&
-                            <div className={`alert ${alert.type}`}>{alert.message}</div>
-                        }
                         <Router history={history}>
                             <Navigation />
                             <Switch>
-                                <PrivateRoute exact path="/" component={() => <Home />} />
+                                <Route exact path="/" component={() => <Home />} />
                                 <Route path="/login" component={() => <Login 
                                     login={(email, password) => this.writer.loginUser(email, password)}/>} 
                                 />
@@ -69,14 +82,17 @@ class App extends React.Component {
                                     register={(firstname, lastname, email, password) => this.writer.registerUser(firstname, lastname, email, password)}/>} 
                                 />
                                 <Route path="/about" exact component={() => <About />} />
+                                <Route path="/code" exact component={() => <Code />} />
                                 <Route path="/contact" exact component={() => <Contact />} />
+                                <Route path="/commentModal" exact component={() => <CommentModal />} />
+                                <Route path="/upload" exact component={() => <Upload 
+                                    upload={(userID, projectName, files) => this.writer.uploadFiles(userID, projectName, files)}/>} />
+                                <Route path="/profile" exact component={() => <Profile />} />
                                 <Redirect from="*" to="/" />
                             </Switch>
                             <Footer />
                         </Router>
-                    </div>
-                </div>
-            </div>
+
         );
     }
 }

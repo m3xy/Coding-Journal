@@ -2,5 +2,20 @@
     "presets": [
       "@babel/preset-react",
       "@babel/preset-env"
-    ]
+    ],
+    "plugins": [
+      ["prismjs", {
+        "languages": [
+          "applescript",
+          "css",
+          "javascript",
+          "markup",
+          "scss",
+          "java"
+        ],
+        "plugins": ["line-numbers"],
+        "theme": "okaidia",
+        "css": true
+      }]
+      ]
 }

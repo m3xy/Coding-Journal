@@ -8,8 +8,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { connect } from 'react-redux';
+import {Helmet} from "react-helmet";
 
 import { userActions } from '../_actions';
+
 
 class Login extends React.Component {
     constructor(props) {
@@ -48,6 +50,11 @@ class Login extends React.Component {
         const { email, password, submitted } = this.state;
         return (
             <div className="col-md-6 col-md-offset-3">
+                <Helmet>
+                    <meta charSet="utf-8" />
+                    <title>My Title</title>
+                    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" />
+                </Helmet>
                 <h2>Login</h2>
                 <form name="form" onSubmit={this.handleSubmit}>
                     <div className={'form-group' + (submitted && !email ? ' has-error' : '')}>
