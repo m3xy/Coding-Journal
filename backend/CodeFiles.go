@@ -404,15 +404,24 @@ func addComment(comment *Comment, fileId int) error {
 		return errors.New("File Id must be > 0")
 	}
 
-	// // checks that the author of the comment is a registered user (either here or in another journal)
-	// var authorExists bool
-	// queryAuthorExists := fmt.Sprintf(
-	// 	SELECT_EXISTS,
-	// 	"*",
-	// 	TABLE_IDMAPPINGS,
-	// 	getDbTag(&IdMappings{}, "globalId"),
-	// )
-	// row := db.QueryRow(queryAuthorExists, comment.AuthorId)
+	// checks that the author of the comment is a registered user (either here or in another journal)
+	var authorExists bool
+	queryAuthorExists := fmt.Sprintf(
+		SELECT_EXISTS,
+		"*",
+		TABLE_IDMAPPINGS,
+		getDbTag(&IdMappings{}, "GlobalId"),
+	)
+	// executes the query, and returns an error if the author is not registered
+	row := db.QueryRow(queryAuthorExists, comment.AuthorId)
+	if row.Err() != nil {
+		return row.Err()
+	} else if err = row.Scan(&authorExists); err != nil {
+		return err
+	}
+	if !authorExists {
+		return errors.New("Authors of comments must be registered in the db")
+	}
 
 	// queries the database to get the file path so that the file's data file can be found
 	var projectId string
@@ -434,14 +443,11 @@ func addComment(comment *Comment, fileId int) error {
 		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
 		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
 	)
-	// executes the query
-	row := db.QueryRow(queryPath, fileId)
+	// executes the query and builds the file path if it was successful 
+	row = db.QueryRow(queryPath, fileId)
 	if row.Err() != nil {
 		return row.Err()
-	}
-
-	// if the query was successful, build the file path
-	if err = row.Scan(&projectId, &projectName, &filePath); err != nil {
+	} else if err = row.Scan(&projectId, &projectName, &filePath); err != nil {
 		return err
 	}
 	dataFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
@@ -551,41 +557,6 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(response)
 }
-
-// // Populate File instance's fields by querying the SQL database
-// //
-// // Params:
-// //	file (*File) : a File structure instance to populate the fields of
-// // Returns:
-// //	error if something goes wrong while querying the DB
-// func getFileData(file *File, fileId int) error {
-// 	// queries the file path, project ID, and project name from the database
-// 	queryColumns := fmt.Sprintf("%s, %s, %s",
-// 		getDbTag(&File{}, "Path"),
-// 		getDbTag(&File{}, "ProjectId"),
-// 		getDbTag(&Project{}, "Name"),
-// 	)
-// 	stmt := fmt.Sprintf(SELECT_ROW_INNER_JOIN,
-// 		queryColumns,
-// 		TABLE_FILES,
-// 		TABLE_PROJECTS,
-// 		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"),
-// 		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
-// 		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
-// 	)
-
-// 	// executes query (should only return 1 row via unique constraint on file ids)
-// 	row := db.QueryRow(stmt, fileId)
-// 	if err := row.Scan(&file.Path, &file.ProjectId, &file.ProjectName); err != nil {
-// 		return err
-// 	}
-
-// 	// sets the file name in the object using the path
-// 	file.Name = filepath.Base(file.Path)
-
-// 	// if no error has occurred, return nil
-// 	return nil
-// }
 
 // Get file content from filesystem. 
 // Params:
@@ -711,7 +682,6 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	// executes query
 	row := db.QueryRow(getProjectName, projectId)
 	if row.Err() != nil {
-		fmt.Println(row.Err())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -729,7 +699,6 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	}
 	project.Reviewers, err = getProjectReviewers(projectId)
 	if err != nil {
-		fmt.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

@@ -31,7 +31,7 @@ const (
 	INNER_JOIN       = "%s INNER JOIN %s"
 	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
 
-	SELECT_EXISTS         = "EXISTS (SELECT %s FROM %s WHERE %s = ?)"
+	SELECT_EXISTS         = "SELECT EXISTS (SELECT %s FROM %s WHERE %s = ?)"
 	SELECT_ROW_TWO_CONDITION = "SELECT %s FROM %s WHERE %s = ? AND %s = ?"
 	SELECT_ALL_ORDER_BY   = "SELECT %s FROM %s ORDER BY ?"
 	SELECT_ROW_INNER_JOIN = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"

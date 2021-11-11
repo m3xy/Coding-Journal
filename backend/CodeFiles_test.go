@@ -697,6 +697,7 @@ func TestAddComment(t *testing.T) {
 	var err error
 	testProject := testProjects[0] // test project to add testFile to
 	testFile := testFiles[0] // test file to add comments to
+	testAuthor := testAuthors[0] // test author of comment
 
 	testAddComment := func(comment *Comment, fileId int) error {
 		// adds a comment to the file
@@ -738,7 +739,7 @@ func TestAddComment(t *testing.T) {
 			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
 		}
 
-		// creates a project and adds a file to it
+		// creates a project, adds a file to it, and adds a test user to the system
 		projectId, err := addProject(testProject)
 		if err != nil {
 			return errors.New(fmt.Sprintf("failed to add project: %v", err))
@@ -748,8 +749,14 @@ func TestAddComment(t *testing.T) {
 			return errors.New(
 				fmt.Sprintf("failed to add a file to the project: %v", err))
 		}
+		authorId, err := registerUser(testAuthor)
+		if err != nil {
+			return errors.New(
+				fmt.Sprintf("failed to add user to the database: %v", err))
+		}
 		testProject.Id = projectId
 		testFile.Id = fileId
+		comment.AuthorId = authorId
 
 		// adds a comment to the file and tests that it was added properly
 		if err = testAddComment(comment, fileId); err != nil {
