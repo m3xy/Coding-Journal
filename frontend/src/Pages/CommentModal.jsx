@@ -1,6 +1,6 @@
 import React from 'react'
 import {Helmet} from "react-helmet";
-import {Modal, Button} from "react-bootstrap";
+import {Modal, Button, InputGroup, FormControl} from "react-bootstrap";
 
 
 
@@ -9,7 +9,8 @@ class CommentModal extends React.Component{
   constructor() {
     super();
     this.state = {
-      show: false
+      show: false,
+      val: ""
     };
     this.showModal = this.showModal.bind(this);
     this.hideModal = this.hideModal.bind(this);
@@ -21,6 +22,11 @@ class CommentModal extends React.Component{
   hideModal = () => {
     this.setState({ show: false });
   }
+  onSubmit = () => {
+    this.hideModal
+    console.log(this.state.val);
+  }
+
   render() {
     return (
       <>
@@ -32,12 +38,18 @@ class CommentModal extends React.Component{
         <Modal.Header closeButton onClick={this.hideModal}>
           <Modal.Title>Comments</Modal.Title>
         </Modal.Header>
-        <Modal.Body>Woohoo, you're reading this text in a modal!</Modal.Body>
+        <Modal.Body style={{textAlign: 'center',}}>Enter Reviewer Comments Below
+            <InputGroup>
+            {/* <InputGroup.Text>Enter Reviewer Comment</InputGroup.Text> */}
+            <FormControl as="textarea" aria-label="With textarea" value={this.state.val} onChange={e => this.setState({ val: e.target.value })}
+          type="text" />
+          </InputGroup>
+        </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={this.hideModal}>
             Close
           </Button>
-          <Button variant="primary" onClick={this.hideModal}>
+          <Button variant="primary" onClick={this.onSubmit} >
             Save Changes
           </Button>
         </Modal.Footer>

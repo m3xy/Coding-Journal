@@ -135,6 +135,7 @@ class Code extends React.Component {
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
     console.log(window.projectID);
+    
 
   }
   render() {
