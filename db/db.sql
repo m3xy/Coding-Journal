@@ -1,6 +1,6 @@
 -- Create and use database (for testing)
-CREATE DATABASE IF NOT EXISTS testdb;
-USE testdb;
+CREATE DATABASE IF NOT EXISTS mydb;
+USE mydb;
 
 -- table for storing basic user information and credentials. Other info like user description, articles published
 -- etc. can all be kept in other tables.
