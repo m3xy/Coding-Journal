@@ -2,12 +2,8 @@
 CREATE DATABASE IF NOT EXISTS testdb;
 USE testdb;
 
-/*
-users table
-
-table for storing basic user information and credentials. Other info like user description, articles published
-etc. can all be kept in other tables.
-*/
+-- table for storing basic user information and credentials. Other info like user description, articles published
+-- etc. can all be kept in other tables.
 CREATE TABLE IF NOT EXISTS users (
   id varchar(64) NOT NULL DEFAULT UUID(), -- id which is auto-generated during user registration
 
@@ -18,10 +14,10 @@ CREATE TABLE IF NOT EXISTS users (
   -- necessary user info
   firstName varchar(32) NOT NULL, -- first name of the user
   lastName varchar(32) NOT NULL, -- last name of the user
-  userType int NOT NULL DEFAUlT 4,
+  userType int NOT NULL DEFAULT 4, -- user type as an integer (mapped to constants in db.go)
 
   -- extra/optional user info
-  phoneNumber varchar(11), -- user phone number, is optional, 11 chars to allow for + and 10 digits
+  phonenumber varchar(11), -- user phone number, is optional, 11 chars to allow for + and 10 digits
   organization varchar(32), -- organization the user is associated with (research org or company)
 
   CONSTRAINT userTypeCheck CHECK (userType IN (0, 1, 2, 3, 4)), -- makes userType into an integer backed enum
@@ -57,7 +53,7 @@ CREATE TABLE IF NOT EXISTS idMappings (
   FOREIGN KEY (localId) REFERENCES users(id) -- makes local id track to the users table
 );
 
-/*
+/* 
 Projects Table
 
 table to store project ID -> name mappings. Note that in the filesystem,
