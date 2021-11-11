@@ -7,6 +7,8 @@
  * All files send data through this class so that there is a common way of doing so
  */
 
+import { history } from "../_helpers"
+
 // URL endpoints for backend functions
 const loginEndpoint = '/login'
 const registerEndpoint = '/register'
@@ -51,6 +53,7 @@ class DataWriter {
             // this.userID = request.responseText;
 
             document.cookie = "userID=" + request.responseText + "; SameSite=Lax"; //Set a session cookie for logged in user
+            history.push('/');
 
             // TEMP: return response here, set the state of the login widget to be login approved
         })

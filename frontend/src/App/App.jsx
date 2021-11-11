@@ -74,7 +74,7 @@ class App extends React.Component {
                         <Router history={history}>
                             <Navigation />
                             <Switch>
-                                <PrivateRoute exact path="/" component={() => <Home />} />
+                                <Route exact path="/" component={() => <Home />} />
                                 <Route path="/login" component={() => <Login 
                                     login={(email, password) => this.writer.loginUser(email, password)}/>} 
                                 />
