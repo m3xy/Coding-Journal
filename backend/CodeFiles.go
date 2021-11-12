@@ -852,3 +852,73 @@ func getProjectFiles(projectId int) ([]string, error) {
 	}
 	return files, nil
 }
+
+// ---------------
+// Supergroup File Transfer
+// ---------------
+
+// Router function to import Journal submissions (projects) from other journals
+//
+// Responses:
+// 	- 200 : if the action completed successfully
+// 	- 400 : if the request is badly formatted
+// 	- 500 : if something goes wrong on our end
+func importFromJournal(w http.ResponseWriter, r *http.Request) {
+	// set content type for return
+	w.Header().Set("Content-Type", "application/json")
+
+	// parses the data into a structure
+	var submission *SupergroupSubmission
+	err := json.NewDecoder(r.Body).Decode(submission)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// moves the data from the structure into a locally compliant format
+	// don't receive user email, so it creates a fake one
+	authorEmail := fmt.Sprintf("%s@email.com",
+		strings.Replace(submission.Metadata.AuthorName, " ", "_", 4))
+	author := &Credentials{
+		Fname: strings.Split(submission.Metadata.AuthorName, " ")[0],
+		Lname: strings.Split(submission.Metadata.AuthorName, " ")[1],
+		Email: authorEmail,
+		Pw: "password", // defaults to password here as we have no way of identifying users
+		Usertype: USERTYPE_PUBLISHER,
+	}
+	authorId, err := registerUser(author)
+	// formats the data in a project
+	project := &Project{
+		Name: strings.Replace(submission.Name, " ", "_", 10), // default is 10 spaces to replace
+		Reviewers: []string{},
+		Authors: []string{authorId},
+		FilePaths: []string{},
+	}
+
+	// adds the project
+	projectId, err := addProject(project)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	project.Id = projectId
+
+	// adds the file
+	for _, submissionFile := range submission.Files {
+		file := &File{
+			ProjectId: projectId,
+			ProjectName: project.Name,
+			Name: submissionFile.Name,
+			Path: submissionFile.Name,
+			Content: submissionFile.Content,
+		}
+		_, err = addFileTo(file, projectId)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+	
+	// writes status OK if nothing goes wrong
+	w.WriteHeader(http.StatusOK)
+}

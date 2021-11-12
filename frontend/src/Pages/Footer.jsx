@@ -1,3 +1,9 @@
+/**
+ * Footer.jsx
+ * Author: 190010714
+ * 
+ * Footer Component
+ */
 import React from "react";
 
 function Footer() {

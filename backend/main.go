@@ -24,6 +24,7 @@ const (
 
 	// end points for URLs
 	ENDPOINT_LOGIN = "/login"
+	ENDPOINT_LOGIN_GLOBAL = "/glogin"
 	ENDPOINT_SIGNUP = "/register"
 	ENDPOINT_ALL_PROJECTS = "/projects"
 	ENDPOINT_PROJECT = "/project"
@@ -71,7 +72,13 @@ func main() {
 func setupCORSsrv() *http.Server {
 	// Set up login and signup functions
 	router := mux.NewRouter()
+	router.Methods("OPTIONS").HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
+		setupResponse(w, r)
+	})
+
+	// Setup all routes.
 	router.HandleFunc(ENDPOINT_LOGIN, logIn)
+	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal)
 	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
 	router.HandleFunc(ENDPOINT_ALL_PROJECTS, getAllProjects)
 	router.HandleFunc(ENDPOINT_PROJECT, getProject)

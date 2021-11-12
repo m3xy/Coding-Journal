@@ -1,3 +1,13 @@
+<<<<<<< HEAD
+=======
+/**
+ * Register.jsx
+ * Author: 190010714
+ * 
+ * Page to register new users to the Journal
+ */
+
+>>>>>>> origin/go-mvp
 import React from 'react';
 import { Form, Button } from 'react-bootstrap';
 

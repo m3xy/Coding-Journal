@@ -1,6 +1,6 @@
 /**
  * DataWriter.jsx
- * author: 190010425, 190019931
+ * author: 190010425, 190019931, 190010714
  * created: October 26, 2021
  * 
  * This file contains a class to send data to the Go backend code via http
@@ -121,6 +121,13 @@ class DataWriter {
         request.send(JSON.stringify(data))
     }
 
+     /**
+     * Author: 190010714
+     * Sends a POST request to the go server to register a new user
+     * 
+     * @param file the file ID for which we wish to render the code
+     * @param project the project ID in which the file is located
+     */
     getCode(file, project) {
         // constructs JSON data to send to the backend
         let data = {
@@ -152,6 +159,15 @@ class DataWriter {
 
     }
     
+     /**
+     * Author: 190010714
+     * Sends a POST request to the go server to uplaod a new comment
+     * 
+     * @param file the file ID for the file on which the comment was made
+     * @param project the project ID for the project in which the file is in
+     * @param author the author of the comment
+     * @param content the content of the comment
+     */
     uploadComment(file, project, author, content) {
         // constructs JSON data to send to the backend
         let data = {

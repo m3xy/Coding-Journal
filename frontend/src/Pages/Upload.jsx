@@ -65,6 +65,7 @@ class Upload extends React.Component {
             console.log("Project ID: " + project);
             var codePage = window.open("/code");
             codePage.project = project;
+            codePage.projectName = this.state.projectName;
         }, (error) => {
             console.log(error);
         });

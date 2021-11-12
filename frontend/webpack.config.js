@@ -26,7 +26,20 @@ module.exports = {
     })],
     devServer: {
         historyApiFallback: true,
-	    port: 23409
+        injectClient: false,
+        port: 23409,
+        proxy: {
+            '/api/*': {
+                target: 'http://localhost:3333',
+                secure: false,
+                changeOrigin: true,
+                headers: {
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Credentials': '*',
+                  'Access-Control-Allow-Methods': '*'
+              }
+            }
+          }
     },
     externals: {
         // global app config object
