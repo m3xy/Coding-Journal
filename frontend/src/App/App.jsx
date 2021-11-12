@@ -83,11 +83,12 @@ class App extends React.Component {
                                 />
                                 <Route path="/about" exact component={() => <About />} />
                                 <Route path="/code" exact component={() => <Code
-                                     code={(file, project) => this.writer.getCode(file, project), (userID, projectName, files, content) => this.writer.uploadComment(userID, projectName, files, content)}/>}
+                                     code={(file, project) => this.writer.getCode(file, project)}/>}
                                 />
                                 <Route path="/contact" exact component={() => <Contact />} />
                                 <Route path="/commentModal" exact component={() => <CommentModal
-                                />} />
+                                    comment={(userID, projectName, files, content) => this.writer.uploadComment(userID, projectName, files, content)}/>} 
+                                    />
                                 <Route path="/upload" exact component={() => <Upload 
                                     upload={(userID, projectName, files) => this.writer.uploadFiles(userID, projectName, files)}/>} />
                                 <Route path="/profile" exact component={() => <Profile

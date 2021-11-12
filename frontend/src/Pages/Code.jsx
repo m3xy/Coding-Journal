@@ -10,7 +10,7 @@ import Prism from "prismjs";
 import CommentModal from "./CommentModal";
 
 // import "./prism.css";
-
+import { Button } from "react-bootstrap"
 import {Helmet} from "react-helmet";
 
 
@@ -20,18 +20,23 @@ class Code extends React.Component {
         super(props)
 
         this.state = {
-            file: window.projectName,
-            project: window.projectID,
+            file: 'CountToFifteen.java',
+            project: 8,
             content: 'hello',
             authorID: '11d38ba6c5-435b-11ec-bb68-320e0198aa16'
 
             
         }
 
-        this.handleSubmit = this.handleSubmit.bind(this);
+        this.redirectToComment = this.redirectToComment.bind(this);
     }
 
-    handleSubmit(e) {
+redirectToComment() {
+        var commentPage = window.open('/commentModal')
+        commentPage.project = this.project 
+        commentPage.file = this.file
+        console.log('project: ' + this.project)
+        console.log('file: ' + this.file)
 
     }
   componentDidMount() {
@@ -39,8 +44,7 @@ class Code extends React.Component {
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
     console.log(window.project);
-    console.log("ID Passed" + window.project);
-    console.log("Project Name Passed" + window.projectName)
+   
     
     
 
@@ -64,12 +68,6 @@ class Code extends React.Component {
     }, (error) => {
         console.log(error);
     });
-
-    // this.props.code(this.state.file, this.state.project, this.state.authorID, this.state.content).then((files) => {
-    //     console.log("received:" + files);
-    // }, (error) => {
-    //     console.log(error);
-    // });
    
     
     console.log("Code submitted");
@@ -77,14 +75,17 @@ class Code extends React.Component {
   }
   render() {
     const code = ''
+    console.log('Type: ' + typeof window.project)
     return (
     <div className="renderCode">
         <h2 style={{textAlign: 'center',}} >Circular Queue</h2>
         <h4 style={{textAlign: 'center',}}>Author:  </h4>
-        <CommentModal/>
+        <Button color='primary' className='px-4' onClick={this.redirectToComment}>
+            Go To Comments
+        </Button>
         <pre className="line-numbers">
             <code className="language-java">
-            {code}
+            {window.project.content}
             </code>
         </pre>
     </div>

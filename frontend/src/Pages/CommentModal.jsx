@@ -57,14 +57,14 @@ class CommentModal extends React.Component{
 
    
 
-    this.props.comment(this.state.file, this.state.project, userID, this.state.val).then((files) => {
+    this.props.comment('CountToFifteen.java', 8, userID.substring(11,50), this.state.val).then((files) => {
         console.log("received:" + files);
     }, (error) => {
         console.log(error);
     });
    
     
-    console.log("Code submitted");
+    console.log("Comment submitted");
 
   }
 
