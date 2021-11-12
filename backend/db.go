@@ -108,7 +108,7 @@ type File struct {
 	// name of the project this file is a part of
 	ProjectName string `json:"projectName"`
 	// relative path to the file from the root of the project
-	Path string `json:"path" db:"filePath"`
+	Path string `json:"filePath" db:"filePath"`
 	// base name of the file with extension
 	Name string `json:"name"`
 	// content of the file encoded as a Base64 string

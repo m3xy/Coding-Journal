@@ -114,10 +114,12 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else {
-		json.NewEncoder(w).Encode(info)
 	}
+
+	// Get map of project IDs to project names.
 }
+
+
 
 /*
 	Log in to website with any server's database.

@@ -31,7 +31,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -83,13 +82,11 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	projectId, err := addProject(wrapperProject)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		log.Println(err)
 		return
 	}
 	_, err = addFileTo(file, projectId)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		log.Println(err)
 		return
 	}
 	wrapperProject.Id = projectId
@@ -111,16 +108,18 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 // 	400 : if the comment was not sent in the proper format
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	
+	// parses the json request body into a map
 	var request map[string]interface{}
-	json.NewDecoder(r.Body).Decode(&request)
-
-	// gets project Id and file path
-	filePath := request[getJsonTag(&File{}, "Path")].(string)
-	projectId, err := strconv.Atoi(request[getJsonTag(&File{}, "ProjectId")].(string))
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// gets project Id and file path
+	filePath := request[getJsonTag(&File{}, "Path")].(string)
+	projectId := int(request[getJsonTag(&File{}, "ProjectId")].(float64))
 	// Parse data into Comment structure
 	comment := &Comment{
 		AuthorId: request[getJsonTag(&Comment{}, "AuthorId")].(string), // authors user id
@@ -291,7 +290,7 @@ func addFileTo(file *File, projectId int) (int, error) {
 		return 0, err
 	}
 	// Write empty CodeFileData as json so comments and other data can be added later.
-	jsonString, err := json.Marshal(&CodeFileData{})
+	jsonString, err := json.Marshal(&CodeFileData{Comments: []*Comment{}})
 	if err != nil {
 		return 0, err
 	}
@@ -503,9 +502,15 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the file path and project Id from the header
-	filePath := string(r.Header.Get("file"))
-	projectId, err := strconv.Atoi(r.Header.Get("project")) // TEMP: don't hard code this
+	// gets the file path and project Id from the request body
+	var request map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	filePath := request[getJsonTag(&File{}, "Path")].(string)
+	projectId := int(request[getJsonTag(&File{}, "ProjectId")].(float64))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -665,13 +670,19 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// creates an empty project and gets the project id from the Get request header. If the header
-	// does not contain an int value, return BadRequest header
-	projectId, err := strconv.Atoi(r.Header.Get("project")) // TEMP: don't hard code this
+	// gets the file path and project Id from the request body
+	var request map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	projectId := int(request[getJsonTag(&Project{}, "Id")].(float64))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	// creates a project with the given ID
 	project := &Project{Id: projectId}
 

@@ -927,20 +927,20 @@ func TestGetProject(t *testing.T) {
 		}
 
 		// creates a request to get a project of a given id
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), nil)
+		reqBody, err := json.Marshal(map[string]interface{} {
+			getJsonTag(&Project{}, "Id"): projectId,
+		})
 		if err != nil {
 			t.Errorf("Error Retrieving Project: %v", err)
 		}
 		// sets a custom header of "project":id to query the specific project id
-		req.Header.Set("project", fmt.Sprint(testProject.Id))
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), bytes.NewBuffer(reqBody))
 		resp, err := sendSecureRequest(req)
-		defer resp.Body.Close()
-		if err != nil {
-			t.Errorf("Error sending request to the go server: %v", err)
-		}
 		if err != nil {
 			t.Errorf("Error while sending Get request: %v", err)
 		}
+		defer resp.Body.Close()
+
 		// if an error occurred while getting the file, it is printed out here
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Error: %d", resp.StatusCode)
@@ -1029,17 +1029,22 @@ func TestGetFile(t *testing.T) {
 		// sets the project id of the added file to link it with the project on this end (just in case. This should happen in addFileTo)
 		testFile.ProjectId = projectId
 
-		// creates a request to get a file of a given path in a given project
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), nil)
+		// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
+		reqBody, err := json.Marshal(map[string]interface{} {
+			getJsonTag(&File{}, "Path"): testFile.Path,
+			getJsonTag(&File{}, "ProjectId"): testFile.ProjectId,
+		})
+		if err != nil {
+			t.Errorf("Error formatting request body: %v", err)
+		}
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), bytes.NewBuffer(reqBody))
 		if err != nil {
 			t.Errorf("Error creating request: %v\n", err)
 		}
-		// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
-		req.Header.Set("file", testFile.Path)
-		req.Header.Set("project", fmt.Sprint(projectId))
+		// send POST request
 		resp, err := sendSecureRequest(req)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("Error occurred in request: %v", err)
 		}
 		defer resp.Body.Close()
 		// if an error occurred while querying, it's status code is printed here
@@ -1096,7 +1101,6 @@ Test Depends on:
 	- TestAddFile()
 */
 func TestUploadSingleFile(t *testing.T) {
-
 	var err error
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
@@ -1220,11 +1224,11 @@ func TestUploadUserComment(t *testing.T) {
 		testComment.AuthorId = testAuthor.Id // sets test comment author
 
 		// formats the request body to send to the server to add a comment
-		reqBody, err := json.Marshal(map[string]string {
-			getJsonTag(&File{}, "ProjectId"):fmt.Sprint(projectId),
-			getJsonTag(&File{}, "Path") :testFile.Path,
-			"author":testAuthor.Id,
-			getJsonTag(&File{}, "Content"):testComment.Content,
+		reqBody, err := json.Marshal(map[string]interface{} {
+			getJsonTag(&File{}, "ProjectId"):projectId,
+			getJsonTag(&File{}, "Path"):testFile.Path,
+			getJsonTag(&Comment{}, "AuthorId"):testAuthor.Id,
+			getJsonTag(&Comment{}, "Content"):testComment.Content,
 		})
 		if err != nil {
 			t.Errorf("Error formatting request body: %v", err)

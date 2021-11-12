@@ -83,7 +83,7 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc("/users/{"+getJsonTag(&Credentials{},"Id")+"}", getUserProfile)
 
 	// sets up handler for CORS
-	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", SECURITY_TOKEN_KEY})
 	originsOk := handlers.AllowedOrigins(allowedOrigins)
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 
