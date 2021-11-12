@@ -146,3 +146,9 @@ CREATE VIEW IF NOT EXISTS globalUserInfo AS
 	SELECT globalId, email, firstName, lastName, userType, phoneNumber, organization
 	FROM idMappings INNER JOIN users
 	ON idMappings.localId = users.id;
+
+/* View for project with user ID */
+CREATE VIEW IF NOT EXISTS projectList AS
+	SELECT userId, projectId, projectName
+	FROM authors INNER JOIN projects
+	ON authors.projectId = projects.id;

@@ -26,6 +26,7 @@ const (
 	TABLE_CATEGORIES = "categories"
 	TABLE_IDMAPPINGS = "idMappings"
 	VIEW_USER_INFO	= "globalUserInfo"
+	VIEW_PROJECTLIST = "projectList"
 
 	// TEMP: reconcile these
 	INNER_JOIN       = "%s INNER JOIN %s"

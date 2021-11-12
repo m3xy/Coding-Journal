@@ -200,9 +200,14 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/register", "application/json", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST", "http://localhost:3333/register", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Error in request: %v/n", err)
+			return
+		}
+		resp, err := sendSecureRequest(req)
+		if err != nil {
+			t.Errorf("Error in response: %v/n", err)
 			return
 		}
 		defer resp.Body.Close()
@@ -241,7 +246,12 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/register", "application/json", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST", "http://localhost:3333/register", bytes.NewBuffer(buffer))
+		if err != nil {
+			t.Errorf("Request error in already registered user: %v\n", err)
+			return
+		}
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Request error in already registered user: %v\n", err)
 			return
@@ -262,7 +272,12 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error marshalling user: %v/n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/register", "application/json", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST", "http://localhost:3333/register", bytes.NewBuffer(buffer))
+		if err != nil {
+			t.Errorf("Request error: %v\n", err.Error())
+			return
+		}
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Response error: %v\n", err.Error())
 			return
@@ -314,9 +329,14 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/login", "application/json", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST", "http://localhost:3333/login", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
+			return
+		}
+		resp, err := sendSecureRequest(req)
+		if err != nil {
+			t.Errorf("Response error on correct login: %v\n", err)
 			return
 		} else if resp.StatusCode != http.StatusOK {
 			t.Errorf("Response status should be %d, got %d\n", http.StatusOK, resp.StatusCode)
@@ -351,7 +371,12 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/login", "application/json", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST", "http://localhost:3333/login", bytes.NewBuffer(buffer))
+		if err != nil {
+			t.Errorf("Request error on correct login: %s\n", err)
+			return
+		}
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
@@ -372,7 +397,11 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		resp, err := http.Post("http://localhost:3333/login", "application/json", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST","http://localhost:3333/login", bytes.NewBuffer(buffer))
+		if err != nil {
+			t.Errorf("Request error on correct login: %v\n", err)
+		}
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
