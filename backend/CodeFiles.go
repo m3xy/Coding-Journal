@@ -56,12 +56,6 @@ const (
 // Responses:
 //	- 200 : if action completes successfully
 func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
-	// Set up response and check for OPTIONS.
-	setupResponse(&w, r)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	var request map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&request)
@@ -114,12 +108,6 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 // 	200 : comment was added succesfully
 // 	400 : if the comment was not sent in the proper format
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
-	// Set up response and check for OPTIONS.
-	setupResponse(&w, r)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	
 	// parses the json request body into a map
@@ -512,12 +500,6 @@ func addComment(comment *Comment, fileId int) error {
 //				content: string
 //				replies: object (same as comments)			
 func getFile(w http.ResponseWriter, r *http.Request) {
-	// Set up response and check for OPTIONS.
-	setupResponse(&w, r)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
@@ -636,12 +618,6 @@ func getFileComments(dataPath string) ([]*Comment, error) {
 // Response Body:
 //	A JSON object of form: {...<project id>:<project name>...}
 func getAllProjects(w http.ResponseWriter, r *http.Request) {
-	// Set up response and check for OPTIONS.
-	setupResponse(&w, r)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
 	// uses getUserProjects to get all user projects by setting authorId = *
@@ -670,12 +646,6 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 // Response Body:
 //	A marshalled Project struct (contained in db.go) 
 func getProject(w http.ResponseWriter, r *http.Request) {
-	// Set up response and check for OPTIONS.
-	setupResponse(&w, r)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
@@ -894,12 +864,6 @@ func getProjectFiles(projectId int) ([]string, error) {
 // 	- 400 : if the request is badly formatted
 // 	- 500 : if something goes wrong on our end
 func importFromJournal(w http.ResponseWriter, r *http.Request) {
-	// Set up response and check for OPTIONS.
-	setupResponse(&w, r)
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
 

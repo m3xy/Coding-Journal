@@ -136,9 +136,9 @@ func sendSecureRequest(req *http.Request) (*http.Response, error) {
 }
 
 // Setup a response when OPTIONS is received.
-func setupResponse(w *http.ResponseWriter, r *http.Request) {
+func setupResponse(w http.ResponseWriter, r *http.Request) {
 	for key, val := range CORSHeaders {
-		(*w).Header().Set(key, val)
+		w.Header().Set(key, val)
 	}
 }
 
