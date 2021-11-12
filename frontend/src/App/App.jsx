@@ -69,7 +69,7 @@ class App extends React.Component {
     }
 
     render() {
-        const { alert } = this.props;
+        
         return (
                         <Router history={history}>
                             <Navigation />
@@ -82,11 +82,15 @@ class App extends React.Component {
                                     register={(firstname, lastname, email, password) => this.writer.registerUser(firstname, lastname, email, password)}/>} 
                                 />
                                 <Route path="/about" exact component={() => <About />} />
-                                <Route path="/code" exact component={() => <Code />} />
+                                <Route path="/code" exact component={() => <Code
+                                     code={(file, project) => this.writer.getCode(file, project), (userID, projectName, files, content) => this.writer.uploadComment(userID, projectName, files, content)}/>}
+                                />
                                 <Route path="/contact" exact component={() => <Contact />} />
-                                <Route path="/commentModal" exact component={() => <CommentModal />} />
+                                <Route path="/commentModal" exact component={() => <CommentModal
+                                />} />
                                 <Route path="/upload" exact component={() => <Upload 
-                                    upload={(userID, projectName, files) => this.writer.uploadFiles(userID, projectName, files)}/>} />
+                                    upload={(userID, projectName, files) => this.writer.uploadFiles(userID, projectName, files)}
+                                    />} />
                                 <Route path="/profile" exact component={() => <Profile />} />
                                 <Redirect from="*" to="/" />
                             </Switch>

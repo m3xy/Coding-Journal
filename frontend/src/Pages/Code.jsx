@@ -12,133 +12,68 @@ import CommentModal from "./CommentModal";
 
 import {Helmet} from "react-helmet";
 
-const code = `
-package DataStructures.Queues;
 
-//This program implements the concept of CircularQueue in Java
-//Link to the concept: (https://en.wikipedia.org/wiki/Circular_buffer)
-
-public class CircularQueue {
-    public static void main(String[] args) {
-        circularQueue cq= new circularQueue(5);
-        System.out.println(cq.isEmpty());
-        System.out.println(cq.isFull());
-        cq.enQueue(1);
-        cq.enQueue(2);
-        cq.enQueue(3);
-        cq.enQueue(4);
-        cq.enQueue(5);
-
-        System.out.println(cq.deQueue());
-        System.out.println(cq.deQueue());
-        System.out.println(cq.deQueue());
-        System.out.println(cq.deQueue());
-        System.out.println(cq.deQueue());
-        System.out.println(cq.isFull());
-        System.out.println(cq.isEmpty());
-        cq.enQueue(6);
-        cq.enQueue(7);
-        cq.enQueue(8);
-        System.out.println(cq.peek());
-        System.out.println(cq.peek());
-        cq.deleteQueue();
-
-    }
-}
-class circularQueue{
-    int[] arr;
-    int topOfQueue;
-    int beginningOfQueue;
-    int size;
-    public circularQueue(int size){
-        arr=new int[size];
-        topOfQueue=-1;
-        beginningOfQueue=-1;
-        this.size=size;
-    }
-    public boolean isEmpty(){
-        if(beginningOfQueue==-1){
-            return true;
-        }else{
-            return false;
-        }
-    }
-
-    public boolean isFull(){
-        if(topOfQueue+1==beginningOfQueue){
-            return true;
-        }else if(topOfQueue==size-1 && beginningOfQueue==0){
-            return true;
-        }else{
-            return false;
-        }
-    }
-
-    public void enQueue(int value){
-        if(isFull()){
-            System.out.println("The Queue is full!");
-        }
-        else if(isEmpty()) {
-            beginningOfQueue=0;
-            topOfQueue++;
-            arr[topOfQueue]=value;
-            System.out.println(value+" has been successfully inserted!");
-        }else{
-            if(topOfQueue+1==size){
-                topOfQueue=0;
-            }else{
-                topOfQueue++;
-            }
-            arr[topOfQueue]=value;
-            System.out.println(value+" has been successfully inserted!");
-        }
-    }
-
-    public int deQueue(){
-        if(isEmpty()){
-            System.out.println("The Queue is Empty!");
-            return -1;
-        }else{
-            int res= arr[beginningOfQueue];
-            arr[beginningOfQueue]=Integer.MIN_VALUE;
-            if(beginningOfQueue==topOfQueue){
-                beginningOfQueue=topOfQueue=-1;
-            }else if(beginningOfQueue+1==size){
-                beginningOfQueue=0;
-            }else{
-                beginningOfQueue++;
-            }
-            return res;
-        }
-
-    }
-
-    public int peek(){
-        if(isEmpty()){
-            System.out.println("The Queue is Empty!");
-            return -1;
-        }else{
-            return arr[beginningOfQueue];
-        }
-    }
-
-    public void deleteQueue(){
-        arr=null;
-        System.out.println("The Queue is deleted!");
-    }
-
-}
-`.trim()
 
 class Code extends React.Component {
+    constructor(props){
+        super(props)
+
+        this.state = {
+            file: 'VendingMachine.java',
+            project: 1,
+            content: 'hello',
+            authorID: '11d38ba6c5-435b-11ec-bb68-320e0198aa16'
+
+            
+        }
+
+        this.handleSubmit = this.handleSubmit.bind(this);
+    }
+
+    handleSubmit(e) {
+
+    }
   componentDidMount() {
+    
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
     console.log(window.projectID);
     
+    
+
+    let userID = null;                          //Preparing to get userID from session cookie
+    let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
+    for(let i = 0; i < cookies.length; i++){    //For each cookie,
+        let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
+        if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
+            userID = cookie[1].trim();
+            break;
+        }
+    }
+
+    if(userID === null){                        //If user has not logged in, disallow submit
+        console.log("Not logged in");
+        return;
+    }
+
+    this.props.code(this.state.file, this.state.project).then((files) => {
+        console.log("received:" + files);
+    }, (error) => {
+        console.log(error);
+    });
+
+    this.props.code(this.state.file, this.state.project, this.state.authorID, this.state.content).then((files) => {
+        console.log("received:" + files);
+    }, (error) => {
+        console.log(error);
+    });
+   
+    
+    console.log("Code submitted");
 
   }
   render() {
+    const code = ''
     return (
     <div className="renderCode">
         <h2 style={{textAlign: 'center',}} >Circular Queue</h2>

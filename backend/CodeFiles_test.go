@@ -923,13 +923,22 @@ func TestGetProject(t *testing.T) {
 
 		// creates a request to get a project of a given id
 		client := &http.Client{}
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), nil)
+		reqBody, err := json.Marshal(map[string]interface{} {
+			getJsonTag(&Project{}, "Id"): projectId,
+		})
 		if err != nil {
-			t.Errorf("Error Retrieving Project: %v", err)
+			t.Errorf("Error formatting request body: %v", err)
 		}
-		// sets a custom header of "project":id to query the specific project id
-		req.Header.Set("project", fmt.Sprint(testProject.Id))
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), bytes.NewBuffer(reqBody))
+		if err != nil {
+			t.Errorf("Error creating request: %v\n", err)
+		}
+
+		// sends POST request to server
 		resp, err := client.Do(req)
+		if err != nil {
+			t.Errorf("Error with request: %v", err)
+		}
 		defer resp.Body.Close()
 		if err != nil {
 			t.Errorf("Error sending request to the go server: %v", err)
@@ -1027,16 +1036,21 @@ func TestGetFile(t *testing.T) {
 
 		// creates a request to get a file of a given path in a given project
 		client := &http.Client{}
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), nil)
+		reqBody, err := json.Marshal(map[string]interface{} {
+			getJsonTag(&File{}, "Path"): testFile.Path,
+			getJsonTag(&File{}, "ProjectId"): testFile.ProjectId,
+		})
+		if err != nil {
+			t.Errorf("Error formatting request body: %v", err)
+		}
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), bytes.NewBuffer(reqBody))
 		if err != nil {
 			t.Errorf("Error creating request: %v\n", err)
 		}
-		// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
-		req.Header.Set("file", testFile.Path)
-		req.Header.Set("project", fmt.Sprint(projectId))
+		// send POST request
 		resp, err := client.Do(req)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("Error occurred in request: %v", err)
 		}
 		defer resp.Body.Close()
 		// if an error occurred while querying, it's status code is printed here
@@ -1093,7 +1107,6 @@ Test Depends on:
 	- TestAddFile()
 */
 func TestUploadSingleFile(t *testing.T) {
-
 	var err error
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
@@ -1219,11 +1232,11 @@ func TestUploadUserComment(t *testing.T) {
 
 		// formats the request body to send to the server to add a comment
 		client := &http.Client{}
-		reqBody, err := json.Marshal(map[string]string {
-			"projectId":fmt.Sprint(projectId),
-			"filePath":testFile.Path,
-			"author":testAuthor.Id,
-			"content":testComment.Content,
+		reqBody, err := json.Marshal(map[string]interface{} {
+			getJsonTag(&File{}, "ProjectId"):projectId,
+			getJsonTag(&File{}, "Path"):testFile.Path,
+			getJsonTag(&Comment{}, "AuthorId"):testAuthor.Id,
+			getJsonTag(&Comment{}, "Content"):testComment.Content,
 		})
 		if err != nil {
 			t.Errorf("Error formatting request body: %v", err)
