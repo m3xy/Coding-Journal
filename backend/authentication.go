@@ -45,6 +45,7 @@ const (
 */
 func logIn(w http.ResponseWriter, r *http.Request) {
 
+	log.Println("Log in function sent!")
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 	respMap := make(map[string]string)
@@ -94,6 +95,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 */
 func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	// Check security token.
+	log.Printf("user profile request sent!")
 	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -150,7 +152,7 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 */
 func logInGlobal(w http.ResponseWriter, r *http.Request) {
 
-	log.Println("Updog!")
+	log.Println("Global login request sent!")
 	propsMap := make(map[string]string)
 	err := json.NewDecoder(r.Body).Decode(&propsMap)
 	if err != nil {
@@ -215,6 +217,7 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
   Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
+	log.Println("Sign up request sent!")
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.

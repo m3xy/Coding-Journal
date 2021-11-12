@@ -20,7 +20,7 @@ const (
 var CORSHeaders map[string]string = map[string]string {
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
-	"Acess-Control-Allow-Headers": "X-Requested-With, " + SECURITY_TOKEN_KEY,
+	"Access-Control-Allow-Headers": "X-Requested-With, " + SECURITY_TOKEN_KEY,
 }
 
 // Array of servers to connect to.
@@ -168,4 +168,5 @@ func tokenValidation(w http.ResponseWriter, r *http.Request) {
 	if !validateToken(token) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}
+	log.Printf("Token validation request sent!")
 }
