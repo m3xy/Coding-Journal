@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"errors"
 )
 
 const (
@@ -16,6 +17,11 @@ const (
 	SECURITY_KEY_SIZE = 128
 	LOG_FILE_PATH = "../cs3099-backend.log"
 )
+var CORSHeaders map[string]string = map[string]string {
+	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
+	"Acess-Control-Allow-Headers": "X-Requested-With, " + SECURITY_TOKEN_KEY,
+}
 
 // Array of servers to connect to.
 var serverArr []*Servers = []*Servers{
@@ -110,6 +116,31 @@ func securityCheck() error {
 	return nil
 }
 
+// Send a given request using needed authentication.
+func sendSecureRequest(req *http.Request) (*http.Response, error) {
+	if req == nil {
+		return nil, errors.New("Request nil!")
+	}
+	// Fetch valid security token from database.
+	storedToken := ""
+	err := db.QueryRow(fmt.Sprintf(
+		SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
+		getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
+		Scan(&storedToken)
+	if err != nil {
+		return nil, err
+	}
+	client := &http.Client{}
+	req.Header.Set(SECURITY_TOKEN_KEY, storedToken)
+	return client.Do(req)
+}
+
+// Setup a response when OPTIONS is received.
+func setupResponse(w *http.ResponseWriter, r *http.Request) {
+	for key, val := range CORSHeaders {
+		(*w).Header().Set(key, val)
+	}
+}
 
 // Validate the given security token's authenticity.
 func validateToken(token string) bool {

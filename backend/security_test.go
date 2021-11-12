@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -66,25 +65,6 @@ func TestValidateToken (t *testing.T) {
 	}
 
 	testEnd()
-}
-
-// Send a given request using needed authentication.
-func sendSecureRequest(req *http.Request) (*http.Response, error) {
-	if req == nil {
-		return nil, errors.New("Request nil!")
-	}
-	// Fetch valid security token from database.
-	storedToken := ""
-	err := db.QueryRow(fmt.Sprintf(
-		SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
-		getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
-		Scan(&storedToken)
-	if err != nil {
-		return nil, err
-	}
-	client := &http.Client{}
-	req.Header.Set(SECURITY_TOKEN_KEY, storedToken)
-	return client.Do(req)
 }
 
 func TestTokenValidation(t *testing.T) {
