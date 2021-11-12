@@ -14,8 +14,11 @@ module.exports = {
             {
                 test: /\.css/,
                 loader: 'style-loader!css-loader'
-            }
-
+            },
+            {
+                test: /\.log$/i,
+                use: 'raw-loader',
+            },
         ]
     },
     plugins: [new HtmlWebpackPlugin({

@@ -34,8 +34,7 @@ const (
 	ENDPOINT_VALIDATE = "/validate"
 )
 
-var allowedOrigins = []string{"http://localhost:3333",
-	"http://localhost:23409", "http://localhost:10533"}
+var allowedOrigins = []string{"*"}
 
 func main() {
 	srv := setupCORSsrv()

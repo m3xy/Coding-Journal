@@ -61,10 +61,10 @@ class Upload extends React.Component {
         // this.state.projectName = this.state.files[0].name;     //Temp, 1 file uploads
         // console.log(this.state.projectName);
 
-        this.props.upload(userID, this.state.projectName, this.state.files).then((projectID) => {
-            console.log("Project ID: " + projectID);
+        this.props.upload(userID, this.state.projectName, this.state.files).then((project) => {
+            console.log("Project ID: " + project);
             var codePage = window.open("/code");
-            codePage.projectID = projectID;
+            codePage.project = project;
         }, (error) => {
             console.log(error);
         });

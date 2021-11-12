@@ -8,6 +8,7 @@
  */
 
 import { history } from "../_helpers"
+import log from '../../../cs3099-backend.log'
 
 // URL endpoints for backend functions
 const loginEndpoint = '/login'
@@ -17,6 +18,9 @@ const profileEndpoint = '/users'
 
 const codeEndpoint = '/project/file'
 const commentEndpoint = '/project/file/newcomment'
+
+const tokenKey = "security token: ";
+const token = log.substr(log.lastIndexOf(tokenKey) + tokenKey.length).split('\n')[0];
 /**
  * Utility class with methods to send data to the backend via HTTP request
  * This class could be optimized by compiling many requests into a single
@@ -39,6 +43,7 @@ class DataWriter {
      * @param userPassword the user's password as a string
      */
     loginUser(userEmail, userPassword, journal) {
+
         // constructs JSON data to send to the backend
         let data = {
             email: userEmail,
@@ -48,6 +53,7 @@ class DataWriter {
 
         // create a new XMLHttpRequest
         var request = new XMLHttpRequest()
+        
         var response;
 
         // get a callback when the server responds
@@ -63,7 +69,7 @@ class DataWriter {
         })
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
         request.open('POST', this.backend_host + ':' + this.backend_port + loginEndpoint)
-        
+        request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
 
@@ -103,6 +109,7 @@ class DataWriter {
         })
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
         request.open('POST', this.backend_host + ':' + this.backend_port + registerEndpoint)
+        request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
 
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
@@ -128,7 +135,7 @@ class DataWriter {
             })
             // open the request with the verb and the url TEMP: this will potentially change with actual URL
             request.open('POST', this.backend_host + ':' + this.backend_port + codeEndpoint)
-
+            request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
             request.onerror = reject;
 
             // send the request with the JSON data as body
@@ -161,7 +168,7 @@ class DataWriter {
             })
             // open the request with the verb and the url TEMP: this will potentially change with actual URL
             request.open('POST', this.backend_host + ':' + this.backend_port + commentEndpoint)
-
+            request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
             request.onerror = reject;
 
             // send the request with the JSON data as body
@@ -226,7 +233,7 @@ class DataWriter {
             
                     // open the request with the verb and the url TEMP: this will potentially change with actual URL
                     request.open('POST', this.backend_host + ':' + this.backend_port + uploadEndpoint)
-            
+                    request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
                     // send the request with the JSON data as body
                     request.send(JSON.stringify(data))
                 })
@@ -240,22 +247,23 @@ class DataWriter {
     getProfile(userID) {
         return new Promise((resolve, reject) => {
 
-            return resolve({                 //Testing
-                firstname: "John",
-                lastname: "Doe",
-                email: "JohnDoe@gmail.com",
-                usertype: 4,
-                phonenumber: "012345678910",
-                organization: "Lonely guy",
-                projects : {
-                    1: "proj1",
-                    2 : "proj2"
-                }
-            });
+            // return resolve({                 //Testing
+            //     firstname: "John",
+            //     lastname: "Doe",
+            //     email: "JohnDoe@gmail.com",
+            //     usertype: 4,
+            //     phonenumber: "012345678910",
+            //     organization: "Lonely guy",
+            //     projects : {
+            //         1: "proj1",
+            //         2 : "proj2"
+            //     }
+            // });
 
             var request = new XMLHttpRequest();
+            
             request.open('GET', this.backend_host + ':' + this.backend_port + profileEndpoint + "/" + userID);
-
+            request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
             // get a callback when the server responds
             request.addEventListener('load', () => {
                 //Return response for code page

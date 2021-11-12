@@ -59,7 +59,8 @@ class Profile extends React.Component {
 
 	componentDidMount() {
 		this.props.getProfile(this.state.userID).then((user) => {
-			console.log(user.projects);
+			console.log(user);
+			user = JSON.parse(user);
 			this.setState({
 				firstname: user.firstname,
 				lastname: user.lastname,

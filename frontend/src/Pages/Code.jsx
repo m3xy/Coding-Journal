@@ -37,7 +37,7 @@ class Code extends React.Component {
     
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
-    console.log(window.projectID);
+    console.log(window.project);
     
     
 
@@ -56,17 +56,17 @@ class Code extends React.Component {
         return;
     }
 
-    this.props.code(this.state.file, this.state.project).then((files) => {
-        console.log("received:" + files);
-    }, (error) => {
-        console.log(error);
-    });
+    // this.props.code(this.state.file, this.state.project).then((files) => {
+    //     console.log("received:" + files);
+    // }, (error) => {
+    //     console.log(error);
+    // });
 
-    this.props.code(this.state.file, this.state.project, this.state.authorID, this.state.content).then((files) => {
-        console.log("received:" + files);
-    }, (error) => {
-        console.log(error);
-    });
+    // this.props.code(this.state.file, this.state.project, this.state.authorID, this.state.content).then((files) => {
+    //     console.log("received:" + files);
+    // }, (error) => {
+    //     console.log(error);
+    // });
    
     
     console.log("Code submitted");
