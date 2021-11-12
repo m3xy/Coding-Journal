@@ -21,15 +21,28 @@ const (
 	protocol = "tcp"
 	password = "secret"
 	dbname   = "mydb"
+
+	// end points for URLs
+	ENDPOINT_LOGIN = "/login"
+	ENDPOINT_SIGNUP = "/register"
+	ENDPOINT_ALL_PROJECTS = "/projects"
+	ENDPOINT_PROJECT = "/project"
+	ENDPOINT_FILE = "/project/file"
+	ENDPOINT_NEWFILE = "/upload"
+	ENDPOINT_USERINFO = "/users"
+	ENDPOINT_NEWCOMMENT = "/project/file/newcomment"
+	ENDPOINT_VALIDATE = "/validate"
 )
 
-var allowedOrigins = []string{"http://localhost:3333", "http://localhost:23409"}
+var allowedOrigins = []string{"http://localhost:3333",
+	"http://localhost:23409", "http://localhost:10533"}
 
 func main() {
 	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
 	dbInit(user, password, protocol, host, port, dbname)
+	securityCheck()
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
@@ -59,11 +72,18 @@ func main() {
 func setupCORSsrv() *http.Server {
 	// Set up login and signup functions
 	router := mux.NewRouter()
-	router.HandleFunc("/login", logIn)
-	router.HandleFunc("/register", signUp)
+	router.HandleFunc(ENDPOINT_LOGIN, logIn)
+	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
+	router.HandleFunc(ENDPOINT_ALL_PROJECTS, getAllProjects)
+	router.HandleFunc(ENDPOINT_PROJECT, getProject)
+	router.HandleFunc(ENDPOINT_FILE, getFile)
+	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment)
+	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile)
+	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation)
+	router.HandleFunc("/users/{"+getJsonTag(&Credentials{},"Id")+"}", getUserProfile)
 
 	// sets up handler for CORS
-	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With"})
+	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", SECURITY_TOKEN_KEY})
 	originsOk := handlers.AllowedOrigins(allowedOrigins)
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 

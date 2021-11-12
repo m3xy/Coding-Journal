@@ -15,6 +15,8 @@ const registerEndpoint = '/register'
 const uploadEndpoint = '/upload'
 const profileEndpoint = '/users'
 
+const codeEndpoint = '/project/file'
+const commentEndpoint = '/project/file/newcomment'
 /**
  * Utility class with methods to send data to the backend via HTTP request
  * This class could be optimized by compiling many requests into a single
@@ -106,6 +108,69 @@ class DataWriter {
         request.send(JSON.stringify(data))
     }
 
+    getCode(file, project) {
+        // constructs JSON data to send to the backend
+        let data = {
+            filePath: file,
+            projectId: project
+        };
+
+        return new Promise((resolve, reject) => {
+
+            // create a new XMLHttpRequest
+            var request = new XMLHttpRequest()
+            // get a callback when the server responds
+            request.addEventListener('load', () => {
+                // update the state of the component with the result here
+                resolve(request.responseText);
+
+                // TEMP: return response here, set the state of the login widget to be login approved
+            })
+            // open the request with the verb and the url TEMP: this will potentially change with actual URL
+            request.open('POST', this.backend_host + ':' + this.backend_port + codeEndpoint)
+
+            request.onerror = reject;
+
+            // send the request with the JSON data as body
+            console.log(data);
+            request.send(JSON.stringify(data))
+
+        })
+
+    }
+    
+    uploadComment(file, project, author, content) {
+        // constructs JSON data to send to the backend
+        let data = {
+            filePath: file,
+            projectId: project,
+            author: author,
+            content: content
+        };
+
+        return new Promise((resolve, reject) => {
+
+            // create a new XMLHttpRequest
+            var request = new XMLHttpRequest()
+            // get a callback when the server responds
+            request.addEventListener('load', () => {
+                // update the state of the component with the result here
+                resolve(request.responseText);
+
+                // TEMP: return response here, set the state of the login widget to be login approved
+            })
+            // open the request with the verb and the url TEMP: this will potentially change with actual URL
+            request.open('POST', this.backend_host + ':' + this.backend_port + commentEndpoint)
+
+            request.onerror = reject;
+
+            // send the request with the JSON data as body
+            console.log(data);
+            request.send(JSON.stringify(data))
+
+        })
+
+    }
 
     /**
      * Sends a POST request to the go server to upload (project) files
@@ -144,9 +209,9 @@ class DataWriter {
             Promise.all(filePromises) //Encode all files to upload into base 64 before uploading
                 .then(() => {
                     let data = {
-                        authorID : authorID,
-                        projectName : projectName,
-                        base64Value : files[0]
+                        author : authorID,
+                        name : projectName,
+                        content : files[0]
                     }
     
                     console.log(data);

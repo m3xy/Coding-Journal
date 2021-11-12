@@ -6,8 +6,8 @@ import {Modal, Button, InputGroup, FormControl} from "react-bootstrap";
 
 class CommentModal extends React.Component{
 
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
       show: false,
       val: ""
