@@ -117,6 +117,23 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get map of project IDs to project names.
+	projectsMap, err := getUserProjects(vars[getJsonTag(&Credentials{}, "Id")])
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	buffMap := map[string]interface{} {
+		getJsonTag(&Credentials{}, "Email"): info.Email,
+		getJsonTag(&Credentials{}, "Fname"): info.Fname,
+		getJsonTag(&Credentials{}, "Lname"): info.Lname,
+		getJsonTag(&Credentials{}, "Usertype"): info.Usertype,
+		getJsonTag(&Credentials{}, "PhoneNumber"): info.PhoneNumber,
+		getJsonTag(&Credentials{}, "Organization"): info.Organization,
+		"projects": projectsMap,
+	}
+	err = json.NewEncoder(w).Encode(buffMap)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 

@@ -23,6 +23,7 @@ being the extension)
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -737,10 +738,13 @@ func getUserProjects(authorId string) (map[int]string, error) {
 		// if there is an error returned by scanning the row, the error is returned
 		// without the array
 		if err := rows.Scan(&id, &projectName); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, nil
+			}
 			return nil, err
 		}
 		projects[id] = projectName
-	}	
+	}
 	return projects, nil
 }
 
