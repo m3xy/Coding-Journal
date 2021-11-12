@@ -1,5 +1,5 @@
 import React from "react";
-import { Form, Button } from "react-bootstrap";
+import { Form, Button, FloatingLabel } from "react-bootstrap";
 
 class Login extends React.Component {
 
@@ -8,7 +8,8 @@ class Login extends React.Component {
 
         this.state = {
             email: "",
-            password: ""
+            password: "",
+            journal: ""
         }
 
         this.handleSubmit = this.handleSubmit.bind(this);
@@ -17,14 +18,14 @@ class Login extends React.Component {
 
     handleSubmit(e) {
         e.preventDefault();
-        this.props.login(this.state.email, this.state.password);
+        this.props.login(this.state.email, this.state.password, this.state.journal);
 
     }
 
     handleChange(e) {
-        const { type, value } = e.target;
+        const { name, value } = e.target;
         this.setState({
-            [type]: value
+            [name]: value
         });
     }
 
@@ -37,7 +38,7 @@ class Login extends React.Component {
                 <Form onSubmit={this.handleSubmit}>
                     <Form.Group className="mb-3" controlId="email">
                         <Form.Label>Email address</Form.Label>
-                        <Form.Control type="email" placeholder="Enter email" onChange={this.handleChange} required/>
+                        <Form.Control type="email" placeholder="Enter email" name="email" onChange={this.handleChange} required/>
                         <Form.Text className="text-muted">
                         We'll never share your email with anyone else.
                         </Form.Text>
@@ -45,8 +46,25 @@ class Login extends React.Component {
 
                     <Form.Group className="mb-3" controlId="password">
                         <Form.Label>Password</Form.Label>
-                        <Form.Control type="password" placeholder="Password" onChange={this.handleChange} required/>
+                        <Form.Control type="password" placeholder="Password" name="password" onChange={this.handleChange} required/>
                     </Form.Group>
+
+                    <Form.Group className="mb-3" controlId="journal">
+                        <Form.Label>Journal</Form.Label>
+                        <Form.Select name="journal" onChange={this.handleChange} required>
+                            <option value="">Select journal</option>
+                            <option value="2">Journal 2</option>
+                            <option value="5">Journal 5</option>
+                            <option value="8">Journal 8</option>
+                            <option value="11">Journal 11</option>
+                            <option value="13">Journal 13</option>
+                            <option value="17">Journal 17</option>
+                            <option value="20">Journal 20</option>
+                            <option value="23">Journal 23</option>
+                            <option value="26">Journal 26</option>
+                        </Form.Select>
+                    </Form.Group> 
+                    <br />
                     <Button variant="primary" type="submit">
                         Login
                     </Button>

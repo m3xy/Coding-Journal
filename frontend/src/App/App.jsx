@@ -76,7 +76,7 @@ class App extends React.Component {
                             <Switch>
                                 <Route exact path="/" component={() => <Home />} />
                                 <Route path="/login" component={() => <Login 
-                                    login={(email, password) => this.writer.loginUser(email, password)}/>} 
+                                    login={(email, password, journal) => this.writer.loginUser(email, password, journal)}/>} 
                                 />
                                 <Route path="/register" component={() => <Register
                                     register={(firstname, lastname, email, password) => this.writer.registerUser(firstname, lastname, email, password)}/>} 

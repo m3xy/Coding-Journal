@@ -36,11 +36,12 @@ class DataWriter {
      * @param userEmail the user's email. Each email can only have one account
      * @param userPassword the user's password as a string
      */
-    loginUser(userEmail, userPassword) {
+    loginUser(userEmail, userPassword, journal) {
         // constructs JSON data to send to the backend
         let data = {
             email: userEmail,
-            password: userPassword
+            password: userPassword,
+            groupNumber:journal
         };
 
         // create a new XMLHttpRequest
@@ -173,7 +174,6 @@ class DataWriter {
 
     getProfile(userID) {
         return new Promise((resolve, reject) => {
-
 
             return resolve({                 //Testing
                 firstname: "John",
