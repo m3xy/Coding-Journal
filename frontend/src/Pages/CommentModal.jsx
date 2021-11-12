@@ -36,7 +36,7 @@ class CommentModal extends React.Component{
     
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
-    console.log(window.projectID);
+    console.log(window.project);
     
     
 
@@ -57,7 +57,7 @@ class CommentModal extends React.Component{
 
    
 
-    this.props.comment(Upload.state.file, Upload.state.project, userID, this.state.val).then((files) => {
+    this.props.comment(this.state.file, this.state.project, userID, this.state.val).then((files) => {
         console.log("received:" + files);
     }, (error) => {
         console.log(error);
