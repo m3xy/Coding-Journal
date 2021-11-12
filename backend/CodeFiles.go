@@ -619,40 +619,18 @@ func getFileComments(dataPath string) ([]*Comment, error) {
 func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
-
-	// queries the database for the project ID and name pairs
-	columns := fmt.Sprintf("%s, %s",
-		getDbTag(&Project{}, "Id"),
-		getDbTag(&Project{}, "Name"),
-	)
-	stmt := fmt.Sprintf(SELECT_ALL_ORDER_BY, columns, TABLE_PROJECTS)
-	rows, err := db.Query(stmt, getDbTag(&Project{}, "Name"))
+	// uses getUserProjects to get all user projects by setting authorId = *
+	projects, err := getUserProjects("*")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	// parses query result into { id : project name } mappings
-	var id int
-	var projectName string
-	projects := make(map[int]string)
-	for rows.Next() {
-		// if there is an error returned by scanning the row, the error is returned
-		// without the array
-		if err := rows.Scan(&id, &projectName); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		projects[id] = projectName
-	}
-
 	// marshals and returns the map as JSON
 	jsonString, err := json.Marshal(projects)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
 	// writes json string
 	w.Write(jsonString)
 }
@@ -730,6 +708,40 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(response)
+}
+
+// gets all authors which are written by a given user and returns them
+// 
+// Params:
+// 	authorId (string) : the global id of the author as stored in the db
+// Return:
+// 	(map[int]string) : map of project Ids to project names
+// 	(error) : an error if something goes wrong, nil otherwise
+func getUserProjects(authorId string) (map[int]string, error) {
+	// queries the database for the project ID and name pairs
+	columns := fmt.Sprintf("%s, %s",
+		getDbTag(&AuthorsReviewers{}, "ProjectId"),
+		getDbTag(&Project{}, "Name"),
+	)
+	stmt := fmt.Sprintf(SELECT_ROW, columns, VIEW_PROJECTLIST, "userId")
+	rows, err := db.Query(stmt, authorId)
+	if err != nil {
+		return nil, err
+	}
+
+	// parses query result into { id : project name } mappings
+	var id int
+	var projectName string
+	projects := make(map[int]string)
+	for rows.Next() {
+		// if there is an error returned by scanning the row, the error is returned
+		// without the array
+		if err := rows.Scan(&id, &projectName); err != nil {
+			return nil, err
+		}
+		projects[id] = projectName
+	}	
+	return projects, nil
 }
 
 // Query the authors of a given project from the database

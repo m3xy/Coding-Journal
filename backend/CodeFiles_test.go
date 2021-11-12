@@ -865,6 +865,86 @@ func TestGetAllProjects(t *testing.T) {
 }
 
 /*
+Tests the getUserProjects() function to get 
+
+Test Depends On:
+	- TestCreateProjects()
+	- TestAddReviewers()
+	- TestAddAuthors()
+*/
+func TestGetUserProjects(t *testing.T) {
+	var err error
+	testProject1 := testProjects[0] // test project to return on getUserProjects()
+	testProject2 := testProjects[1] // test project to not return on getUserProjects()
+	testAuthor := testAuthors[0] // test author of the project being queried
+	testNonAuthor := testAuthors[3] // test author of project not being queried
+
+	/*
+	test for basic functionality. Adds 2 projects to the db with different authors, then queries them and tests for equality
+	*/
+	testGetSingleProject := func () {
+		// sets up the test environment (db and filesystem)		
+		if err = initTestEnvironment(); err != nil {
+			t.Errorf("Error initializing the test environment %s", err)
+		}
+		
+		// adds two test users to the db
+		authorId, err := registerUser(testAuthor)
+		if err != nil {
+			t.Errorf("Error occurred while registering user: %v", err)
+		}
+		nonAuthorId, err := registerUser(testNonAuthor)
+		if err != nil {
+			t.Errorf("Error occurred while registering user: %v", err)
+		}
+
+		// adds two test projects to the db
+		testProject1.Id, err = addProject(testProject1)
+		if err != nil {
+			t.Errorf("Error occurred while adding project1: %v", err)
+		}
+		testProject2.Id, err = addProject(testProject2)
+		if err != nil {
+			t.Errorf("Error occurred while adding project2: %v", err)
+		}
+
+		// adds authors to the test projects
+		if err = addAuthor(authorId, testProject1.Id); err != nil{
+			t.Errorf("Failed to add author")
+		}
+		if err = addAuthor(nonAuthorId, testProject2.Id); err != nil{
+			t.Errorf("Failed to add author")
+		}
+
+		// queries all of testAuthor's projects
+		projects, err := getUserProjects(authorId)
+		if err != nil {
+			t.Errorf("Error getting user projects: %v", err)
+		}
+
+		// tests for equality of project Id and that testProject2.Id is not in the map
+		if _, ok := projects[testProject2.Id]; ok {
+			t.Errorf("Returned project where the test author is not an author")
+		} else if projects[testProject1.Id] != testProject1.Name {
+			t.Errorf("Returned incorrect project name: %s", projects[testProject1.Id])
+		}
+
+		// destroys the test environment
+		if err = clearTestEnvironment(); err != nil {
+			t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
+		}
+	}
+
+	// runs tests
+	testGetSingleProject()
+
+	// tears down the test environment (makes sure that if a test fails, the env is still cleared)
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("error while tearing down db: %v", err)
+	}
+}
+
+/*
 Tests the ability of the CodeFiles module to get a project from the db
 
 Test Depends On:
