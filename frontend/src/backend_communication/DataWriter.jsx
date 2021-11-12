@@ -70,6 +70,10 @@ class DataWriter {
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
         request.open('POST', this.backend_host + ':' + this.backend_port + loginEndpoint)
         request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
+
+        // request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        // request.setRequestHeader('Access-Control-Allow-Origin', '*');
+        
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
 
@@ -110,6 +114,8 @@ class DataWriter {
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
         request.open('POST', this.backend_host + ':' + this.backend_port + registerEndpoint)
         request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
+        request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        request.setRequestHeader('Access-Control-Allow-Origin', '*');
 
         // send the request with the JSON data as body
         request.send(JSON.stringify(data))
