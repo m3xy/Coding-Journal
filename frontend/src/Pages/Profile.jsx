@@ -15,12 +15,12 @@ class Profile extends React.Component {
 
         this.state = {
 			userID: this.getUserID(),
-			firstName: "",
-			lastName: "",
+			firstname: "",
+			lastname: "",
 			email: "",
-			userType: 0,
-			phoneNumber: "",
-			organisation: "",
+			usertype: 0,
+			phonenumber: "",
+			organization: "",
 			projects: {}
         };
 
@@ -61,12 +61,12 @@ class Profile extends React.Component {
 		this.props.getProfile(this.state.userID).then((user) => {
 			console.log(user.projects);
 			this.setState({
-				firstName: user.firstName,
-				lastName: user.lastName,
-				userType: user.userType,
+				firstname: user.firstname,
+				lastname: user.lastname,
+				usertype: user.usertype,
 				email: user.email,
-				phoneNumber: user.phoneNumber,
-				organisation: user.organisation,
+				phonenumber: user.phonenumber,
+				organization: user.organization,
 				projects: user.projects
 			});
 		})
@@ -103,8 +103,8 @@ class Profile extends React.Component {
 		return (
 			<div className="col-md-6 offset-md-3" style={{textAlign:"center"}}>
 				<br/>
-				<h2>{this.state.firstName + " " + this.state.lastName}</h2>
-				 <label>({userTypes[this.state.userType]})</label>
+				<h2>{this.state.firstname + " " + this.state.lastname}</h2>
+				 <label>({userTypes[this.state.usertype]})</label>
 				<br/><br/>
 				<Tabs justify defaultActiveKey="profile" id="profileTabs" className="mb-3">
 					<Tab eventKey="posts" title="Posts">
@@ -120,8 +120,8 @@ class Profile extends React.Component {
 					</Tab>
 					<Tab eventKey="contact" title="Contact">
 						Email: {this.state.email} <br/>
-						Phone Number: {this.state.phoneNumber}  <br/>
-						Organisation: {this.state.organisation} <br/>
+						Phone Number: {this.state.phonenumber}  <br/>
+						Organization: {this.state.organization} <br/>
 					</Tab>
 				</Tabs>
 			</div>

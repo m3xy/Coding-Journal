@@ -58,8 +58,9 @@ class Home extends React.Component {
         }
 
         return (
-            <div>
-                Logged in.
+            <div className="text-center">
+                <br/>
+                You are logged in.
                 <br/>
                 <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
             </div>

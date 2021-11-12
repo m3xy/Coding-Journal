@@ -13,7 +13,7 @@ import { history } from "../_helpers"
 const loginEndpoint = '/login'
 const registerEndpoint = '/register'
 const uploadEndpoint = '/upload'
-const profileEndpoint = '/profile'
+const profileEndpoint = '/users'
 
 /**
  * Utility class with methods to send data to the backend via HTTP request
@@ -91,7 +91,10 @@ class DataWriter {
         // get a callback when the server responds
         request.addEventListener('load', () => {
             // update the state of the component with the result here
-            console.log(request.responseText)
+            console.log(request.responseText);
+            if(request.status == 200){
+                history.push('/');
+            }
 
             // TEMP: return response here, set the state of the login widget to be login approved
         })
@@ -123,7 +126,7 @@ class DataWriter {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
-                reader.onload = function(e){
+                reader.onload = function(e) {
                     files[i] = e.target.result;
                     resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
                 } 
@@ -172,18 +175,18 @@ class DataWriter {
         return new Promise((resolve, reject) => {
 
 
-            // return resolve({                 //Testing
-            //     firstName: "John",
-            //     lastName: "Doe",
-            //     email: "JohnDoe@gmail.com",
-            //     userType: 4,
-            //     phoneNumber: "012345678910",
-            //     organisation: "Lonely guy",
-            //     projects : {
-            //         1: "proj1",
-            //         2 : "proj2"
-            //     }
-            // });
+            return resolve({                 //Testing
+                firstname: "John",
+                lastname: "Doe",
+                email: "JohnDoe@gmail.com",
+                usertype: 4,
+                phonenumber: "012345678910",
+                organization: "Lonely guy",
+                projects : {
+                    1: "proj1",
+                    2 : "proj2"
+                }
+            });
 
             var request = new XMLHttpRequest();
             request.open('GET', this.backend_host + ':' + this.backend_port + profileEndpoint + "/" + userID);
