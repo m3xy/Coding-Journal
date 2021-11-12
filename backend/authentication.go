@@ -11,6 +11,7 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -115,6 +116,68 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		json.NewEncoder(w).Encode(info)
+	}
+}
+
+/*
+	Log in to website with any server's database.
+	Content type: application/json
+	Input: {"email": string, "password": string, "groupNumber": int}
+	Success: 200, Credentials are correct.
+	Failure: 401, Unauthorized
+	Returns: userId
+*/
+func logInGlobal(w http.ResponseWriter, r *http.Request) {
+	propsMap := make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&propsMap)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Query path from team ID.
+	retServer := &Servers{}
+	stmt := fmt.Sprintf(SELECT_ROW, "*", TABLE_SERVERS, getDbTag(&Servers{}, "GroupNumber"))
+	err = db.QueryRow(stmt, propsMap[getJsonTag(&Servers{}, "GroupNumber")]).Scan(getCols(retServer)...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Make request from given URL and security token
+	delete(propsMap, getJsonTag(&Servers{}, "GroupNumber"))
+	jsonBody, err := json.Marshal(propsMap)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	globalReq, _ := http.NewRequest(
+		"POST", retServer.Url + "/login", bytes.NewBuffer(jsonBody))
+	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
+	client := &http.Client{}
+
+	// Get response from login request.
+	res, err := client.Do(globalReq)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else if res.StatusCode != http.StatusOK {
+		w.WriteHeader(res.StatusCode)
+		return
+	} else {
+		err = json.NewDecoder(res.Body).Decode(&propsMap)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		err = json.NewEncoder(w).Encode(&propsMap)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 }
 

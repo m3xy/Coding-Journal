@@ -29,6 +29,7 @@ const (
 	ENDPOINT_PROJECT = "/project"
 	ENDPOINT_FILE = "/project/file"
 	ENDPOINT_NEWFILE = "/upload"
+	ENDPOINT_USERINFO = "/users"
 	ENDPOINT_NEWCOMMENT = "/project/file/newcomment"
 	ENDPOINT_VALIDATE = "/validate"
 )

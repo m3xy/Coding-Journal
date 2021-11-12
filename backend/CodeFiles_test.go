@@ -94,7 +94,11 @@ var testFileData []*CodeFileData = []*CodeFileData{
 func initTestEnvironment() error {
 	dbInit(user, password, protocol, host, port, TEST_DB)
 	dbClear()
-	if _, err := os.Stat(TEST_FILES_DIR); err == nil {
+	err := securityCheck()
+	if err != nil {
+		return err
+	}
+	if _, err = os.Stat(TEST_FILES_DIR); err == nil {
 		os.RemoveAll(TEST_FILES_DIR)
 	}
 	if err := os.Mkdir(TEST_FILES_DIR, DIR_PERMISSIONS); err != nil {
@@ -819,7 +823,8 @@ func TestGetAllProjects(t *testing.T) {
 		}
 
 		// builds and sends and http get request
-		resp, err := http.Get(fmt.Sprintf("%s:%s/projects", TEST_URL, TEST_SERVER_PORT))
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/projects", TEST_URL, TEST_SERVER_PORT), nil)
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Error occurred while sending get request to the Go server: %v", err)
 		}
@@ -922,14 +927,13 @@ func TestGetProject(t *testing.T) {
 		}
 
 		// creates a request to get a project of a given id
-		client := &http.Client{}
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), nil)
 		if err != nil {
 			t.Errorf("Error Retrieving Project: %v", err)
 		}
 		// sets a custom header of "project":id to query the specific project id
 		req.Header.Set("project", fmt.Sprint(testProject.Id))
-		resp, err := client.Do(req)
+		resp, err := sendSecureRequest(req)
 		defer resp.Body.Close()
 		if err != nil {
 			t.Errorf("Error sending request to the go server: %v", err)
@@ -1026,7 +1030,6 @@ func TestGetFile(t *testing.T) {
 		testFile.ProjectId = projectId
 
 		// creates a request to get a file of a given path in a given project
-		client := &http.Client{}
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), nil)
 		if err != nil {
 			t.Errorf("Error creating request: %v\n", err)
@@ -1034,7 +1037,7 @@ func TestGetFile(t *testing.T) {
 		// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
 		req.Header.Set("file", testFile.Path)
 		req.Header.Set("project", fmt.Sprint(projectId))
-		resp, err := client.Do(req)
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Error(err)
 		}
@@ -1097,7 +1100,7 @@ func TestUploadSingleFile(t *testing.T) {
 	var err error
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
-	testFile := testFiles[0] 
+	testFile := testFiles[0]
 	testAuthor := testAuthors[0]
 
 	// Set up server to listen with the getFile() function.
@@ -1121,7 +1124,6 @@ func TestUploadSingleFile(t *testing.T) {
 		}
 
 		// formats the request body to send to the server to add a comment
-		client := &http.Client{}
 		reqBody, err := json.Marshal(map[string]string {
 			"author": testAuthor.Id,
 			getJsonTag(&File{}, "Name"): testFile.Name,
@@ -1136,7 +1138,7 @@ func TestUploadSingleFile(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating request: %v", err)
 		}
-		resp, err := client.Do(req)
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Error executing request: %v", err)
 		}
@@ -1179,10 +1181,10 @@ func TestUploadUserComment(t *testing.T) {
 	var err error
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
-	testFile := testFiles[0] 
+	testFile := testFiles[0]
 	testProject := testProjects[0]
 	testAuthor := testAuthors[0]
-	testComment := testComments[0] 
+	testComment := testComments[0]
 
 	// Set up server to listen with the getFile() function.
 	srv := setupCORSsrv()
@@ -1218,12 +1220,11 @@ func TestUploadUserComment(t *testing.T) {
 		testComment.AuthorId = testAuthor.Id // sets test comment author
 
 		// formats the request body to send to the server to add a comment
-		client := &http.Client{}
 		reqBody, err := json.Marshal(map[string]string {
-			"projectId":fmt.Sprint(projectId),
-			"filePath":testFile.Path,
+			getJsonTag(&File{}, "ProjectId"):fmt.Sprint(projectId),
+			getJsonTag(&File{}, "Path") :testFile.Path,
 			"author":testAuthor.Id,
-			"content":testComment.Content,
+			getJsonTag(&File{}, "Content"):testComment.Content,
 		})
 		if err != nil {
 			t.Errorf("Error formatting request body: %v", err)
@@ -1234,7 +1235,7 @@ func TestUploadUserComment(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating request: %v", err)
 		}
-		resp, err := client.Do(req)
+		resp, err := sendSecureRequest(req)
 		if err != nil {
 			t.Errorf("Error executing request: %v", err)
 		}

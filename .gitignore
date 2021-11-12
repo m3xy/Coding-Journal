@@ -6,6 +6,8 @@
 /frontend/node_modules
 /.pnp
 .pnp.js
+filesystem
+cs3099-backend.log
 
 # testing
 /coverage
