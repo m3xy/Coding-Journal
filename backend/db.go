@@ -116,7 +116,6 @@ type File struct {
 	Content string `json:"content"`
 	// user comments on the file
 	Comments []*Comment `json:"comments"`
-	// TEMP: add more fields (i.e. reviewer comments)
 }
 
 // Structure for user comments on code
@@ -142,6 +141,30 @@ type CodeFileData struct {
 	// TEMP: add IsReviewed field
 	Comments []*Comment `json:"comments"`
 }
+
+// structure to hold supergroup compliant project metadata
+type SupergroupSubmissionMetaData struct {
+	// creation date of the project
+	CreationDate string `json:"creationDate"`
+	// author name
+	AuthorName string `json:"authorName"`
+}
+
+type SuperGroupFile struct {
+	Name string `json:"filename"`
+	Content string `json:"base64Value"`
+}
+
+// structure to hold formatted supergroup submissions
+type SupergroupSubmission struct {
+	// name of the project
+	Name string `json:"name"`
+	// metadata about the submission
+	Metadata *SupergroupSubmissionMetaData `json:"metadata"`
+	// files array
+	Files []*SuperGroupFile `json:"files"`
+}
+
 
 // Structure for servers.
 type Servers struct {
