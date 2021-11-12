@@ -1,6 +1,6 @@
 /**
  * Register.jsx
- * author: 190010714
+ * Author: 190010714
  * 
  * Page to register new users to the Journal
  */

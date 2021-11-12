@@ -19,7 +19,7 @@ function About() {
 					<div className="col-lg-5">
 						<h1 className="font-weight-light">About</h1>
 						<p>
-							<code>TODO</code>
+							<code>Test</code>
 						</p>
 					</div>
 				</div>

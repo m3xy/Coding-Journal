@@ -1,5 +1,6 @@
 /**
  * Code.jsx
+ * Author: 190010714
  * 
  * This file stores the info for rendering the Code page of our Journal
  */
@@ -19,8 +20,8 @@ class Code extends React.Component {
         super(props)
 
         this.state = {
-            file: 'VendingMachine.java',
-            project: 1,
+            file: window.projectName,
+            project: window.projectID,
             content: 'hello',
             authorID: '11d38ba6c5-435b-11ec-bb68-320e0198aa16'
 
@@ -37,7 +38,8 @@ class Code extends React.Component {
     
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
-    console.log(window.projectID);
+    console.log("ID Passed" + window.projectID);
+    console.log("Project Name Passed" + window.projectName)
     
     
 
@@ -62,11 +64,11 @@ class Code extends React.Component {
         console.log(error);
     });
 
-    this.props.code(this.state.file, this.state.project, this.state.authorID, this.state.content).then((files) => {
-        console.log("received:" + files);
-    }, (error) => {
-        console.log(error);
-    });
+    // this.props.code(this.state.file, this.state.project, this.state.authorID, this.state.content).then((files) => {
+    //     console.log("received:" + files);
+    // }, (error) => {
+    //     console.log(error);
+    // });
    
     
     console.log("Code submitted");

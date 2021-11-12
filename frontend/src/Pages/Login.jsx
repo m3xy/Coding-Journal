@@ -1,6 +1,6 @@
 /**
  * Register.jsx
- * author: 190010714
+ * Author: 190010714
  * 
  * Page for registered users to login to the website
  */
