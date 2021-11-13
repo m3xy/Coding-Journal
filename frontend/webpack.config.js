@@ -26,7 +26,6 @@ module.exports = {
     })],
     devServer: {
         historyApiFallback: true,
-        injectClient: false,
         port: 23409,
         proxy: {
             '/api/*': {
@@ -35,11 +34,16 @@ module.exports = {
                 changeOrigin: true,
                 headers: {
                   'Access-Control-Allow-Origin': '*',
-                  'Access-Control-Allow-Credentials': '*',
-                  'Access-Control-Allow-Methods': '*'
-              }
+                  'Access-Control-Allow-Headers': 'X-Requested-With', 'X-FOREIGNJOURNAL-SECURITY-TOKEN',
+                  'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, OPTIONS'
+                }
             }
-          }
+        },
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'X-Requested-With', 'X-FOREIGNJOURNAL-SECURITY-TOKEN',
+            'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, OPTIONS'
+        }
     },
     externals: {
         // global app config object
