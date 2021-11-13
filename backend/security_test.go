@@ -10,7 +10,7 @@ const (
 	WRONG_SECURITY_TOKEN = "testwrongToken"
 )
 
-func TestRandString (t *testing.T) {
+func TestRandString(t *testing.T) {
 	// Test if given new rand string is not null.
 	if randStringBase64(1, 128) == "" {
 		t.Error("Random string empty!")
@@ -26,7 +26,7 @@ func TestRandString (t *testing.T) {
 	}
 }
 
-func TestSecurityCheck (t *testing.T) {
+func TestSecurityCheck(t *testing.T) {
 	testInit()
 	// Test security check
 	err := securityCheck()
@@ -42,7 +42,7 @@ func TestSecurityCheck (t *testing.T) {
 	testEnd()
 }
 
-func TestValidateToken (t *testing.T) {
+func TestValidateToken(t *testing.T) {
 	testInit()
 	securityCheck() // Generate the security token.
 
@@ -76,17 +76,16 @@ func TestTokenValidation(t *testing.T) {
 	go srv.ListenAndServe()
 
 	// Write valid security token response
-	validReq, err := http.NewRequest("GET", "http://localhost:3333/validate", nil)
-	res, err := sendSecureRequest(validReq)
+	validReq, err := http.NewRequest("GET", BACKEND_ADDRESS+ENDPOINT_VALIDATE, nil)
+	res, err := sendSecureRequest(validReq, TEAM_ID)
 	if err != nil {
 		t.Errorf("HTTP request error: %v\n", err)
-	} else if res.StatusCode != http.StatusOK  {
+	} else if res.StatusCode != http.StatusOK {
 		t.Errorf("Response Status code should be OK, but is %d", res.StatusCode)
 	}
 
 	// Write invalid security token response
 	client := http.Client{}
-	validReq, err = http.NewRequest("GET", "http://localhost:3333/validate", nil)
 	if err != nil {
 		t.Errorf("Request creation error: %v\n", err)
 	}

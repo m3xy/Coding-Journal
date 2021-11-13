@@ -28,7 +28,7 @@ import (
 
 const (
 	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//://_//-//+//-//=//\"//'"
-	A_NUMS = "a-zA-Z0-9"
+	A_NUMS        = "a-zA-Z0-9"
 	HASH_COST     = 8
 )
 
@@ -104,17 +104,17 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user from parameters.
 	vars := mux.Vars(r)
 	if checkUnique(TABLE_IDMAPPINGS,
-	getDbTag(&IdMappings{}, "GlobalId"), vars[getJsonTag(&Credentials{}, "Id")]) {
+		getDbTag(&IdMappings{}, "GlobalId"), vars[getJsonTag(&Credentials{}, "Id")]) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	// Get user details from user ID.
-	info := &Credentials{ Pw: ""}
+	info := &Credentials{Pw: ""}
 	err := db.QueryRow(fmt.Sprintf(SELECT_ROW, "*", VIEW_USER_INFO,
-	getDbTag(&IdMappings{}, "GlobalId")), vars[getJsonTag(&Credentials{}, "Id")]).
-	Scan(&info.Id, &info.Email, &info.Fname, &info.Lname, &info.Usertype,
-	&info.PhoneNumber, &info.Organization)
+		getDbTag(&IdMappings{}, "GlobalId")), vars[getJsonTag(&Credentials{}, "Id")]).
+		Scan(&info.Id, &info.Email, &info.Fname, &info.Lname, &info.Usertype,
+			&info.PhoneNumber, &info.Organization)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -125,12 +125,12 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	buffMap := map[string]interface{} {
-		getJsonTag(&Credentials{}, "Email"): info.Email,
-		getJsonTag(&Credentials{}, "Fname"): info.Fname,
-		getJsonTag(&Credentials{}, "Lname"): info.Lname,
-		getJsonTag(&Credentials{}, "Usertype"): info.Usertype,
-		getJsonTag(&Credentials{}, "PhoneNumber"): info.PhoneNumber,
+	buffMap := map[string]interface{}{
+		getJsonTag(&Credentials{}, "Email"):        info.Email,
+		getJsonTag(&Credentials{}, "Fname"):        info.Fname,
+		getJsonTag(&Credentials{}, "Lname"):        info.Lname,
+		getJsonTag(&Credentials{}, "Usertype"):     info.Usertype,
+		getJsonTag(&Credentials{}, "PhoneNumber"):  info.PhoneNumber,
 		getJsonTag(&Credentials{}, "Organization"): info.Organization,
 		"projects": projectsMap,
 	}
@@ -139,8 +139,6 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
-
-
 
 /*
 	Log in to website with any server's database.
@@ -162,33 +160,32 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 
 	// Query path from team ID.
 	retServer := &Servers{}
-	stmt := fmt.Sprintf(SELECT_ROW, "*", TABLE_SERVERS, getDbTag(&Servers{}, "GroupNumber"))
-	err = db.QueryRow(stmt, propsMap[getJsonTag(&Servers{}, "GroupNumber")]).Scan(getCols(retServer)...)
+	stmt := fmt.Sprintf(SELECT_ROW, "*", TABLE_SERVERS, getDbTag(&Servers{}, "GroupNb"))
+	fmt.Println(stmt)
+	err = db.QueryRow(stmt, propsMap[getJsonTag(&Servers{}, "GroupNb")]).Scan(getCols(retServer)...)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			w.WriteHeader(http.StatusUnauthorized)
+			http.Error(w, "Team doesn't exist!", http.StatusInternalServerError)
 		} else {
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// Make request from given URL and security token
-	delete(propsMap, getJsonTag(&Servers{}, "GroupNumber"))
 	jsonBody, err := json.Marshal(propsMap)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	fmt.Println(retServer.Url + ENDPOINT_LOGIN)
 	globalReq, _ := http.NewRequest(
-		"POST", retServer.Url + "/login", bytes.NewBuffer(jsonBody))
-	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
-	client := &http.Client{}
+		"POST", retServer.Url+ENDPOINT_LOGIN, bytes.NewBuffer(jsonBody))
 
 	// Get response from login request.
-	res, err := client.Do(globalReq)
+	res, err := sendSecureRequest(globalReq, propsMap[getJsonTag(&Servers{}, "GroupNb")])
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	} else if res.StatusCode != http.StatusOK {
 		w.WriteHeader(res.StatusCode)
@@ -196,12 +193,12 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 	} else {
 		err = json.NewDecoder(res.Body).Decode(&propsMap)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		err = json.NewEncoder(w).Encode(&propsMap)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
@@ -255,13 +252,13 @@ func registerUser(creds *Credentials) (string, error) {
 
 	// Make credentials insert statement for query.
 	stmt := fmt.Sprintf(INSERT_FULL, TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-			getDbTag(&Credentials{}, "Pw"),
-			getDbTag(&Credentials{}, "Fname"),
-			getDbTag(&Credentials{}, "Lname"),
-			getDbTag(&Credentials{}, "Usertype"),
-			getDbTag(&Credentials{}, "PhoneNumber"),
-			getDbTag(&Credentials{}, "Organization"))
+		getDbTag(&Credentials{}, "Email"),
+		getDbTag(&Credentials{}, "Pw"),
+		getDbTag(&Credentials{}, "Fname"),
+		getDbTag(&Credentials{}, "Lname"),
+		getDbTag(&Credentials{}, "Usertype"),
+		getDbTag(&Credentials{}, "PhoneNumber"),
+		getDbTag(&Credentials{}, "Organization"))
 
 	// Query full insert statement.
 	_, err := db.Exec(stmt, creds.Email, hash, creds.Fname, creds.Lname,
@@ -270,7 +267,7 @@ func registerUser(creds *Credentials) (string, error) {
 		return "", err
 	}
 
-	// Get new UUID from query 
+	// Get new UUID from query
 	err = db.QueryRow(
 		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
 			TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email).

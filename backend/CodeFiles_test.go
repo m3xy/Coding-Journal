@@ -13,19 +13,19 @@ a test breaks, fix the top one first and then re-run
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"time"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
-	"errors"
-	"reflect"
-	"bytes"
+	"time"
 )
 
 const (
@@ -35,7 +35,7 @@ const (
 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
 	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
 
-	TEST_URL = "http://localhost"
+	TEST_URL         = "http://localhost"
 	TEST_SERVER_PORT = "3333"
 )
 
@@ -52,38 +52,38 @@ var testFiles []*File = []*File{
 	{Id: -1, ProjectId: -1, ProjectName: "testProject1", Path: "testFile2.txt",
 		Name: "testFile2.txt", Content: "hello world", Comments: nil},
 }
-var testAuthors []*Credentials = []*Credentials {
+var testAuthors []*Credentials = []*Credentials{
 	{Email: "test@test.com", Pw: "123456aB$", Fname: "test",
 		Lname: "test", PhoneNumber: "0574349206", Usertype: USERTYPE_PUBLISHER},
-	{Email: "john.doe@test.com", Pw:"dlbjDs2!", Fname: "John",
+	{Email: "john.doe@test.com", Pw: "dlbjDs2!", Fname: "John",
 		Lname: "Doe", Organization: "TestOrg", Usertype: USERTYPE_USER},
-	{Email: "jane.doe@test.net", Pw:"dlbjDs2!", Fname: "Jane",
+	{Email: "jane.doe@test.net", Pw: "dlbjDs2!", Fname: "Jane",
 		Lname: "Doe", Usertype: USERTYPE_REVIEWER},
-	{Email: "adam.doe@test.net", Pw:"dlbjDs2!", Fname: "Adam",
+	{Email: "adam.doe@test.net", Pw: "dlbjDs2!", Fname: "Adam",
 		Lname: "Doe", Usertype: USERTYPE_REVIEWER_PUBLISHER},
 }
-var testReviewers []*Credentials = []*Credentials {
+var testReviewers []*Credentials = []*Credentials{
 	{Email: "dave@test.com", Pw: "123456aB$", Fname: "dave",
 		Lname: "smith", PhoneNumber: "0574349206", Usertype: USERTYPE_REVIEWER},
-	{Email: "Geoff@test.com", Pw:"dlbjDs2!", Fname: "Geoff",
+	{Email: "Geoff@test.com", Pw: "dlbjDs2!", Fname: "Geoff",
 		Lname: "Williams", Organization: "TestOrg", Usertype: USERTYPE_USER},
-	{Email: "jane.doe@test.net", Pw:"dlbjDs2!", Fname: "Jane",
+	{Email: "jane.doe@test.net", Pw: "dlbjDs2!", Fname: "Jane",
 		Lname: "Doe", Usertype: USERTYPE_PUBLISHER},
-	{Email: "adam.doe@test.net", Pw:"dlbjDs2!", Fname: "Adam",
+	{Email: "adam.doe@test.net", Pw: "dlbjDs2!", Fname: "Adam",
 		Lname: "Doe", Usertype: USERTYPE_REVIEWER_PUBLISHER},
 }
 var testComments []*Comment = []*Comment{
 	{
 		AuthorId: "",
-		Time: fmt.Sprint(time.Now()),
-		Content: "Hello World",
-		Replies: []*Comment{},
+		Time:     fmt.Sprint(time.Now()),
+		Content:  "Hello World",
+		Replies:  []*Comment{},
 	},
 	{
 		AuthorId: "",
-		Time: fmt.Sprint(time.Now()),
-		Content: "Goodbye World",
-		Replies: []*Comment{},
+		Time:     fmt.Sprint(time.Now()),
+		Content:  "Goodbye World",
+		Replies:  []*Comment{},
 	},
 }
 var testFileData []*CodeFileData = []*CodeFileData{
@@ -118,7 +118,7 @@ func clearTestEnvironment() error {
 }
 
 /*
-  Tests the functionality to create projects in the database and filesystem from a 
+  Tests the functionality to create projects in the database and filesystem from a
   Project struct
 */
 func TestCreateProjects(t *testing.T) {
@@ -140,12 +140,12 @@ func TestCreateProjects(t *testing.T) {
 		authors := []string{}
 		reviewers := []string{}
 		// builds SQL Queries for testing the added values
-		queryProjectName := fmt.Sprintf( SELECT_ROW, getDbTag(&Project{}, "Name"),
+		queryProjectName := fmt.Sprintf(SELECT_ROW, getDbTag(&Project{}, "Name"),
 			TABLE_PROJECTS, getDbTag(&Project{}, "Id"))
-		queryAuthors := fmt.Sprintf( SELECT_ROW, "userId",
+		queryAuthors := fmt.Sprintf(SELECT_ROW, "userId",
 			TABLE_AUTHORS, "projectId")
-		queryReviewers := fmt.Sprintf( SELECT_ROW, "userId",
-		TABLE_REVIEWERS, "projectId")
+		queryReviewers := fmt.Sprintf(SELECT_ROW, "userId",
+			TABLE_REVIEWERS, "projectId")
 
 		// tests that the project name was added correctly
 		row := db.QueryRow(queryProjectName, projectId)
@@ -156,7 +156,7 @@ func TestCreateProjects(t *testing.T) {
 		} else if testProject.Name != projectName {
 			return errors.New(
 				fmt.Sprintf("Project name mismatch. %s vs %s",
-				testProject.Name, projectName))
+					testProject.Name, projectName))
 		}
 
 		// tests that the authors were added correctly
@@ -239,7 +239,7 @@ func TestCreateProjects(t *testing.T) {
 		if err = clearTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while tearing down db: %v", err))
 		}
-		return nil		
+		return nil
 	}
 
 	// runs tests
@@ -267,10 +267,10 @@ func TestAddAuthors(t *testing.T) {
 	testProject := testProjects[0]
 
 	// test to add a single valid author
-	testSingleValidAuthor := func (author *Credentials) error {
+	testSingleValidAuthor := func(author *Credentials) error {
 		// initializes the test environment, returning an error if any occurs
 		if err := initTestEnvironment(); err != nil {
-			return errors.New( fmt.Sprintf("Error in testdb init: %v", err))
+			return errors.New(fmt.Sprintf("Error in testdb init: %v", err))
 		}
 
 		// declares test variables
@@ -293,7 +293,7 @@ func TestAddAuthors(t *testing.T) {
 		}
 
 		// checks the author ID and project ID for matches
-		queryAuthor := fmt.Sprintf( SELECT_ROW, "*", TABLE_AUTHORS, "userId")
+		queryAuthor := fmt.Sprintf(SELECT_ROW, "*", TABLE_AUTHORS, "userId")
 		// executes query
 		row := db.QueryRow(queryAuthor, authorId)
 		if row.Err() != nil {
@@ -308,11 +308,11 @@ func TestAddAuthors(t *testing.T) {
 		if projectId != queriedProjectId {
 			return errors.New(
 				fmt.Sprintf("Author added to the wrong project: Wanted: %d Got: %d",
-				projectId, queriedProjectId))
+					projectId, queriedProjectId))
 		} else if authorId != queriedAuthorId {
 			return errors.New(
 				fmt.Sprintf("Author Ids do not match: Added: %s Gotten Back: %s",
-				authorId, queriedAuthorId))
+					authorId, queriedAuthorId))
 		}
 
 		// clears the test environment and returns nil because the test has passed
@@ -413,7 +413,7 @@ func TestAddReviewers(t *testing.T) {
 	testProject := testProjects[0]
 
 	// test to add a single valid reviewer
-	testSingleValidReviewer := func (reviewer *Credentials) error {
+	testSingleValidReviewer := func(reviewer *Credentials) error {
 		// initializes the test environment, returning an error if any occurs
 		if err = initTestEnvironment(); err != nil {
 			return errors.New(fmt.Sprintf("error while initializing the test environment db: %v", err))
@@ -422,7 +422,7 @@ func TestAddReviewers(t *testing.T) {
 		// declares test variables
 		var projectId int
 		var reviewerId string
-		var queriedProjectId int // gotten from db after adding reviewer
+		var queriedProjectId int     // gotten from db after adding reviewer
 		var queriedReviewerId string // gotten from db after adding reviewer
 
 		// adds a valid project and user to the db and filesystem so that an reviewer can be added
@@ -560,11 +560,11 @@ func TestAddFiles(t *testing.T) {
 	// test function to add a single file. This function is not called directly as a test, but is a utility method for other tests
 	testAddSingleFile := func(file *File, projectId int) error {
 		// instantiates test variables
-		var projectName string // name of the project as queried from the SQL db
-		var fileId int // id of the file as returned from addFileTo()
+		var projectName string        // name of the project as queried from the SQL db
+		var fileId int                // id of the file as returned from addFileTo()
 		var queriedFileContent string // the content of the file
-		var queriedProjectId int // the id of the project as gotten from the files table
-		var queriedFilePath string // the file path as queried from the files table
+		var queriedProjectId int      // the id of the project as gotten from the files table
+		var queriedFilePath string    // the file path as queried from the files table
 
 		// adds file to the already instantiated project
 		fileId, err := addFileTo(file, projectId)
@@ -620,17 +620,17 @@ func TestAddFiles(t *testing.T) {
 			fmt.Sprint(projectId),
 			DATA_DIR_NAME,
 			projectName,
-			strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath)) + ".json",
+			strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath))+".json",
 		)
 		_, err = os.Stat(fileDataPath)
 		if err != nil && errors.Is(err, os.ErrNotExist) {
 			return errors.New("Data file not generated during file upload")
 		} else if projectId != queriedProjectId { // Compare  test values.
 			return errors.New(fmt.Sprintf("Project ID mismatch: %d vs %d",
-			projectId, queriedProjectId))
+				projectId, queriedProjectId))
 		} else if file.Path != queriedFilePath {
 			return errors.New(fmt.Sprintf("File path mismatch:  %s vs %s",
-			file.Path, queriedFilePath))
+				file.Path, queriedFilePath))
 		} else if file.Content != queriedFileContent {
 			return errors.New(
 				fmt.Sprintf("file content not written to filesystem properly"))
@@ -700,8 +700,8 @@ Test Depends on:
 func TestAddComment(t *testing.T) {
 	var err error
 	testProject := testProjects[0] // test project to add testFile to
-	testFile := testFiles[0] // test file to add comments to
-	testAuthor := testAuthors[0] // test author of comment
+	testFile := testFiles[0]       // test file to add comments to
+	testAuthor := testAuthors[0]   // test author of comment
 
 	testAddComment := func(comment *Comment, fileId int) error {
 		// adds a comment to the file
@@ -715,7 +715,7 @@ func TestAddComment(t *testing.T) {
 			fmt.Sprint(testProject.Id),
 			DATA_DIR_NAME,
 			testProject.Name,
-			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path)) + ".json",
+			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
 		)
 		fileBytes, err := ioutil.ReadFile(fileDataPath)
 		if err != nil {
@@ -727,11 +727,11 @@ func TestAddComment(t *testing.T) {
 			return errors.New(fmt.Sprintf("failed to unmarshal code file data: %v", err))
 		}
 
-		// extracts the last comment (most recently added) from the comments and checks for equality with 
+		// extracts the last comment (most recently added) from the comments and checks for equality with
 		// the passed in comment
-		addedComment := codeData.Comments[len(codeData.Comments) - 1]
+		addedComment := codeData.Comments[len(codeData.Comments)-1]
 		if comment.AuthorId != addedComment.AuthorId {
-			return errors.New(fmt.Sprintf( "Comment author ID mismatch: %s vs %s",
+			return errors.New(fmt.Sprintf("Comment author ID mismatch: %s vs %s",
 				comment.AuthorId, addedComment.AuthorId))
 		}
 		return nil
@@ -802,13 +802,13 @@ func TestGetAllProjects(t *testing.T) {
 	go srv.ListenAndServe()
 
 	/*
-	test for basic functionality. Adds 2 projects to the db, then queries them and tests for equality
+		test for basic functionality. Adds 2 projects to the db, then queries them and tests for equality
 	*/
-	testGetTwoProjects := func () {
-		var projectId int // variable to temporarily store project ids as they are added to the db
+	testGetTwoProjects := func() {
+		var projectId int                    // variable to temporarily store project ids as they are added to the db
 		sentProjects := make(map[int]string) // variable to hold the id: project name mappings which are sent to the db
 
-		// sets up the test environment (db and filesystem)		
+		// sets up the test environment (db and filesystem)
 		if err = initTestEnvironment(); err != nil {
 			t.Errorf("Error initializing the test environment %s", err)
 		}
@@ -824,7 +824,7 @@ func TestGetAllProjects(t *testing.T) {
 
 		// builds and sends and http get request
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/projects", TEST_URL, TEST_SERVER_PORT), nil)
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error occurred while sending get request to the Go server: %v", err)
 		}
@@ -839,7 +839,7 @@ func TestGetAllProjects(t *testing.T) {
 
 		// tests that the proper values have been returned
 		for k, v := range returnedProjects {
-			if (v != sentProjects[k]) {
+			if v != sentProjects[k] {
 				t.Errorf("Projects of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentProjects[k], v)
 			}
 		}
@@ -865,7 +865,7 @@ func TestGetAllProjects(t *testing.T) {
 }
 
 /*
-Tests the getUserProjects() function to get 
+Tests the getUserProjects() function to get
 
 Test Depends On:
 	- TestCreateProjects()
@@ -876,18 +876,18 @@ func TestGetUserProjects(t *testing.T) {
 	var err error
 	testProject1 := testProjects[0] // test project to return on getUserProjects()
 	testProject2 := testProjects[1] // test project to not return on getUserProjects()
-	testAuthor := testAuthors[0] // test author of the project being queried
+	testAuthor := testAuthors[0]    // test author of the project being queried
 	testNonAuthor := testAuthors[3] // test author of project not being queried
 
 	/*
-	test for basic functionality. Adds 2 projects to the db with different authors, then queries them and tests for equality
+		test for basic functionality. Adds 2 projects to the db with different authors, then queries them and tests for equality
 	*/
-	testGetSingleProject := func () {
-		// sets up the test environment (db and filesystem)		
+	testGetSingleProject := func() {
+		// sets up the test environment (db and filesystem)
 		if err = initTestEnvironment(); err != nil {
 			t.Errorf("Error initializing the test environment %s", err)
 		}
-		
+
 		// adds two test users to the db
 		authorId, err := registerUser(testAuthor)
 		if err != nil {
@@ -909,10 +909,10 @@ func TestGetUserProjects(t *testing.T) {
 		}
 
 		// adds authors to the test projects
-		if err = addAuthor(authorId, testProject1.Id); err != nil{
+		if err = addAuthor(authorId, testProject1.Id); err != nil {
 			t.Errorf("Failed to add author")
 		}
-		if err = addAuthor(nonAuthorId, testProject2.Id); err != nil{
+		if err = addAuthor(nonAuthorId, testProject2.Id); err != nil {
 			t.Errorf("Failed to add author")
 		}
 
@@ -949,7 +949,7 @@ Tests the ability of the CodeFiles module to get a project from the db
 
 Test Depends On:
 	- TestCreateProjects()
-	- TestAddFiles() 
+	- TestAddFiles()
 	- TestAddReviewers()
 	- TestAddAuthors()
 */
@@ -963,15 +963,15 @@ func TestGetProject(t *testing.T) {
 	go srv.ListenAndServe()
 
 	/*
-	Tests the basic ability of the CodeFiles module to load a project from the
-	db and filesystem
+		Tests the basic ability of the CodeFiles module to load a project from the
+		db and filesystem
 	*/
 	testGetValidProject := func() {
 		var projectId int // holds the project id as returned from the addProject() function
 
-		testFile := testFiles[0] // defines the file to use for the test here so that it can be easily changed
-		testProject := testProjects[0] // defines the project to use for the test here so that it can be easily changed
-		testAuthor := testAuthors[0] // defines the author of the project
+		testFile := testFiles[0]         // defines the file to use for the test here so that it can be easily changed
+		testProject := testProjects[0]   // defines the project to use for the test here so that it can be easily changed
+		testAuthor := testAuthors[0]     // defines the author of the project
 		testReviewer := testReviewers[0] // defines the reviewer of the project
 
 		// initializes the filesystem and db
@@ -1007,7 +1007,7 @@ func TestGetProject(t *testing.T) {
 		}
 
 		// creates a request to get a project of a given id
-		reqBody, err := json.Marshal(map[string]interface{} {
+		reqBody, err := json.Marshal(map[string]interface{}{
 			getJsonTag(&Project{}, "Id"): projectId,
 		})
 		if err != nil {
@@ -1015,7 +1015,7 @@ func TestGetProject(t *testing.T) {
 		}
 		// sets a custom header of "project":id to query the specific project id
 		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), bytes.NewBuffer(reqBody))
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error while sending Get request: %v", err)
 		}
@@ -1034,18 +1034,18 @@ func TestGetProject(t *testing.T) {
 		}
 
 		// tests that the project matches the passed in data
-		if (testProject.Id != project.Id) {
+		if testProject.Id != project.Id {
 			t.Errorf("Project IDs do not match. Given: %d != Returned: %d", testProject.Id, project.Id)
-		} else if (testProject.Name != project.Name) {
+		} else if testProject.Name != project.Name {
 			t.Errorf("Project Names do not match. Given: %s != Returned: %s", testProject.Name, project.Name)
-		// tests that file paths match (done directly here as there is only one constituent file)
-		} else if (testProject.FilePaths[0] != project.FilePaths[0]) {
+			// tests that file paths match (done directly here as there is only one constituent file)
+		} else if testProject.FilePaths[0] != project.FilePaths[0] {
 			t.Errorf("Project file path lists do not match. Given: %s != Returned: %s", testProject.FilePaths[0], project.FilePaths[0])
-		// tests that the authors lists match (done directly here as there is only one author)
-		} else if (authorId != project.Authors[0]) {
+			// tests that the authors lists match (done directly here as there is only one author)
+		} else if authorId != project.Authors[0] {
 			t.Errorf("Authors do not match. Expected: %s Given: %s", authorId, testProject.Authors[0])
-		// tests that the reviewer lists match (done directly here as there is only one reviewer)
-		} else if (reviewerId != project.Reviewers[0]) {
+			// tests that the reviewer lists match (done directly here as there is only one reviewer)
+		} else if reviewerId != project.Reviewers[0] {
 			t.Errorf("Authors do not match. Expected: %s Given: %s", reviewerId, testProject.Reviewers[0])
 		}
 
@@ -1088,8 +1088,8 @@ func TestGetFile(t *testing.T) {
 	// Tests the basic ability of the CodeFiles module to load the data from a
 	// valid file path passed to it. Simple valid one code file project
 	testGetSingleFile := func() {
-		var projectId int // stores project id returned by addProject()
-		testFile := testFiles[0] // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+		var projectId int              // stores project id returned by addProject()
+		testFile := testFiles[0]       // the test file to be added to the db and filesystem (saved here so it can be easily changed)
 		testProject := testProjects[0] // the test project to be added to the db and filesystem (saved here so it can be easily changed)
 
 		// initializes the filesystem and db
@@ -1110,8 +1110,8 @@ func TestGetFile(t *testing.T) {
 		testFile.ProjectId = projectId
 
 		// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
-		reqBody, err := json.Marshal(map[string]interface{} {
-			getJsonTag(&File{}, "Path"): testFile.Path,
+		reqBody, err := json.Marshal(map[string]interface{}{
+			getJsonTag(&File{}, "Path"):      testFile.Path,
 			getJsonTag(&File{}, "ProjectId"): testFile.ProjectId,
 		})
 		if err != nil {
@@ -1122,7 +1122,7 @@ func TestGetFile(t *testing.T) {
 			t.Errorf("Error creating request: %v\n", err)
 		}
 		// send POST request
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error occurred in request: %v", err)
 		}
@@ -1140,16 +1140,16 @@ func TestGetFile(t *testing.T) {
 		}
 
 		// tests that the file path
-		if (testFile.Path != file.Path) {
+		if testFile.Path != file.Path {
 			t.Errorf("File Path %d != %d", file.Id, testFile.Id)
-		// tests for project id correctness
-		} else if (testFile.ProjectId != file.ProjectId) {
+			// tests for project id correctness
+		} else if testFile.ProjectId != file.ProjectId {
 			t.Errorf("File Project Id %d != %d", file.ProjectId, testFile.ProjectId)
-		// tests if the file paths are identical
-		} else if (testFile.Path != file.Path) {
+			// tests if the file paths are identical
+		} else if testFile.Path != file.Path {
 			t.Errorf("File Path %s != %s", file.Path, testFile.Path)
-		// tests that the file content is correct
-		} else if (testFile.Content != file.Content) {
+			// tests that the file content is correct
+		} else if testFile.Content != file.Content {
 			t.Error("File Content does not match")
 		}
 
@@ -1177,7 +1177,7 @@ func TestGetFile(t *testing.T) {
 tests uploading single files via HTTP
 
 Test Depends on:
-	- TestCreateProject() 
+	- TestCreateProject()
 	- TestAddFile()
 */
 func TestUploadSingleFile(t *testing.T) {
@@ -1208,9 +1208,9 @@ func TestUploadSingleFile(t *testing.T) {
 		}
 
 		// formats the request body to send to the server to add a comment
-		reqBody, err := json.Marshal(map[string]string {
-			"author": testAuthor.Id,
-			getJsonTag(&File{}, "Name"): testFile.Name,
+		reqBody, err := json.Marshal(map[string]string{
+			"author":                       testAuthor.Id,
+			getJsonTag(&File{}, "Name"):    testFile.Name,
 			getJsonTag(&File{}, "Content"): testFile.Content,
 		})
 		if err != nil {
@@ -1222,7 +1222,7 @@ func TestUploadSingleFile(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating request: %v", err)
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error executing request: %v", err)
 		}
@@ -1304,11 +1304,11 @@ func TestUploadUserComment(t *testing.T) {
 		testComment.AuthorId = testAuthor.Id // sets test comment author
 
 		// formats the request body to send to the server to add a comment
-		reqBody, err := json.Marshal(map[string]interface{} {
-			getJsonTag(&File{}, "ProjectId"):projectId,
-			getJsonTag(&File{}, "Path"):testFile.Path,
-			getJsonTag(&Comment{}, "AuthorId"):testAuthor.Id,
-			getJsonTag(&Comment{}, "Content"):testComment.Content,
+		reqBody, err := json.Marshal(map[string]interface{}{
+			getJsonTag(&File{}, "ProjectId"):   projectId,
+			getJsonTag(&File{}, "Path"):        testFile.Path,
+			getJsonTag(&Comment{}, "AuthorId"): testAuthor.Id,
+			getJsonTag(&Comment{}, "Content"):  testComment.Content,
 		})
 		if err != nil {
 			t.Errorf("Error formatting request body: %v", err)
@@ -1319,7 +1319,7 @@ func TestUploadUserComment(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error creating request: %v", err)
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error executing request: %v", err)
 		}
@@ -1336,7 +1336,7 @@ func TestUploadUserComment(t *testing.T) {
 			fmt.Sprint(testProject.Id),
 			DATA_DIR_NAME,
 			testProject.Name,
-			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path)) + ".json",
+			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
 		)
 		fileBytes, err := ioutil.ReadFile(fileDataPath)
 		if err != nil {
@@ -1348,9 +1348,9 @@ func TestUploadUserComment(t *testing.T) {
 			t.Errorf("failed to unmarshal code file data: %v", err)
 		}
 
-		// extracts the last comment (most recently added) from the comments and checks for equality with 
+		// extracts the last comment (most recently added) from the comments and checks for equality with
 		// the passed in comment
-		addedComment := codeData.Comments[len(codeData.Comments) - 1]
+		addedComment := codeData.Comments[len(codeData.Comments)-1]
 		if testComment.AuthorId != addedComment.AuthorId {
 			t.Errorf("Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
 		} else if testComment.Content != addedComment.Content {

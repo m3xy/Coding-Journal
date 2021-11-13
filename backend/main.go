@@ -22,20 +22,26 @@ const (
 	password = "secret"
 	dbname   = "mydb"
 
+	BACKEND_ADDRESS = "http://localhost:3333"
+	PORT            = ":3333"
+
 	// end points for URLs
-	ENDPOINT_LOGIN = "/login"
+	ENDPOINT_LOGIN        = "/login"
 	ENDPOINT_LOGIN_GLOBAL = "/glogin"
-	ENDPOINT_SIGNUP = "/register"
+	ENDPOINT_SIGNUP       = "/register"
 	ENDPOINT_ALL_PROJECTS = "/projects"
-	ENDPOINT_PROJECT = "/project"
-	ENDPOINT_FILE = "/project/file"
-	ENDPOINT_NEWFILE = "/upload"
-	ENDPOINT_USERINFO = "/users"
-	ENDPOINT_NEWCOMMENT = "/project/file/newcomment"
-	ENDPOINT_VALIDATE = "/validate"
+	ENDPOINT_PROJECT      = "/project"
+	ENDPOINT_FILE         = "/project/file"
+	ENDPOINT_NEWFILE      = "/upload"
+	ENDPOINT_USERINFO     = "/users"
+	ENDPOINT_NEWCOMMENT   = "/project/file/newcomment"
+	ENDPOINT_VALIDATE     = "/validate"
 )
 
+// CORS headers
 var allowedOrigins = []string{"*"}
+var allowedHeaders = []string{"X-Requested-With", SECURITY_TOKEN_KEY}
+var allowedMethods = []string{"GET", "HEAD", "POST", "PUT", "OPTIONS"}
 
 func main() {
 	srv := setupCORSsrv()
@@ -52,10 +58,10 @@ func main() {
 			log.Fatalf("listen: %v\n", err)
 		}
 	}()
-	log.Printf("Server started at %s\n", time.Now().String())
+	log.Printf("Server started.\n")
 
 	<-done // Wait for termination signal to be received before ending program.
-	log.Printf("Server stopped at %s\n", time.Now().String())
+	log.Printf("Server stopped.\n")
 
 	// Gracefully shut down server by shutting down all idling connections after a timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -65,16 +71,18 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatalf("Server Shutdown failed: %v\n", err)
 	}
-	log.Printf("Server shut down properly at %s\n", time.Now().String())
+	log.Printf("Server shut down properly.\n")
 }
 
 // Setup CORS-compatible server.
 func setupCORSsrv() *http.Server {
 	// Set up login and signup functions
 	router := mux.NewRouter()
-	router.Methods("OPTIONS").HandlerFunc(func (w http.ResponseWriter, r *http.Request) {
-		setupResponse(w, r)
-	})
+
+	// sets up handler for CORS
+	headersOk := handlers.AllowedHeaders(allowedHeaders)
+	originsOk := handlers.AllowedOrigins(allowedOrigins)
+	methodsOk := handlers.AllowedMethods(allowedMethods)
 
 	// Setup all routes.
 	router.HandleFunc(ENDPOINT_LOGIN, logIn)
@@ -86,16 +94,11 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment)
 	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation)
-	router.HandleFunc("/users/{"+getJsonTag(&Credentials{},"Id")+"}", getUserProfile)
-
-	// sets up handler for CORS
-	headersOk := handlers.AllowedHeaders([]string{"X-Requested-With", SECURITY_TOKEN_KEY})
-	originsOk := handlers.AllowedOrigins(allowedOrigins)
-	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
+	router.HandleFunc("/users/{"+getJsonTag(&Credentials{}, "Id")+"}", getUserProfile)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
-		Addr:    ":3333",
+		Addr:    PORT,
 		Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
 	}
 }

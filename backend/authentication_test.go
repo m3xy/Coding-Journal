@@ -7,23 +7,23 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/validator.v2"
 	"net/http"
 	"testing"
 	"time"
-	"gopkg.in/validator.v2"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
-	VALID_PW        = "aB12345$"
-	PW_NO_UC        = "a123456$"
-	PW_NO_LC        = "B123456$"
-	PW_NO_NUM       = "aBcdefg$"
-	PW_NO_SC        = "aB123456"
-	PW_WRONG_CHARS  = "asbd/\\s@!"
-	TEST_DB         = "testdb"
-	JSON_TAG_PW		= "password"
-	INVALID_ID		= "invalid-always"
+	VALID_PW       = "aB12345$"
+	PW_NO_UC       = "a123456$"
+	PW_NO_LC       = "B123456$"
+	PW_NO_NUM      = "aBcdefg$"
+	PW_NO_SC       = "aB123456"
+	PW_WRONG_CHARS = "asbd/\\s@!"
+	TEST_DB        = "testdb"
+	JSON_TAG_PW    = "password"
+	INVALID_ID     = "invalid-always"
 )
 
 var testUsers []*Credentials = []*Credentials{
@@ -205,7 +205,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Error in request: %v/n", err)
 			return
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error in response: %v/n", err)
 			return
@@ -251,7 +251,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Request error in already registered user: %v\n", err)
 			return
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Request error in already registered user: %v\n", err)
 			return
@@ -277,7 +277,7 @@ func TestSignUp(t *testing.T) {
 			t.Errorf("Request error: %v\n", err.Error())
 			return
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Response error: %v\n", err.Error())
 			return
@@ -334,7 +334,7 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Response error on correct login: %v\n", err)
 			return
@@ -353,9 +353,9 @@ func TestLogIn(t *testing.T) {
 			return
 		}
 
-		// Check if gotten 
+		// Check if gotten
 		storedId := respMap[getJsonTag(&Credentials{}, "Id")]
-		if (storedId != testUsers[i].Id) {
+		if storedId != testUsers[i].Id {
 			t.Errorf("IDs don't correspond! %s vs %s", storedId, testUsers[i].Id)
 			return
 		}
@@ -376,7 +376,7 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("Request error on correct login: %s\n", err)
 			return
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
@@ -397,11 +397,11 @@ func TestLogIn(t *testing.T) {
 			t.Errorf("JSON Marshal Error: %v\n", err)
 			return
 		}
-		req, err := http.NewRequest("POST","http://localhost:3333/login", bytes.NewBuffer(buffer))
+		req, err := http.NewRequest("POST", "http://localhost:3333/login", bytes.NewBuffer(buffer))
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 		}
-		resp, err := sendSecureRequest(req)
+		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Request error on correct login: %v\n", err)
 			return
@@ -420,7 +420,7 @@ func TestLogIn(t *testing.T) {
 }
 
 // Test user info getter.
-func TestGetUserProfile (t *testing.T) {
+func TestGetUserProfile(t *testing.T) {
 	testInit()
 	securityCheck()
 	srv := setupCORSsrv()
@@ -431,13 +431,13 @@ func TestGetUserProfile (t *testing.T) {
 	// Populate database for testing and test valid user.
 	for i := range testUsers {
 		testUsers[i].Id, _ = registerUser(testUsers[i])
-		validReq, err := http.NewRequest("GET", "http://localhost:3333/users/" +
+		validReq, err := http.NewRequest("GET", "http://localhost:3333/users/"+
 			testUsers[i].Id, nil)
 		if err != nil {
 			t.Errorf("Request making error: %v\n", err)
 			return
 		}
-		res, err := sendSecureRequest(validReq)
+		res, err := sendSecureRequest(validReq, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error in request sending: %v\n", err)
 			return
@@ -465,13 +465,13 @@ func TestGetUserProfile (t *testing.T) {
 	}
 
 	// Test invalid users.
-	invalidReq, err := http.NewRequest("GET", "http://localhost:3333/users/" +
+	invalidReq, err := http.NewRequest("GET", "http://localhost:3333/users/"+
 		INVALID_ID, nil)
 	if err != nil {
 		t.Errorf("Request making error: %v\n", err)
 		return
 	}
-	res, err := sendSecureRequest(invalidReq)
+	res, err := sendSecureRequest(invalidReq, TEAM_ID)
 	if err != nil {
 		t.Errorf("Response error: %v\n", err)
 		return
