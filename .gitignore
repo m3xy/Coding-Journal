@@ -7,8 +7,12 @@
 /.pnp
 .pnp.js
 backend/main
+
+# Files/directories created by backend
+.env
 filesystem
 cs3099-backend.log
+package-lock.json
 
 # testing
 /coverage
