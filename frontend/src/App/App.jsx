@@ -34,7 +34,7 @@ const constants = {
         port: '23409' // TEMP: for now
     },
     backend: {
-        host: 'http://localhost',
+	    host: 'http://cs3099user11.host.cs.st-andrews.ac.uk',
         port: '3333'
     }
 }

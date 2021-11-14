@@ -2,7 +2,8 @@
   "license": "MIT",
   "scripts": {
     "build": "webpack --mode production",
-    "start": "webpack-dev-server --open"
+    "start": "webpack-dev-server --open",
+    "start:dev" : "webpack-dev-server --open --watch"
   },
   "dependencies": {
     "bootstrap": "^5.1.3",

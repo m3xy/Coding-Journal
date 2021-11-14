@@ -27,21 +27,22 @@ module.exports = {
     devServer: {
         historyApiFallback: true,
         port: 23409,
+	injectClient: false,
         proxy: {
-            '/api/*': {
-                target: 'http://localhost:3333',
+            '/api/v1/supergroup/*': {
+                target: 'http://cs3099user11.host.cs.st-andrews.ac.uk:3333',
                 secure: false,
                 changeOrigin: true,
                 headers: {
                   'Access-Control-Allow-Origin': '*',
-                  'Access-Control-Allow-Headers': 'X-Requested-With', 'X-FOREIGNJOURNAL-SECURITY-TOKEN',
+                  'Access-Control-Allow-Headers': 'X-Requested-With, X-FOREIGNJOURNAL-SECURITY-TOKEN',
                   'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, OPTIONS'
                 }
             }
         },
         headers: {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'X-Requested-With', 'X-FOREIGNJOURNAL-SECURITY-TOKEN',
+            'Access-Control-Allow-Headers': 'X-Requested-With, X-FOREIGNJOURNAL-SECURITY-TOKEN',
             'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, OPTIONS'
         }
     },
