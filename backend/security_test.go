@@ -44,7 +44,6 @@ func TestSecurityCheck(t *testing.T) {
 
 func TestValidateToken(t *testing.T) {
 	testInit()
-	securityCheck() // Generate the security token.
 
 	// Test valid security token.
 	storedToken := ""
@@ -69,7 +68,6 @@ func TestValidateToken(t *testing.T) {
 
 func TestTokenValidation(t *testing.T) {
 	testInit()
-	securityCheck()
 	srv := setupCORSsrv()
 
 	// Start server

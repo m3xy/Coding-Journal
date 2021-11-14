@@ -11,7 +11,7 @@ import { history } from "../_helpers"
 import log from '../../../cs3099-backend.log'
 
 // URL endpoints for backend functions
-const loginEndpoint = '/login'
+const loginEndpoint = '/glogin'
 const registerEndpoint = '/register'
 const uploadEndpoint = '/upload'
 const profileEndpoint = '/users'
@@ -19,8 +19,7 @@ const profileEndpoint = '/users'
 const codeEndpoint = '/project/file'
 const commentEndpoint = '/project/file/newcomment'
 
-const tokenKey = "security token: ";
-const token = log.substr(log.lastIndexOf(tokenKey) + tokenKey.length).split('\n')[0];
+const token = process.env.BACKEND_TOKEN;
 /**
  * Utility class with methods to send data to the backend via HTTP request
  * This class could be optimized by compiling many requests into a single
@@ -54,7 +53,7 @@ class DataWriter {
         // create a new XMLHttpRequest
         var request = new XMLHttpRequest()
         
-        var response;
+        // var response;
 
         // get a callback when the server responds
         request.addEventListener('load', () => {

@@ -102,3 +102,41 @@ func setupCORSsrv() *http.Server {
 		Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
 	}
 }
+
+// Set up the server and it's dependencies.
+func setup() error {
+	// Set log file logging.
+	var err error = nil
+	file, err := os.OpenFile(LOG_FILE_PATH, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatalf("Log file creation failure: %v! Exitting...", err)
+		goto RETURN
+	}
+	log.SetOutput(file)
+
+	// Check security token existence before running.
+	err = securityCheck()
+	if err != nil {
+		goto RETURN
+	}
+
+	// Check for filesystem existence.
+	if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {
+		log.Printf("Filesystem not setup up! Setting it up at %s",
+			FILESYSTEM_ROOT)
+		err = os.MkdirAll(FILESYSTEM_ROOT, DIR_PERMISSIONS)
+		if err != nil {
+			log.Fatalf("Filesystem setup error: %v\n", err)
+			goto RETURN
+		}
+	}
+
+	// Set foreign servers.
+	if err = setForeignServers(); err != nil {
+		log.Fatalf("FATAL - Foreign server set up error: %v\n", err)
+		goto RETURN
+	}
+
+RETURN:
+	return err
+}

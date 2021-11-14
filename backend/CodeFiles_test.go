@@ -94,7 +94,7 @@ var testFileData []*CodeFileData = []*CodeFileData{
 func initTestEnvironment() error {
 	dbInit(user, password, protocol, host, port, TEST_DB)
 	dbClear()
-	err := securityCheck()
+	err := setup()
 	if err != nil {
 		return err
 	}

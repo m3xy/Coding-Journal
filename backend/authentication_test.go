@@ -45,6 +45,7 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 // Initialise the database for testing.
 func testInit() {
 	dbInit(user, password, protocol, host, port, TEST_DB)
+	setup()
 	if err := dbClear(); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
 	}
@@ -422,7 +423,6 @@ func TestLogIn(t *testing.T) {
 // Test user info getter.
 func TestGetUserProfile(t *testing.T) {
 	testInit()
-	securityCheck()
 	srv := setupCORSsrv()
 
 	// Start server.

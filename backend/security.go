@@ -58,62 +58,64 @@ func randStringBase64(seed int, n int) string {
 	return retStr
 }
 
-// Check needed configuration setup before running server
-func securityCheck() error {
-	// Set log file logging.
-	file, err := os.OpenFile(LOG_FILE_PATH, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+// Get security key from database.
+func getDbSecurityKey() (string, error) {
+	// Get security key from database
+	var token string
+	err := db.QueryRow(fmt.Sprintf(SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS, getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
+		Scan(&token)
 	if err != nil {
-		log.Fatalf("Log file creation failure: %v! Exitting...", err)
-		return err
+		return "", err
+	} else {
+		return token, nil
 	}
-	log.SetOutput(file)
+}
 
+// Check security key existence, and set it if it doesn't exist.
+func securityCheck() error {
 	// Check security token existence before running.
-	if checkUnique(TABLE_SERVERS, getDbTag(&Servers{}, "GroupNb"), TEAM_ID) {
-		log.Println("Server token not set! Setting up...")
-		securityToken := getNewSecurityKey()
-		_, err := db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
-			TEAM_ID, securityToken, allowedOrigins[0])
-		if err != nil {
-			log.Fatalf("Critical token failure! %v\n", err)
-			return err
+	token, err := getDbSecurityKey()
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Println("Server token not set! Setting up...")
+			securityToken := getNewSecurityKey()
+			_, err := db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
+				TEAM_ID, securityToken, allowedOrigins[0])
+			if err != nil {
+				log.Fatalf("Critical token failure! %v\n", err)
+				return err
+			} else {
+				log.Println("Security token successfully stored in database.")
+				log.Printf("Store this security token: %s\n", securityToken)
+			}
+
 		} else {
-			log.Println("Security token successfully stored in database.")
-			os.Setenv(SECURITY_TOKEN_ENV, securityToken)
-			log.Printf("Store this security token: %s\n", securityToken)
+			log.Fatalf("FATAL - Can't fetch security token: %v\n", err)
+			return err
 		}
 	}
+	os.Setenv(SECURITY_TOKEN_ENV, token)
+	return nil
+}
 
-	// Check for filesystem existence.
-	if _, err := os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {
-		log.Printf("Filesystem not setup up! Setting it up at %s",
-			FILESYSTEM_ROOT)
-		os.MkdirAll(FILESYSTEM_ROOT, DIR_PERMISSIONS)
-	}
-
+func setForeignServers() error {
+	var err error = nil
 	// Set server tokens for all servers in organization.
 	for _, server := range serverArr {
 		stmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
 			getDbTag(&Servers{}, "GroupNb"))
 		var token string
-		err := db.QueryRow(stmt, server.GroupNb).Scan(&token)
+		err = db.QueryRow(stmt, server.GroupNb).Scan(&token)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				log.Printf("Server no. %d not set up! Setting it up...", server.GroupNb)
 				_, err = db.Exec(
 					fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
 					server.GroupNb, server.Token, server.Url)
-				if err != nil {
-					log.Fatalf("FATAL - Server insertion error: %v. Exiting...", err)
-					return err
-				}
-			} else {
-				log.Fatalf("FATAL - Database error: %v! Exiting...", err)
-				return err
 			}
 		}
 	}
-	return nil
+	return err
 }
 
 // Send a given request using needed authentication.
