@@ -19,7 +19,9 @@ const profileEndpoint = '/users'
 const codeEndpoint = '/project/file'
 const commentEndpoint = '/project/file/newcomment'
 
-const token = process.env.BACKEND_TOKEN;
+const BACKEND_TOKEN = process.env.BACKEND_TOKEN;
+const BACKEND_ADDRESS = process.env.BACKEND_ADDRESS;
+
 /**
  * Utility class with methods to send data to the backend via HTTP request
  * This class could be optimized by compiling many requests into a single
@@ -33,6 +35,22 @@ class DataWriter {
         this.backend_host = backend_host;
         this.backend_port = backend_port;
         // this.userID = null;
+    }
+
+    /**
+     * Author: 190014935
+     * Send a request with needed security token and headers.
+     *
+     * @param request The request to send.
+     * @param data The body for the request.
+     */
+    sendSecureRequest(request, data) {
+        request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", BACKEND_TOKEN)
+        if (data == null) {
+            request.send()
+        } else {
+            request.send(JSON.stringify(data))
+        }
     }
 
     /**
@@ -66,16 +84,11 @@ class DataWriter {
 
             // TEMP: return response here, set the state of the login widget to be login approved
         })
-        // open the request with the verb and the url TEMP: this will potentially change with actual URL
-        request.open('POST', this.backend_host + ':' + this.backend_port + loginEndpoint)
-        request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
+        // open the request and send request.
+        request.open('POST', BACKEND_ADDRESS + loginEndpoint)
+        this.sendSecureRequest(request, data)
 
-        // request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        // request.setRequestHeader('Access-Control-Allow-Origin', '*');
-        
-        // send the request with the JSON data as body
-        request.send(JSON.stringify(data))
-
+        // Send request with JSON data as body.
         // TEMP: return bool here to indicate success or failure#
     }
 
@@ -111,13 +124,8 @@ class DataWriter {
             // TEMP: return response here, set the state of the login widget to be login approved
         })
         // open the request with the verb and the url TEMP: this will potentially change with actual URL
-        request.open('POST', this.backend_host + ':' + this.backend_port + registerEndpoint)
-        request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
-        // request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        // request.setRequestHeader('Access-Control-Allow-Origin', '*');
-
-        // send the request with the JSON data as body
-        request.send(JSON.stringify(data))
+        request.open('POST', BACKEND_ADDRESS + registerEndpoint)
+        this.sendSecureRequest(request, data)
     }
 
      /**
@@ -146,14 +154,10 @@ class DataWriter {
                 // TEMP: return response here, set the state of the login widget to be login approved
             })
             // open the request with the verb and the url TEMP: this will potentially change with actual URL
-            request.open('POST', this.backend_host + ':' + this.backend_port + codeEndpoint)
-            request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
+            request.open('POST', BACKEND_ADDRESS + codeEndpoint)
             request.onerror = reject;
-
-            // send the request with the JSON data as body
             console.log(data);
-            request.send(JSON.stringify(data))
-
+            this.sendSecureRequest(request, data)
         })
 
     }
@@ -188,14 +192,10 @@ class DataWriter {
                 // TEMP: return response here, set the state of the login widget to be login approved
             })
             // open the request with the verb and the url TEMP: this will potentially change with actual URL
-            request.open('POST', this.backend_host + ':' + this.backend_port + commentEndpoint)
-            request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
+            request.open('POST', BACKEND_ADDRESS + commentEndpoint)
             request.onerror = reject;
-
-            // send the request with the JSON data as body
             console.log(data);
-            request.send(JSON.stringify(data))
-
+            this.sendSecureRequest(request, data)
         })
 
     }
@@ -253,10 +253,8 @@ class DataWriter {
                     request.onerror = reject;
             
                     // open the request with the verb and the url TEMP: this will potentially change with actual URL
-                    request.open('POST', this.backend_host + ':' + this.backend_port + uploadEndpoint)
-                    request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
-                    // send the request with the JSON data as body
-                    request.send(JSON.stringify(data))
+                    request.open('POST', BACKEND_ADDRESS + uploadEndpoint)
+                    this.sendSecureRequest(request, data)
                 })
                 .catch((error) => {
                     console.log(error);
@@ -265,6 +263,12 @@ class DataWriter {
     }
 
 
+    /**
+     * Author: 190019931
+     * Get a user's profile information.
+     *
+     * @param userID The user to fetch profile from.
+     */
     getProfile(userID) {
         return new Promise((resolve, reject) => {
 
@@ -283,21 +287,15 @@ class DataWriter {
 
             var request = new XMLHttpRequest();
             
-            request.open('GET', this.backend_host + ':' + this.backend_port + profileEndpoint + "/" + userID);
-            request.setRequestHeader("X-FOREIGNJOURNAL-SECURITY-TOKEN", token);
+            request.open('GET', BACKEND_ADDRESS + profileEndpoint + "/" + userID);
             // get a callback when the server responds
             request.addEventListener('load', () => {
-                //Return response for code page
                 resolve(request.responseText);
             })
-
             request.onerror = reject;
-            request.send();
-        }) 
-
+            this.sendSecureRequest(request, null)
+        })
     }
-
-
     // add more writing functions here
 }
 

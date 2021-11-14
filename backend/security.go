@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -18,6 +17,19 @@ const (
 	SECURITY_KEY_SIZE  = 128
 	LOG_FILE_PATH      = "../cs3099-backend.log"
 )
+
+// CORS headers
+var allowedOrigins = "*"
+
+// var allowedHeaders = "X-Requested-With, " + SECURITY_TOKEN_KEY + ", Access-Control-Request-Origin"
+var allowedHeaders = "*"
+var allowedMethods = "GET, HEAD, POST, PUT, OPTIONS"
+
+var corsMap map[string]string = map[string]string{
+	"Access-Control-Allow-Origin":  allowedOrigins,
+	"Access-Control-Allow-Headers": allowedHeaders,
+	"Access-Control-Allow-Methods": allowedMethods,
+}
 
 // Array of servers to connect to.
 var serverArr []*Servers = []*Servers{
@@ -80,7 +92,7 @@ func securityCheck() error {
 			log.Println("Server token not set! Setting up...")
 			securityToken := getNewSecurityKey()
 			_, err := db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
-				TEAM_ID, securityToken, allowedOrigins[0])
+				TEAM_ID, securityToken, BACKEND_ADDRESS)
 			if err != nil {
 				log.Fatalf("Critical token failure! %v\n", err)
 				return err
@@ -94,10 +106,13 @@ func securityCheck() error {
 			return err
 		}
 	}
-	os.Setenv(SECURITY_TOKEN_ENV, token)
+
+	// Write environment variable for security token.
+	dotenvMap[SECURITY_TOKEN_ENV] = token
 	return nil
 }
 
+// Add foreign servers to database if not added yet.
 func setForeignServers() error {
 	var err error = nil
 	// Set server tokens for all servers in organization.
@@ -159,9 +174,21 @@ func validateToken(token string) bool {
 //  200: Success - security token valid.
 //  401: Failure - security token invalid.
 func tokenValidation(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
 	token := r.Header.Get(SECURITY_TOKEN_KEY)
 	if !validateToken(token) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 	log.Printf("Token validation request sent!")
+}
+
+// Add CORS headers to response.
+// Return: 200
+func useCORSresponse(w *http.ResponseWriter, r *http.Request) {
+	log.Println("Headers set up!")
+	for key, val := range corsMap {
+		(*w).Header().Set(key, val)
+	}
 }

@@ -40,7 +40,7 @@ import (
 const (
 	// TEMP: hard coded for testing
 	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all project directories TEMP: maybe set with an env variable?
-	DATA_DIR_NAME = ".data" // name of the hidden data dir to be put into the project directory structure
+	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the project directory structure
 
 	// File Mode Constants
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
@@ -56,27 +56,34 @@ const (
 // Responses:
 //	- 200 : if action completes successfully
 func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	var request map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&request)
 
 	// Parse data into local variables
-	fileName := request[getJsonTag(&File{}, "Name")] // file name as a string
-	fileAuthor := request["author"] // author's user Id
+	fileName := request[getJsonTag(&File{}, "Name")]       // file name as a string
+	fileAuthor := request["author"]                        // author's user Id
 	fileContent := request[getJsonTag(&File{}, "Content")] // base64 encoding of file content
 
 	// Put parsed values into a file object and a project object
 	wrapperProject := &Project{
-		Name: fileName.(string),
-		Authors: []string{fileAuthor.(string)},
+		Name:      fileName.(string),
+		Authors:   []string{fileAuthor.(string)},
 		Reviewers: []string{},
 		FilePaths: []string{fileName.(string)},
 	}
 	file := &File{
 		ProjectName: fileName.(string),
-		Path: fileName.(string),
-		Name: fileName.(string),
-		Content: fileContent.(string),
+		Path:        fileName.(string),
+		Name:        fileName.(string),
+		Content:     fileContent.(string),
 	}
 
 	// adds file to the db and filesystem
@@ -108,8 +115,15 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 // 	200 : comment was added succesfully
 // 	400 : if the comment was not sent in the proper format
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// parses the json request body into a map
 	var request map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -124,9 +138,9 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	// Parse data into Comment structure
 	comment := &Comment{
 		AuthorId: request[getJsonTag(&Comment{}, "AuthorId")].(string), // authors user id
-		Time: fmt.Sprint(time.Now()),
-		Content: request[getJsonTag(&Comment{}, "Content")].(string),
-		Replies: nil, // replies are nil upon insertion
+		Time:     fmt.Sprint(time.Now()),
+		Content:  request[getJsonTag(&Comment{}, "Content")].(string),
+		Replies:  nil, // replies are nil upon insertion
 	}
 
 	// gets the fileId from the database
@@ -155,12 +169,11 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-
 // -----
 // Upload Helper Functions
 // -----
 
-// Add project to filesystem and database. 
+// Add project to filesystem and database.
 // Note: project ID is set by this function.
 // Params:
 //	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
@@ -231,13 +244,13 @@ func addProject(project *Project) (int, error) {
 //
 // Params:
 //	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
-//	projectId (int) : the id of the project which the added file is to be linked 
+//	projectId (int) : the id of the project which the added file is to be linked
 //		to as an unsigned integer
 // Returns:
 //	(int) : the id of the added file (0 if an error occurs)
 //	(error) : if the operation fails
 func addFileTo(file *File, projectId int) (int, error) {
-	// declares return value variables 
+	// declares return value variables
 	var fileId int
 	var err error
 
@@ -248,7 +261,7 @@ func addFileTo(file *File, projectId int) (int, error) {
 		getDbTag(&File{}, "ProjectId"),
 		getDbTag(&File{}, "Path"),
 	)
-	// executes the formatted query, returning the fileId 
+	// executes the formatted query, returning the fileId
 	// (note that here SQL implicitly checks that the projectId exists in the projects table via Foreign key constraint)
 	row := db.QueryRow(insertFile, projectId, file.Path)
 	if row.Err() != nil {
@@ -335,7 +348,7 @@ func addAuthor(authorId string, projectId int) error {
 	if row.Err() != nil {
 		return row.Err()
 	}
-	// gets the user's permissions 
+	// gets the user's permissions
 	if err := row.Scan(&permissions); err != nil {
 		return err
 	}
@@ -352,7 +365,7 @@ func addAuthor(authorId string, projectId int) error {
 }
 
 // Add a user to a project as a reviewer
-// 
+//
 // Params:
 //	reviewerId (int) : the id of the reviewer to add to the project
 //	projectId (int) : the id of the project to be added to
@@ -377,7 +390,7 @@ func addReviewer(reviewerId string, projectId int) error {
 	if row.Err() != nil {
 		return row.Err()
 	}
-	// gets the user's permissions 
+	// gets the user's permissions
 	if err := row.Scan(&permissions); err != nil {
 		return err
 	}
@@ -446,7 +459,7 @@ func addComment(comment *Comment, fileId int) error {
 		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
 		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
 	)
-	// executes the query and builds the file path if it was successful 
+	// executes the query and builds the file path if it was successful
 	row = db.QueryRow(queryPath, fileId)
 	if row.Err() != nil {
 		return row.Err()
@@ -474,16 +487,15 @@ func addComment(comment *Comment, fileId int) error {
 	return ioutil.WriteFile(dataFilePath, dataBytes, FILE_PERMISSIONS)
 }
 
-
 // -----
 // Retrieve File functionality
 // -----
 
 // Retrieve code files from filesystem. Returns
 // file content with comments and metadata. Recieves
-// a FilePath and projectId as header strings in 
+// a FilePath and projectId as header strings in
 // the request
-// 
+//
 // Response Codes:
 //	200 : File exists, getter success.
 //	400 : otherwise
@@ -498,8 +510,15 @@ func addComment(comment *Comment, fileId int) error {
 // 				author: int
 //				time: datetime string
 //				content: string
-//				replies: object (same as comments)			
+//				replies: object (same as comments)
 func getFile(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
@@ -541,10 +560,10 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 
 	// constructs a file object to return to the frontend
 	file := &File{
-		ProjectId: projectId,
+		ProjectId:   projectId,
 		ProjectName: projectName,
-		Path: filePath,
-		Name: filepath.Base(filePath),
+		Path:        filePath,
+		Name:        filepath.Base(filePath),
 	}
 	// gets file content and comments
 	file.Content, err = getFileContent(fullFilePath)
@@ -567,7 +586,7 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-// Get file content from filesystem. 
+// Get file content from filesystem.
 // Params:
 // 	filePath (string): an absolute path to the file
 // Returns:
@@ -584,7 +603,7 @@ func getFileContent(filePath string) (string, error) {
 
 // Get a file's comments from filesystem, and returns a []*Comments
 // array
-// 
+//
 // Params:
 //	dataPath (string) : a path to the data file containing a given file's meta-data
 //Returns:
@@ -618,6 +637,13 @@ func getFileComments(dataPath string) ([]*Comment, error) {
 // Response Body:
 //	A JSON object of form: {...<project id>:<project name>...}
 func getAllProjects(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
 	// uses getUserProjects to get all user projects by setting authorId = *
@@ -644,8 +670,15 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 //	200 : if the project exists and the request succeeded
 //	400 : otherwise
 // Response Body:
-//	A marshalled Project struct (contained in db.go) 
+//	A marshalled Project struct (contained in db.go)
 func getProject(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
@@ -712,7 +745,7 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 }
 
 // gets all authors which are written by a given user and returns them
-// 
+//
 // Params:
 // 	authorId (string) : the global id of the author as stored in the db
 // Return:
@@ -864,6 +897,13 @@ func getProjectFiles(projectId int) ([]string, error) {
 // 	- 400 : if the request is badly formatted
 // 	- 500 : if something goes wrong on our end
 func importFromJournal(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
 
@@ -880,18 +920,18 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 	authorEmail := fmt.Sprintf("%s@email.com",
 		strings.Replace(submission.Metadata.AuthorName, " ", "_", 4))
 	author := &Credentials{
-		Fname: strings.Split(submission.Metadata.AuthorName, " ")[0],
-		Lname: strings.Split(submission.Metadata.AuthorName, " ")[1],
-		Email: authorEmail,
-		Pw: "password", // defaults to password here as we have no way of identifying users
+		Fname:    strings.Split(submission.Metadata.AuthorName, " ")[0],
+		Lname:    strings.Split(submission.Metadata.AuthorName, " ")[1],
+		Email:    authorEmail,
+		Pw:       "password", // defaults to password here as we have no way of identifying users
 		Usertype: USERTYPE_PUBLISHER,
 	}
 	authorId, err := registerUser(author)
 	// formats the data in a project
 	project := &Project{
-		Name: strings.Replace(submission.Name, " ", "_", 10), // default is 10 spaces to replace
+		Name:      strings.Replace(submission.Name, " ", "_", 10), // default is 10 spaces to replace
 		Reviewers: []string{},
-		Authors: []string{authorId},
+		Authors:   []string{authorId},
 		FilePaths: []string{},
 	}
 
@@ -906,11 +946,11 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 	// adds the file
 	for _, submissionFile := range submission.Files {
 		file := &File{
-			ProjectId: projectId,
+			ProjectId:   projectId,
 			ProjectName: project.Name,
-			Name: submissionFile.Name,
-			Path: submissionFile.Name,
-			Content: submissionFile.Content,
+			Name:        submissionFile.Name,
+			Path:        submissionFile.Name,
+			Content:     submissionFile.Content,
 		}
 		_, err = addFileTo(file, projectId)
 		if err != nil {
@@ -918,7 +958,7 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// writes status OK if nothing goes wrong
 	w.WriteHeader(http.StatusOK)
 }

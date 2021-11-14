@@ -9,8 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/handlers"
+	// "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -24,6 +25,8 @@ const (
 
 	BACKEND_ADDRESS = "http://localhost:3333"
 	PORT            = ":3333"
+	ADDRESS_KEY     = "BACKEND_ADDRESS"
+	ENV_DIR         = "../frontend/.env"
 
 	// end points for URLs
 	ENDPOINT_LOGIN        = "/login"
@@ -38,17 +41,16 @@ const (
 	ENDPOINT_VALIDATE     = "/validate"
 )
 
-// CORS headers
-var allowedOrigins = []string{"*"}
-var allowedHeaders = []string{"X-Requested-With", SECURITY_TOKEN_KEY}
-var allowedMethods = []string{"GET", "HEAD", "POST", "PUT", "OPTIONS"}
+// Environment variables setter map.
+var dotenvMap map[string]string = map[string]string{}
 
 func main() {
 	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
 	dbInit(user, password, protocol, host, port, dbname)
-	securityCheck()
+	setup()
+
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
@@ -80,26 +82,27 @@ func setupCORSsrv() *http.Server {
 	router := mux.NewRouter()
 
 	// sets up handler for CORS
-	headersOk := handlers.AllowedHeaders(allowedHeaders)
-	originsOk := handlers.AllowedOrigins(allowedOrigins)
-	methodsOk := handlers.AllowedMethods(allowedMethods)
+	// headersOk := handlers.AllowedHeaders(allowedHeaders)
+	// originsOk := handlers.AllowedOrigins(allowedOrigins)
+	// methodsOk := handlers.AllowedMethods(allowedMethods)
 
 	// Setup all routes.
-	router.HandleFunc(ENDPOINT_LOGIN, logIn)
-	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal)
-	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
-	router.HandleFunc(ENDPOINT_ALL_PROJECTS, getAllProjects)
-	router.HandleFunc(ENDPOINT_PROJECT, getProject)
-	router.HandleFunc(ENDPOINT_FILE, getFile)
-	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment)
-	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile)
-	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation)
-	router.HandleFunc("/users/{"+getJsonTag(&Credentials{}, "Id")+"}", getUserProfile)
+	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_ALL_PROJECTS, getAllProjects).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_PROJECT, getProject).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/users/{"+getJsonTag(&Credentials{}, "Id")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
-		Addr:    PORT,
-		Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
+		Addr: PORT,
+		// Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
+		Handler: router,
 	}
 }
 
@@ -136,6 +139,10 @@ func setup() error {
 		log.Fatalf("FATAL - Foreign server set up error: %v\n", err)
 		goto RETURN
 	}
+
+	// Write needed environment variables to dotenv file.
+	dotenvMap[ADDRESS_KEY] = BACKEND_ADDRESS
+	err = godotenv.Write(dotenvMap, ENV_DIR)
 
 RETURN:
 	return err

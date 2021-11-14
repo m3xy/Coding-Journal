@@ -17,7 +17,7 @@ import { connect } from 'react-redux';
 
 import { history } from '../_helpers';
 import { alertActions } from '../_actions';
-import { PrivateRoute } from '../_components';
+// import { PrivateRoute } from '../_components';
 
 import { DataWriter } from '../backend_communication';
 import { Navigation, CommentModal, Home, Login, Register, About, Contact, Footer, Code, Upload, Profile } from '../Pages'
@@ -34,7 +34,7 @@ const constants = {
         port: '23409' // TEMP: for now
     },
     backend: {
-	    host: 'http://cs3099user11.host.cs.st-andrews.ac.uk',
+	    host: 'http://localhost',
         port: '3333'
     }
 }
@@ -46,7 +46,7 @@ class App extends React.Component {
         // data writing module for communicating with the backend
         this.writer = new DataWriter(constants.backend.host, constants.backend.port)
 
-        history.listen((location, action) => {
+        history.listen((/*location, action*/) => {
             // clear alert on location change
             this.props.clearAlerts();
         });

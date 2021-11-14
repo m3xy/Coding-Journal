@@ -44,8 +44,15 @@ const (
  Returns: userId
 */
 func logIn(w http.ResponseWriter, r *http.Request) {
-
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
 	log.Println("Log in function sent!")
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 	respMap := make(map[string]string)
@@ -94,6 +101,9 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	Failure: 404, User not found.
 */
 func getUserProfile(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
 	// Check security token.
 	log.Printf("user profile request sent!")
 	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
@@ -149,8 +159,16 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	Returns: userId
 */
 func logInGlobal(w http.ResponseWriter, r *http.Request) {
-
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
+	// Check validity
 	log.Println("Global login request sent!")
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	propsMap := make(map[string]string)
 	err := json.NewDecoder(r.Body).Decode(&propsMap)
 	if err != nil {
@@ -161,7 +179,6 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 	// Query path from team ID.
 	retServer := &Servers{}
 	stmt := fmt.Sprintf(SELECT_ROW, "*", TABLE_SERVERS, getDbTag(&Servers{}, "GroupNb"))
-	fmt.Println(stmt)
 	err = db.QueryRow(stmt, propsMap[getJsonTag(&Servers{}, "GroupNb")]).Scan(getCols(retServer)...)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -178,7 +195,6 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Println(retServer.Url + ENDPOINT_LOGIN)
 	globalReq, _ := http.NewRequest(
 		"POST", retServer.Url+ENDPOINT_LOGIN, bytes.NewBuffer(jsonBody))
 
@@ -214,7 +230,14 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
   Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
 	log.Println("Sign up request sent!")
+	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
@@ -320,6 +343,9 @@ func mapUserToGlobal(userId string) (string, error) {
 // 	email, password, first name, last name, phone number, organisation, id (global)
 // }
 func exportUser(w http.ResponseWriter, r *http.Request) {
+	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
+		return
+	}
 	w.Header().Set("Content-type", "application/json")
 
 	// Decode input into credentials and check necessary parameters.
