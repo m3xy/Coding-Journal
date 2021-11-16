@@ -6,62 +6,66 @@
  */
 
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { connect } from 'react-redux';
-
-import { userActions } from '../_actions';
+import { Button } from 'react-bootstrap';
+import  { Redirect } from 'react-router-dom'
 
 class Home extends React.Component {
-    componentDidMount() {
-        this.props.getUsers();
+
+    constructor(props){
+        super(props);
+
+        this.state = {
+            userID: this.getUserID()
+        }
+
+        this.logout= this.logout.bind(this);
     }
 
-    handleDeleteUser(id) {
-        return (e) => this.props.deleteUser(id);
+    componentDidMount() {
+        
+    }
+
+    getUserID() {
+        let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
+        for(let i = 0; i < cookies.length; i++){    //For each cookie,
+            let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
+            if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
+                return JSON.parse(cookie[1].trim()).userId;
+            }
+        }
+        return null;
+    }
+
+    logout() {
+        var cookies = document.cookie.split(';'); 
+    
+        // The "expire" attribute of every cookie is set to "Thu, 01 Jan 1970 00:00:00 GMT".
+        for (var i = 0; i < cookies.length; i++) {
+            document.cookie = cookies[i] + "=;expires=" + new Date(0).toUTCString();  //Setting all cookies expiry date to be a past date.
+        }
+
+        this.setState({
+            userID : null
+        })
     }
 
     render() {
-        const { user, users } = this.props;
+    
+        console.log(this.state.userID);
+
+        if(this.getUserID() === null) {
+            return (<Redirect to ='/login' />);
+        }
+
         return (
-            <div className="col-md-6 col-md-offset-3">
-                <h1>Hi {user.firstName}!</h1>
-                <p>You're logged in with React!!</p>
-                <h3>All registered users:</h3>
-                {users.loading && <em>Loading users...</em>}
-                {users.error && <span className="text-danger">ERROR: {users.error}</span>}
-                {users.items &&
-                    <ul>
-                        {users.items.map((user, index) =>
-                            <li key={user.id}>
-                                {user.firstName + ' ' + user.lastName}
-                                {
-                                    user.deleting ? <em> - Deleting...</em>
-                                    : user.deleteError ? <span className="text-danger"> - ERROR: {user.deleteError}</span>
-                                    : <span> - <a onClick={this.handleDeleteUser(user.id)}>Delete</a></span>
-                                }
-                            </li>
-                        )}
-                    </ul>
-                }
-                <p>
-                    <Link to="/login">Logout</Link>
-                </p>
+            <div className="text-center">
+                <br/>
+                You are logged in.
+                <br/>
+                <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
             </div>
         );
     }
 }
 
-function mapState(state) {
-    const { users, authentication } = state;
-    const { user } = authentication;
-    return { user, users };
-}
-
-const actionCreators = {
-    getUsers: userActions.getAll,
-    deleteUser: userActions.delete
-}
-
-const connectedHomePage = connect(mapState, actionCreators)(Home);
-export { connectedHomePage as Home };
 export default Home;

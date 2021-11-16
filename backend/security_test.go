@@ -1,0 +1,97 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"testing"
+)
+
+const (
+	WRONG_SECURITY_TOKEN = "testwrongToken"
+)
+
+func TestRandString(t *testing.T) {
+	// Test if given new rand string is not null.
+	if randStringBase64(1, 128) == "" {
+		t.Error("Random string empty!")
+		return
+	}
+	if randStringBase64(2, 8) == "" {
+		t.Error("Random string empty!")
+		return
+	}
+	if randStringBase64(2, 0) != "" {
+		t.Error("Null size random string not empty!")
+		return
+	}
+}
+
+func TestSecurityCheck(t *testing.T) {
+	testInit()
+	// Test security check
+	err := securityCheck()
+	if err != nil {
+		t.Errorf("Security check failure: %v\n", err)
+	}
+
+	// Test security check if non-empty token server
+	err = securityCheck()
+	if err != nil {
+		t.Errorf("Security check failure: %v\n", err)
+	}
+	testEnd()
+}
+
+func TestValidateToken(t *testing.T) {
+	testInit()
+
+	// Test valid security token.
+	storedToken := ""
+	err := db.QueryRow(fmt.Sprintf(
+		SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
+		getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
+		Scan(&storedToken)
+	if err != nil {
+		t.Errorf("Token query error: %v\n", err)
+	} else if !validateToken(storedToken) {
+		t.Errorf("Token validation error: token should be valid.\n")
+	}
+
+	// Test invalid security token.
+	storedToken = WRONG_SECURITY_TOKEN
+	if validateToken(storedToken) {
+		t.Errorf("Token validation error: test token should be invalid.\n")
+	}
+
+	testEnd()
+}
+
+func TestTokenValidation(t *testing.T) {
+	testInit()
+	srv := setupCORSsrv()
+
+	// Start server
+	go srv.ListenAndServe()
+
+	// Write valid security token response
+	validReq, err := http.NewRequest("GET", BACKEND_ADDRESS+ENDPOINT_VALIDATE, nil)
+	res, err := sendSecureRequest(validReq, TEAM_ID)
+	if err != nil {
+		t.Errorf("HTTP request error: %v\n", err)
+	} else if res.StatusCode != http.StatusOK {
+		t.Errorf("Response Status code should be OK, but is %d", res.StatusCode)
+	}
+
+	// Write invalid security token response
+	client := http.Client{}
+	if err != nil {
+		t.Errorf("Request creation error: %v\n", err)
+	}
+	validReq.Header.Set(SECURITY_TOKEN_KEY, WRONG_SECURITY_TOKEN)
+	res, err = client.Do(validReq)
+	if err != nil {
+		t.Errorf("HTTP request error: %v\n", err)
+	} else if res.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Response Status code should be 401, but is %d", res.StatusCode)
+	}
+}
