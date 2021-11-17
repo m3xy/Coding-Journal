@@ -55,7 +55,6 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
-	respMap := make(map[string]string)
 
 	// Get credentials from log in request.
 	creds := &Credentials{}
@@ -84,10 +83,9 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	respMap[getJsonTag(&Credentials{}, "Id")] = storedCreds.Id
 
 	// Marshal JSON and insert it into the response.
-	jsonResp, err := json.Marshal(respMap)
+	jsonResp, err := json.Marshal(map[string]string{getJsonTag(&Credentials{}, "Id"): storedCreds.Id})
 	if err != nil {
 	} else {
 		w.Write(jsonResp)
@@ -207,12 +205,13 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(res.StatusCode)
 		return
 	} else {
-		err = json.NewDecoder(res.Body).Decode(&propsMap)
+		retMap := make(map[string]string)
+		err = json.NewDecoder(res.Body).Decode(&retMap)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		err = json.NewEncoder(w).Encode(&propsMap)
+		err = json.NewEncoder(w).Encode(&retMap)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
