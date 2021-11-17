@@ -99,6 +99,7 @@ func securityCheck() error {
 			} else {
 				log.Println("Security token successfully stored in database.")
 				log.Printf("Store this security token: %s\n", securityToken)
+				token = securityToken
 			}
 
 		} else {

@@ -8,7 +8,6 @@
  */
 
 import { history } from "../_helpers"
-import log from '../../../cs3099-backend.log'
 
 // URL endpoints for backend functions
 const loginEndpoint = '/glogin'
