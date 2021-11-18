@@ -1,5 +1,8 @@
 import React from 'react';
 import { Form, Button } from 'react-bootstrap';
+import axiosInstance from "../Web/axiosInstance";
+
+const registerEndpoint = '/register'
 
 class Register extends React.Component {
 
@@ -19,9 +22,36 @@ class Register extends React.Component {
 
     }
 
+    /**
+     * Sends a POST request to the go server to register a new user
+     *
+     * @param userFirstName the first name of the user being registered
+     * @param userLastName the last name of the user being registered
+     * @param userEmail the user's email (only one account per email)
+     * @param userPassword the user's password
+     */
+    registerUser(userFirstName, userLastName, userEmail, userPassword) {
+        // constructs JSON data to send to the backend
+        let data = {
+            firstname: userFirstName,
+            lastname: userLastName,
+            email: userEmail,
+            password: userPassword
+        };
+
+        // Send register request to backend.
+        axiosInstance.post(registerEndpoint, data)
+                     .then(() => {
+                         history.push('/')
+                     })
+                     .catch((error) => {
+                         console.log(error)
+                     })
+    }
+
     handleSubmit(e) {
         e.preventDefault();
-        this.props.register(this.state.firstName, this.state.lastName, this.state.email, this.state.password);
+        this.registerUser(this.state.firstName, this.state.lastName, this.state.email, this.state.password);
     }
 
     handleChange(e) {

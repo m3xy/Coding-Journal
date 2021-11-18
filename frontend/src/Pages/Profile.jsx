@@ -7,6 +7,9 @@
 import React from "react";
 import {Tabs, Tab, ListGroup} from "react-bootstrap";
 import { Redirect } from "react-router-dom";
+import axiosInstance from "../Web/axiosInstance";
+
+const profileEndpoint = '/users';
 
 class Profile extends React.Component {
 
@@ -14,7 +17,7 @@ class Profile extends React.Component {
         super(props);
 
         this.state = {
-			userID: this.getUserID(),
+			userId: this.getUserID(),
 			firstname: "",
 			lastname: "",
 			email: "",
@@ -27,13 +30,12 @@ class Profile extends React.Component {
 		this.logout= this.logout.bind(this);
     }
 
-
 	getUserID() {
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
         for(let i = 0; i < cookies.length; i++){    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-            if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
-                return JSON.parse(cookie[1].trim()).userId;
+            if(cookie[0].trim() == "userId") {       //  If userId key exists, extract the userId value
+                return cookie[1].trim();
             }
         }
         return null;
@@ -48,7 +50,7 @@ class Profile extends React.Component {
         }
 
         this.setState({
-            userID : null
+            userId : null
         })
     }
 
@@ -58,32 +60,22 @@ class Profile extends React.Component {
 	}
 
 	componentDidMount() {
-		this.props.getProfile(this.state.userID).then((user) => {
-			console.log(user);
-			user = JSON.parse(user);
+        axiosInstance.get(profileEndpoint + "/" + this.state.userId)
+		             .then((response) => {
+			console.log(response.data);
 			this.setState({
-				firstname: user.firstname,
-				lastname: user.lastname,
-				usertype: user.usertype,
-				email: user.email,
-				phonenumber: user.phonenumber,
-				organization: user.organization,
-				projects: user.projects
+				firstname: response.data.firstname,
+				lastname: response.data.lastname,
+				usertype: response.data.usertype,
+				email: response.data.email,
+				phonenumber: response.data.phonenumber,
+				organization: response.data.organization,
+				projects: response.data.projects
 			});
 		})
 	}
 
 	render() {
-
-		//Get user details from ID
-		// const firstName = "John";
-		// const lastName = "Doe";
-		// const userType = "User";
-		// const email = "JohnDoe@gmail.com"
-
-		//Get user posts
-		// const posts = []
-
 		//Get user comments
 		const comments = []
 

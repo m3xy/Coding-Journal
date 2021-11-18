@@ -5,13 +5,14 @@
  * A Modal component dedicated to displaying comments.
  */
 import React from 'react'
-import {Helmet} from "react-helmet";
+// import {Helmet} from "react-helmet";
+import  axiosInstance  from "../Web/axiosInstance";
 import {Modal, Button, InputGroup, FormControl} from "react-bootstrap";
 
+const commentEndpoint = 'project/file/newcomment' ;
 
 
 class CommentModal extends React.Component{
-
   constructor(props) {
     super(props);
     this.state = {
@@ -21,6 +22,7 @@ class CommentModal extends React.Component{
     this.showModal = this.showModal.bind(this);
     this.hideModal = this.hideModal.bind(this);
   }
+
   showModal = () => {
     this.setState({ show: true });
   }
@@ -28,17 +30,43 @@ class CommentModal extends React.Component{
   hideModal = () => {
     this.setState({ show: false });
   }
+
   onSubmit = () => {
     this.hideModal
     console.log(this.state.val);
   }
+
+  /**
+  * Author: 190010714
+  * Sends a POST request to the go server to uplaod a new comment
+  *
+  * @param file the file ID for the file on which the comment was made
+  * @param project the project ID for the project in which the file is in
+  * @param author the author of the comment
+  * @param content the content of the comment
+  */
+  uploadComment(file, project, author, content) {
+    let data = {
+        filePath: file,
+        projectId: project,
+        author: author,
+        content: content
+    };
+    axiosInstance.post(commentEndpoint, data)
+                 .then(() => {
+                   console.log("Received: " + files);
+                 })
+                 .catch((error) => {
+                   console.log(error)
+                 })
+  }
+
+
+  // TODO - Remove the hard coding.
   componentDidMount() {
-    
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
     console.log(window.project);
-    
-    
 
     let userID = null;                          //Preparing to get userID from session cookie
     let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
@@ -55,18 +83,10 @@ class CommentModal extends React.Component{
         return;
     }
 
-   
-
-    this.props.comment('CountToFifteen.java', 8, userID.substring(11,50), this.state.val).then((files) => {
-        console.log("received:" + files);
-    }, (error) => {
-        console.log(error);
-    });
-   
-    
+    this.uploadComment('CountToFifteen.java', 8, userID.substring(11,50), this.state.val);
     console.log("Comment submitted");
-
   }
+
 
   render() {
     return (
@@ -98,7 +118,6 @@ class CommentModal extends React.Component{
     </>
     )
   }
-
 }
 
 export default CommentModal;
