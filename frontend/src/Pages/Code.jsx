@@ -83,17 +83,17 @@ class Code extends React.Component {
         setTimeout(() => Prism.highlightAll(), 0)
         console.log(window.project);
 
-        let userID = null;                          //Preparing to get userID from session cookie
+        let userId = null;                          //Preparing to get userId from session cookie
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
         for(let i = 0; i < cookies.length; i++){    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-            if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
-                userID = cookie[1].trim();
+            if(cookie[0].trim() == "userId"){       //  If userId key exists, extract the userId value
+                userId = cookie[1].trim();
                 break;
             }
         }
 
-        if(userID === null){                        //If user has not logged in, disallow submit
+        if(userId === null){                        //If user has not logged in, disallow submit
             console.log("Not logged in");
             return;
         }
@@ -111,7 +111,7 @@ class Code extends React.Component {
 
     render() {
         // const code = ''
-        console.log('Type: ' + typeof window.project)
+        // console.log('Type: ' + typeof window.project)
         return (
         <div className="renderCode">
             <h2 style={{textAlign: 'center',}} >Circular Queue</h2>
