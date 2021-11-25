@@ -17,14 +17,19 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
+	"io/ioutil"
+	"path/filepath"
 )
 
 // data to use in the tests
 var testProjects []*Project = []*Project{
 	{Id: -1, Name: "testProject1", Reviewers: []string{},
-		Authors: []string{}, FilePaths: []string{"testFile1.txt"}},
+		Authors: []string{}, FilePaths: []string{"testFile1.txt"}, MetaData: testProjectMetaData[0]},
 	{Id: -1, Name: "testProject2", Reviewers: []string{},
-		Authors: []string{}, FilePaths: []string{"testFile2.txt"}},
+		Authors: []string{}, FilePaths: []string{"testFile2.txt"}, MetaData: testProjectMetaData[0]},
+}
+var testProjectMetaData = []*CodeProjectData{
+	{Abstract: "test abstract, this means nothing", Reviews:nil}, // TODO: add comments here
 }
 var testAuthors []*Credentials = []*Credentials{
 	{Email: "test@test.com", Pw: "123456aB$", Fname: "test",
@@ -108,6 +113,27 @@ func testAddProject(testProject *Project) error {
 	}
 	if !(reflect.DeepEqual(testProject.Reviewers, reviewers)) {
 		return errors.New("reviewers arrays do not match")
+	}
+
+	// checks that the filesystem has a proper corresponding entry and metadata file
+	projectDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(projectId))
+	fileDataPath := filepath.Join(projectDirPath, DATA_DIR_NAME, projectName + ".json")
+	dataString, err := ioutil.ReadFile(fileDataPath)
+	if err != nil {
+		return err
+	}
+	// marshalls the string of data into a struct
+	projectData := &CodeProjectData{}
+	if err := json.Unmarshal(dataString, projectData); err != nil {
+		return err
+	}
+	// tests that the metadata is properly formatted
+	if projectData.Abstract != testProject.MetaData.Abstract {
+		return errors.New(fmt.Sprintf(
+			"project metadata not added to filesystem properly. Abstracts %s, %s do not match",
+			projectData.Abstract, testProject.MetaData.Abstract))
+	} else if !(reflect.DeepEqual(projectData.Reviews, testProject.MetaData.Reviews)) {
+		return errors.New("Project Reviews do not match")
 	}
 	return nil
 }
@@ -385,12 +411,61 @@ func TestAddNonUserReviewer(t *testing.T) {
 	}
 }
 
-/*
-Tests the ability of the getAllProjects() function to get all projects from the db at once
+// This function tests the getProjectMetaData function
+//
+// This test depends on:
+// 	- addProject()
+func TestGetProjectMetaData(t *testing.T) {
+	testProject := testProjects[0]
 
-Test Depends On:
-	- TestCreateProjects()
-*/
+	// initializes the test environment, returning an error if any occurs
+	if err := initTestEnvironment(); err != nil {
+		t.Errorf("Error in test environment init: %v", err)
+	}
+	// adds the test project to the db
+	projectId, err := addProject(testProject)
+	if err != nil {
+		t.Errorf("Error adding project to the db and filesystem: %v", err)
+	}
+	// tests that the metadata can be read back properly
+	projectData, err := getProjectMetaData(projectId)
+	if err != nil {
+		t.Errorf("Error getting project metadata: %v", err)
+	}
+	// tests for equality of the added metadata with that which was retrieved
+	if projectData.Abstract != testProject.MetaData.Abstract {
+		t.Errorf("project metadata not added to filesystem properly. Abstracts %s, %s do not match",
+			projectData.Abstract, testProject.MetaData.Abstract)
+	} else if !(reflect.DeepEqual(projectData.Reviews, testProject.MetaData.Reviews)) {
+		t.Error("Project Reviews do not match")
+	}
+	// clears the test environment
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("Error on db teardown: %v", err)
+	}
+}
+
+// Tests that getProjectMetaData will throw an error if an incorrect project ID is passed in
+func TestGetInvalidProjectMetaData(t *testing.T) {
+	// initializes the test environment, returning an error if any occurs
+	if err := initTestEnvironment(); err != nil {
+		t.Errorf("Error in test environment init: %v", err)
+	}
+	// tests that an error is thrown if a non-existant project ID is passed to getProjectMetaData
+	_, err := getProjectMetaData(400)
+	if err == nil {
+		t.Errorf("No error was thrown for invalid project")
+	}
+	// clears the test environment
+	if err = clearTestEnvironment(); err != nil {
+		t.Errorf("Error on db teardown: %v", err)
+	}
+}
+
+// Tests the ability of the getAllProjects() function to get all projects from the db at once
+//
+// Test Depends On:
+// 	- TestCreateProjects()
 func TestGetAllProjects(t *testing.T) {
 	var err error
 
