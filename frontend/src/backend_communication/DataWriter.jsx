@@ -15,8 +15,8 @@ const registerEndpoint = '/register'
 const uploadEndpoint = '/upload'
 const profileEndpoint = '/users'
 
-const codeEndpoint = '/project/file'
-const commentEndpoint = '/project/file/newcomment'
+const codeEndpoint = '/submission/file'
+const commentEndpoint = '/submission/file/newcomment'
 
 const BACKEND_TOKEN = process.env.BACKEND_TOKEN;
 const BACKEND_ADDRESS = process.env.BACKEND_ADDRESS;
@@ -132,13 +132,13 @@ class DataWriter {
      * Sends a POST request to the go server to register a new user
      * 
      * @param file the file ID for which we wish to render the code
-     * @param project the project ID in which the file is located
+     * @param submission the submission ID in which the file is located
      */
-    getCode(file, project) {
+    getCode(file, submission) {
         // constructs JSON data to send to the backend
         let data = {
             filePath: file,
-            projectId: project
+            submissionId: submission
         };
 
         return new Promise((resolve, reject) => {
@@ -166,15 +166,15 @@ class DataWriter {
      * Sends a POST request to the go server to uplaod a new comment
      * 
      * @param file the file ID for the file on which the comment was made
-     * @param project the project ID for the project in which the file is in
+     * @param submission the submission ID for the submission in which the file is in
      * @param author the author of the comment
      * @param content the content of the comment
      */
-    uploadComment(file, project, author, content) {
+    uploadComment(file, submission, author, content) {
         // constructs JSON data to send to the backend
         let data = {
             filePath: file,
-            projectId: project,
+            submissionId: submission,
             author: author,
             content: content
         };
@@ -200,13 +200,13 @@ class DataWriter {
     }
 
     /**
-     * Sends a POST request to the go server to upload (project) files
+     * Sends a POST request to the go server to upload (submission) files
      * 
-     * @param {JSON} userID Project files' Author's User ID
-     * @param {Array.<File>} files Project files
+     * @param {JSON} userID Submission files' Author's User ID
+     * @param {Array.<File>} files Submission files
      * @returns 
      */
-    uploadFiles(userID, projectName, files) {
+    uploadFiles(userID, submissionName, files) {
 
         if(userID === null) {
             console.log("not logged in!");
@@ -237,7 +237,7 @@ class DataWriter {
                 .then(() => {
                     let data = {
                         author : authorID,
-                        name : projectName,
+                        name : submissionName,
                         content : files[0]
                     }
     
@@ -278,7 +278,7 @@ class DataWriter {
             //     usertype: 4,
             //     phonenumber: "012345678910",
             //     organization: "Lonely guy",
-            //     projects : {
+            //     submissions : {
             //         1: "proj1",
             //         2 : "proj2"
             //     }

@@ -83,14 +83,14 @@ class App extends React.Component {
                                 />
                                 <Route path="/about" exact component={() => <About />} />
                                 <Route path="/code" exact component={() => <Code
-                                     code={(file, project) => this.writer.getCode(file, project)}/>}
+                                     code={(file, submission) => this.writer.getCode(file, submission)}/>}
                                 />
                                 <Route path="/contact" exact component={() => <Contact />} />
                                 <Route path="/commentModal" exact component={() => <CommentModal
-                                    comment={(userID, projectName, files, content) => this.writer.uploadComment(userID, projectName, files, content)}/>} 
+                                    comment={(userID, submissionName, files, content) => this.writer.uploadComment(userID, submissionName, files, content)}/>} 
                                     />
                                 <Route path="/upload" exact component={() => <Upload 
-                                    upload={(userID, projectName, files) => this.writer.uploadFiles(userID, projectName, files)}/>} />
+                                    upload={(userID, submissionName, files) => this.writer.uploadFiles(userID, submissionName, files)}/>} />
                                 <Route path="/profile" exact component={() => <Profile
                                     getProfile={(userID) => this.writer.getProfile(userID)}/>} />
                                 <Redirect from="*" to="/" />

@@ -36,7 +36,7 @@ class CommentModal extends React.Component{
     
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
-    console.log(window.project);
+    console.log(window.submission);
     
     
 

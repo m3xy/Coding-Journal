@@ -16,22 +16,22 @@ class Upload extends React.Component {
 
         this.state = {
             files: [],
-            projectName: ""
+            submissionName: ""
         };
 
         this.dropFiles = this.dropFiles.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
         this.handleDrop = this.handleDrop.bind(this);
-        this.setProjectName = this.setProjectName.bind(this);
+        this.setSubmissionName = this.setSubmissionName.bind(this);
     }
 
     dropFiles(e) {
         this.handleDrop(e.target.files);
     }
 
-    setProjectName(e) {
+    setSubmissionName(e) {
         this.setState({
-            projectName: e.target.value
+            submissionName: e.target.value
         })
     }
 
@@ -58,24 +58,24 @@ class Upload extends React.Component {
             return;
         }
 
-        // this.state.projectName = this.state.files[0].name;     //Temp, 1 file uploads
-        // console.log(this.state.projectName);
+        // this.state.submissionName = this.state.files[0].name;     //Temp, 1 file uploads
+        // console.log(this.state.submissionName);
 
-        this.props.upload(userID, this.state.projectName, this.state.files).then((project) => {
-            console.log("Project ID: " + project);
+        this.props.upload(userID, this.state.submissionName, this.state.files).then((submission) => {
+            console.log("Submission ID: " + submission);
             var codePage = window.open("/code");
-            codePage.project = project;
-            codePage.projectName = this.state.projectName;
+            codePage.submission = submission;
+            codePage.submissionName = this.state.submissionName;
         }, (error) => {
             console.log(error);
         });
         
 
         document.getElementById("formFile").files = new DataTransfer().files;
-        document.getElementById("projectName").value = "";
+        document.getElementById("submissionName").value = "";
         this.setState({
             files: [],
-            projectName: ""
+            submissionName: ""
         });
 
         console.log("Files submitted");
@@ -175,8 +175,8 @@ class Upload extends React.Component {
                             )}
                         </Card.Body>
 
-                        <FloatingLabel controlId="projectName" label="Project name" className="mb-0">
-                            <Form.Control type="text" placeholder="My_Project" required onChange={this.setProjectName}/>
+                        <FloatingLabel controlId="submissionName" label="Submission name" className="mb-0">
+                            <Form.Control type="text" placeholder="My_Submission" required onChange={this.setSubmissionName}/>
                         </FloatingLabel>
                         
                         <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload files</Button>{' '}</Card.Footer>

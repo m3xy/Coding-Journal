@@ -21,7 +21,7 @@ class Code extends React.Component {
 
         this.state = {
             file: 'CountToFifteen.java',
-            project: 8,
+            submission: 8,
             content: 'hello',
             authorID: '11d38ba6c5-435b-11ec-bb68-320e0198aa16'
 
@@ -33,9 +33,9 @@ class Code extends React.Component {
 
 redirectToComment() {
         var commentPage = window.open('/commentModal')
-        commentPage.project = this.project 
+        commentPage.submission = this.submission 
         commentPage.file = this.file
-        console.log('project: ' + this.project)
+        console.log('submission: ' + this.submission)
         console.log('file: ' + this.file)
 
     }
@@ -43,7 +43,7 @@ redirectToComment() {
     
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
-    console.log(window.project);
+    console.log(window.submission);
    
     
     
@@ -63,7 +63,7 @@ redirectToComment() {
         return;
     }
 
-    this.props.code(this.state.file, this.state.project).then((files) => {
+    this.props.code(this.state.file, this.state.submission).then((files) => {
         console.log("received:" + files);
     }, (error) => {
         console.log(error);
@@ -75,7 +75,7 @@ redirectToComment() {
   }
   render() {
     const code = ''
-    console.log('Type: ' + typeof window.project)
+    console.log('Type: ' + typeof window.submission)
     return (
     <div className="renderCode">
         <h2 style={{textAlign: 'center',}} >Circular Queue</h2>
@@ -85,7 +85,7 @@ redirectToComment() {
         </Button>
         <pre className="line-numbers">
             <code className="language-java">
-            {window.project.content}
+            {window.submission.content}
             </code>
         </pre>
     </div>

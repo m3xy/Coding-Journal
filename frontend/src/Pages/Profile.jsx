@@ -21,7 +21,7 @@ class Profile extends React.Component {
 			usertype: 0,
 			phonenumber: "",
 			organization: "",
-			projects: {}
+			submissions: {}
         };
 
 		this.logout= this.logout.bind(this);
@@ -52,9 +52,9 @@ class Profile extends React.Component {
         })
     }
 
-	openProject(projectID) {
+	openSubmission(submissionID) {
 		var codePage = window.open("/code");
-		codePage.projectID = projectID;
+		codePage.submissionID = submissionID;
 	}
 
 	componentDidMount() {
@@ -68,7 +68,7 @@ class Profile extends React.Component {
 				email: user.email,
 				phonenumber: user.phonenumber,
 				organization: user.organization,
-				projects: user.projects
+				submissions: user.submissions
 			});
 		})
 	}
@@ -89,9 +89,9 @@ class Profile extends React.Component {
 
 		const userTypes = ["None", "Publisher", "Reviewer", "Reviewer-Publisher", "User"]
 
-		const projects = Object.entries(this.state.projects).map(([id, name]) => {
+		const submissions = Object.entries(this.state.submissions).map(([id, name]) => {
 			return (
-                <ListGroup.Item as="li" key={id} action onClick={() => {this.openProject(id)}}>
+                <ListGroup.Item as="li" key={id} action onClick={() => {this.openSubmission(id)}}>
                     <label>{name}</label>
                 </ListGroup.Item>
             );
@@ -109,8 +109,8 @@ class Profile extends React.Component {
 				<br/><br/>
 				<Tabs justify defaultActiveKey="profile" id="profileTabs" className="mb-3">
 					<Tab eventKey="posts" title="Posts">
-						{projects.length > 0 ? (
-							<ListGroup>{projects}</ListGroup>
+						{submissions.length > 0 ? (
+							<ListGroup>{submissions}</ListGroup>
 						) : (
 							<div className="text-center" style={{color:"grey"}}><i>No posts</i></div>
 						)	
