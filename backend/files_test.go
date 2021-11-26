@@ -1,14 +1,13 @@
-/*
-files_test.go
-author: 190010425
-created: November 23, 2021
+// ===================================================================
+// files_test.go
+// Authors: 190010425
+// Created: November 23, 2021
+//
+// test file for files.go
+// Note that the tests are written dependency wise from top to bottom.
+// Hence if a test breaks, fix the top one first and then re-run.
+// ===================================================================
 
-Test file for the CodeFiles module.
-
-Note that the tests are written dependency wise from top to bottom. This means
-that if a test breaks, then most of the tests below it will also break. Hence if
-a test breaks, fix the top one first and then re-run
-*/
 
 package main
 
@@ -39,9 +38,9 @@ const (
 )
 
 var testFiles []*File = []*File{
-	{Id: -1, ProjectId: -1, ProjectName: "testProject1", Path: "testFile1.txt",
+	{Id: -1, SubmissionId: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
 		Name: "testFile1.txt", Content: "hello world", Comments: nil},
-	{Id: -1, ProjectId: -1, ProjectName: "testProject1", Path: "testFile2.txt",
+	{Id: -1, SubmissionId: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
 		Name: "testFile2.txt", Content: "hello world", Comments: nil},
 }
 
@@ -92,48 +91,48 @@ func clearTestEnvironment() error {
 }
 
 // test function to add a single file. This function is not called directly as a test, but is a utility method for other tests
-func testAddFile(file *File, projectId int) error {
-	var projectName string        // name of the project as queried from the SQL db
+func testAddFile(file *File, submissionId int) error {
+	var submissionName string        // name of the submission as queried from the SQL db
 	var fileId int                // id of the file as returned from addFileTo()
 	var queriedFileContent string // the content of the file
-	var queriedProjectId int      // the id of the project as gotten from the files table
+	var queriedSubmissionId int      // the id of the submission as gotten from the files table
 	var queriedFilePath string    // the file path as queried from the files table
 
-	// adds file to the already instantiated project
-	fileId, err := addFileTo(file, projectId)
+	// adds file to the already instantiated submission
+	fileId, err := addFileTo(file, submissionId)
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to add file to the given project"))
+		return errors.New(fmt.Sprintf("failed to add file to the given submission"))
 	}
 
-	// gets the project name from the db
-	queryProjectName := fmt.Sprintf(
+	// gets the submission name from the db
+	querySubmissionName := fmt.Sprintf(
 		SELECT_ROW,
-		getDbTag(&Project{}, "Name"),
-		TABLE_PROJECTS,
-		getDbTag(&Project{}, "Id"),
+		getDbTag(&Submission{}, "Name"),
+		TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Id"),
 	)
 	// executes the query
-	row := db.QueryRow(queryProjectName, projectId)
-	if err = row.Scan(&projectName); err != nil {
-		return errors.New(fmt.Sprintf("Query failure on project name: %v", err))
+	row := db.QueryRow(querySubmissionName, submissionId)
+	if err = row.Scan(&submissionName); err != nil {
+		return errors.New(fmt.Sprintf("Query failure on submission name: %v", err))
 	}
 
 	// gets the file data from the db
 	queryFileData := fmt.Sprintf(
 		SELECT_ROW,
-		fmt.Sprintf("%s, %s", getDbTag(&File{}, "ProjectId"), getDbTag(&File{}, "Path")),
+		fmt.Sprintf("%s, %s", getDbTag(&File{}, "SubmissionId"), getDbTag(&File{}, "Path")),
 		TABLE_FILES,
 		getDbTag(&File{}, "Id"),
 	)
 	// executes query
 	row = db.QueryRow(queryFileData, fileId)
-	if err = row.Scan(&queriedProjectId, &queriedFilePath); err != nil {
+	if err = row.Scan(&queriedSubmissionId, &queriedFilePath); err != nil {
 		return errors.New(
-			fmt.Sprintf("Failed to query project name after db: %v", err))
+			fmt.Sprintf("Failed to query submission name after db: %v", err))
 	}
 
 	// gets the file content from the filesystem
-	filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(projectId), projectName, queriedFilePath)
+	filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId), submissionName, queriedFilePath)
 	fileBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return errors.New(
@@ -144,18 +143,18 @@ func testAddFile(file *File, projectId int) error {
 	// checks that a data file has been generated for the uploaded file
 	fileDataPath := filepath.Join(
 		TEST_FILES_DIR,
-		fmt.Sprint(projectId),
+		fmt.Sprint(submissionId),
 		DATA_DIR_NAME,
-		projectName,
+		submissionName,
 		strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath))+".json",
 	)
 	// gets data about the file, and tests it for equality against the added file
 	_, err = os.Stat(fileDataPath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		return errors.New("Data file not generated during file upload")
-	} else if projectId != queriedProjectId { // Compare  test values.
-		return errors.New(fmt.Sprintf("Project ID mismatch: %d vs %d",
-			projectId, queriedProjectId))
+	} else if submissionId != queriedSubmissionId { // Compare  test values.
+		return errors.New(fmt.Sprintf("Submission ID mismatch: %d vs %d",
+			submissionId, queriedSubmissionId))
 	} else if file.Path != queriedFilePath {
 		return errors.New(fmt.Sprintf("File path mismatch:  %s vs %s",
 			file.Path, queriedFilePath))
@@ -168,18 +167,18 @@ func testAddFile(file *File, projectId int) error {
 
 // tests that a single given valid file will be uploaded to the db and filesystem properly
 func TestAddOneFile(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testFile := testFiles[0]
 	// sets up the test environment
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("error while initializing the test environment db: %v", err)
 	}
 
-	// adds the test project and file to the db and filesystem
-	projectId, err := addProject(testProject)
+	// adds the test submission and file to the db and filesystem
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error occurred while adding test project: %v", err)
-	} else if err = testAddFile(testFile, projectId); err != nil {
+		t.Errorf("Error occurred while adding test submission: %v", err)
+	} else if err = testAddFile(testFile, submissionId); err != nil {
 		t.Errorf("Error occurred while adding file: %v", err)
 	}
 	
@@ -189,9 +188,9 @@ func TestAddOneFile(t *testing.T) {
 	}
 }
 
-// tests that multiple files can be successfully added to one code project
+// tests that multiple files can be successfully added to one code submission
 func TestAddMultipleFiles(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
 
 	// sets up the test environmetn
@@ -199,14 +198,14 @@ func TestAddMultipleFiles(t *testing.T) {
 		t.Errorf("error while initializing the test environment db: %v", err)
 	}
 
-	// adds a test project to the db
-	projectId, err := addProject(testProject)
+	// adds a test submission to the db
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error occurred while adding test project: %v", err)
+		t.Errorf("Error occurred while adding test submission: %v", err)
 	}
 	// Test adding file for every file in array.
 	for _, file := range testFiles {
-		if err = testAddFile(file, projectId); err != nil {
+		if err = testAddFile(file, submissionId); err != nil {
 			t.Errorf("Error occurred while adding file: %v", err)
 		}
 	}
@@ -220,15 +219,15 @@ func TestAddMultipleFiles(t *testing.T) {
 func testAddComment(comment *Comment, testFile *File) error {
 	// adds a comment to the file
 	if err := addComment(comment, testFile.Id); err != nil {
-		return errors.New(fmt.Sprintf("failed to add comment to the project: %v", err))
+		return errors.New(fmt.Sprintf("failed to add comment to the submission: %v", err))
 	}
 
 	// reads the data file into a CodeDataFile struct
 	fileDataPath := filepath.Join(
 		TEST_FILES_DIR,
-		fmt.Sprint(testFile.ProjectId),
+		fmt.Sprint(testFile.SubmissionId),
 		DATA_DIR_NAME,
-		testFile.ProjectName,
+		testFile.SubmissionName,
 		strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
 	)
 	fileBytes, err := ioutil.ReadFile(fileDataPath)
@@ -253,7 +252,7 @@ func testAddComment(comment *Comment, testFile *File) error {
 
 // tests adding one valid comment. Uses the testAddComment() utility method
 func TestAddOneComment(t *testing.T) {
-	testProject := testProjects[0] // test project to add testFile to
+	testSubmission := testSubmissions[0] // test submission to add testFile to
 	testFile := testFiles[0]       // test file to add comments to
 	testAuthor := testAuthors[0]   // test author of comment
 	testComment := testComments[0]
@@ -263,20 +262,20 @@ func TestAddOneComment(t *testing.T) {
 		t.Errorf("error while initializing the test environment db: %v", err)
 	}
 
-	// creates a project, adds a file to it, and adds a test user to the system
-	projectId, err := addProject(testProject)
+	// creates a submission, adds a file to it, and adds a test user to the system
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("failed to add project: %v", err)
+		t.Errorf("failed to add submission: %v", err)
 	}
-	fileId, err := addFileTo(testFile, projectId)
+	fileId, err := addFileTo(testFile, submissionId)
 	if err != nil {
-		t.Errorf("failed to add a file to the project: %v", err)
+		t.Errorf("failed to add a file to the submission: %v", err)
 	}
 	authorId, err := registerUser(testAuthor)
 	if err != nil {
 		t.Errorf("failed to add user to the database: %v", err)
 	}
-	testProject.Id = projectId
+	testSubmission.Id = submissionId
 	testFile.Id = fileId
 	testComment.AuthorId = authorId
 
@@ -293,10 +292,10 @@ func TestAddOneComment(t *testing.T) {
 
 
 // Tests the basic ability of the CodeFiles module to load the data from a
-// valid file path passed to it. Simple valid one code file project
+// valid file path passed to it. Simple valid one code file submission
 
 // Test Depends On:
-// 	- TestCreateProject()
+// 	- TestCreateSubmission()
 // 	- TestAddFiles()
 func TestGetOneFile(t *testing.T) {
 	var err error
@@ -307,31 +306,31 @@ func TestGetOneFile(t *testing.T) {
 	// Start server.
 	go srv.ListenAndServe()
 
-	var projectId int              // stores project id returned by addProject()
+	var submissionId int              // stores submission id returned by addSubmission()
 	testFile := testFiles[0]       // the test file to be added to the db and filesystem (saved here so it can be easily changed)
-	testProject := testProjects[0] // the test project to be added to the db and filesystem (saved here so it can be easily changed)
+	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	// initializes the filesystem and db
 	if err = initTestEnvironment(); err != nil {
 		t.Errorf("Error initializing the test environment %s", err)
 	}
-	// adds a project to the database and filesystem
-	projectId, err = addProject(testProject)
+	// adds a submission to the database and filesystem
+	submissionId, err = addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error adding project %s: %v", testProject.Name, err)
+		t.Errorf("Error adding submission %s: %v", testSubmission.Name, err)
 	}
 	// adds a file to the database and filesystem
-	_, err = addFileTo(testFile, projectId)
+	_, err = addFileTo(testFile, submissionId)
 	if err != nil {
 		t.Errorf("Error adding file %s: %v", testFile.Name, err)
 	}
-	// sets the project id of the added file to link it with the project on this end (just in case. This should happen in addFileTo)
-	testFile.ProjectId = projectId
+	// sets the submission id of the added file to link it with the submission on this end (just in case. This should happen in addFileTo)
+	testFile.SubmissionId = submissionId
 
-	// sets a custom header "file": file path and "project": projectId to indicate which file is being queried to the server
+	// sets a custom header "file": file path and "submission": submissionId to indicate which file is being queried to the server
 	reqBody, err := json.Marshal(map[string]interface{}{
 		getJsonTag(&File{}, "Path"):      testFile.Path,
-		getJsonTag(&File{}, "ProjectId"): testFile.ProjectId,
+		getJsonTag(&File{}, "SubmissionId"): testFile.SubmissionId,
 	})
 	if err != nil {
 		t.Errorf("Error formatting request body: %v", err)
@@ -361,9 +360,9 @@ func TestGetOneFile(t *testing.T) {
 	// tests that the file path
 	if testFile.Path != file.Path {
 		t.Errorf("File Path %d != %d", file.Id, testFile.Id)
-	// tests for project id correctness
-	} else if testFile.ProjectId != file.ProjectId {
-		t.Errorf("File Project Id %d != %d", file.ProjectId, testFile.ProjectId)
+	// tests for submission id correctness
+	} else if testFile.SubmissionId != file.SubmissionId {
+		t.Errorf("File Submission Id %d != %d", file.SubmissionId, testFile.SubmissionId)
 	// tests if the file paths are identical
 	} else if testFile.Path != file.Path {
 		t.Errorf("File Path %s != %s", file.Path, testFile.Path)
@@ -384,10 +383,10 @@ func TestGetOneFile(t *testing.T) {
 }
 
 // Tests the basic ability of the CodeFiles module to upload a single file
-// code project
+// code submission
 //
 // Test Depends on:
-// 	- TestCreateProject()
+// 	- TestCreateSubmission()
 // 	- TestAddFile()
 func TestUploadOneFile(t *testing.T) {
 	var err error
@@ -452,18 +451,18 @@ func TestUploadOneFile(t *testing.T) {
 }
 
 // Tests the basic ability of the CodeFiles module to add a comment to a file
-// given file path and project id
+// given file path and submission id
 //
 // Test Depends On:
 // 	- TestAddComment()
-// 	- TestCreateProject()
+// 	- TestCreateSubmission()
 // 	- TestAddFiles()
 func TestUploadUserComment(t *testing.T) {
 	var err error
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testAuthor := testAuthors[0]
 	testComment := testComments[0]
 
@@ -473,7 +472,7 @@ func TestUploadUserComment(t *testing.T) {
 	// Start server.
 	go srv.ListenAndServe()
 
-	var projectId int // stores project id returned by addProject()
+	var submissionId int // stores submission id returned by addSubmission()
 
 	// initializes the filesystem and db
 	if err = initTestEnvironment(); err != nil {
@@ -481,13 +480,13 @@ func TestUploadUserComment(t *testing.T) {
 	}
 
 	// adds test values to the db and filesystem
-	projectId, err = addProject(testProject)
+	submissionId, err = addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("error occurred while adding testProject: %v", err)
+		t.Errorf("error occurred while adding testSubmission: %v", err)
 	}
-	_, err = addFileTo(testFile, projectId)
+	_, err = addFileTo(testFile, submissionId)
 	if err != nil {
-		t.Errorf("error occurred while adding testProject: %v", err)
+		t.Errorf("error occurred while adding testSubmission: %v", err)
 	}
 	testAuthor.Id, err = registerUser(testAuthor)
 	if err != nil {
@@ -497,7 +496,7 @@ func TestUploadUserComment(t *testing.T) {
 
 	// formats the request body to send to the server to add a comment
 	reqBody, err := json.Marshal(map[string]interface{}{
-		getJsonTag(&File{}, "ProjectId"):   projectId,
+		getJsonTag(&File{}, "SubmissionId"):   submissionId,
 		getJsonTag(&File{}, "Path"):        testFile.Path,
 		getJsonTag(&Comment{}, "AuthorId"): testAuthor.Id,
 		getJsonTag(&Comment{}, "Content"):  testComment.Content,
@@ -525,9 +524,9 @@ func TestUploadUserComment(t *testing.T) {
 	// tests that the comment was added properly
 	fileDataPath := filepath.Join(
 		TEST_FILES_DIR,
-		fmt.Sprint(testProject.Id),
+		fmt.Sprint(testSubmission.Id),
 		DATA_DIR_NAME,
-		testProject.Name,
+		testSubmission.Name,
 		strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
 	)
 	fileBytes, err := ioutil.ReadFile(fileDataPath)

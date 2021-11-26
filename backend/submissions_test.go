@@ -1,10 +1,10 @@
-/*
-submissions_test.go
-author: 190010425
-created: November 18, 2021
-
-This file takes care of 
-*/
+// ===========================
+// submissions_test.go
+// Authors: 190010425
+// Created: November 18, 2021
+//
+// This file takes care of 
+// ===========================
 
 package main
 
@@ -22,13 +22,13 @@ import (
 )
 
 // data to use in the tests
-var testProjects []*Project = []*Project{
-	{Id: -1, Name: "testProject1", Reviewers: []string{},
-		Authors: []string{}, FilePaths: []string{"testFile1.txt"}, MetaData: testProjectMetaData[0]},
-	{Id: -1, Name: "testProject2", Reviewers: []string{},
-		Authors: []string{}, FilePaths: []string{"testFile2.txt"}, MetaData: testProjectMetaData[0]},
+var testSubmissions []*Submission = []*Submission{
+	{Id: -1, Name: "testSubmission1", Reviewers: []string{},
+		Authors: []string{}, FilePaths: []string{"testFile1.txt"}, MetaData: testSubmissionMetaData[0]},
+	{Id: -1, Name: "testSubmission2", Reviewers: []string{},
+		Authors: []string{}, FilePaths: []string{"testFile2.txt"}, MetaData: testSubmissionMetaData[0]},
 }
-var testProjectMetaData = []*CodeProjectData{
+var testSubmissionMetaData = []*CodeSubmissionData{
 	{Abstract: "test abstract, this means nothing", Reviews:nil}, // TODO: add comments here
 }
 var testAuthors []*Credentials = []*Credentials{
@@ -52,102 +52,102 @@ var testReviewers []*Credentials = []*Credentials{
 		Lname: "Doe", Usertype: USERTYPE_REVIEWER_PUBLISHER},
 }
 
-// Utility function to be re-used for testing adding projects to the db
-func testAddProject(testProject *Project) error {
-	projectId, err := addProject(testProject)
+// Utility function to be re-used for testing adding submissions to the db
+func testAddSubmission(testSubmission *Submission) error {
+	submissionId, err := addSubmission(testSubmission)
 
 	// simple error cases
 	if err != nil {
 		return err
-	} else if projectId < 0 {
-		return errors.New(fmt.Sprintf("Invalid Project ID returned: %d", projectId))
+	} else if submissionId < 0 {
+		return errors.New(fmt.Sprintf("Invalid Submission ID returned: %d", submissionId))
 	}
 
-	// checks manually that the project was added correctly
-	var projectName string
+	// checks manually that the submission was added correctly
+	var submissionName string
 	authors := []string{}
 	reviewers := []string{}
 	// builds SQL Queries for testing the added values
-	queryProjectName := fmt.Sprintf(SELECT_ROW, getDbTag(&Project{}, "Name"),
-		TABLE_PROJECTS, getDbTag(&Project{}, "Id"))
+	querySubmissionName := fmt.Sprintf(SELECT_ROW, getDbTag(&Submission{}, "Name"),
+		TABLE_SUBMISSIONS, getDbTag(&Submission{}, "Id"))
 	queryAuthors := fmt.Sprintf(SELECT_ROW, "userId",
-		TABLE_AUTHORS, "projectId")
+		TABLE_AUTHORS, "submissionId")
 	queryReviewers := fmt.Sprintf(SELECT_ROW, "userId",
-		TABLE_REVIEWERS, "projectId")
+		TABLE_REVIEWERS, "submissionId")
 
-	// tests that the project name was added correctly
-	row := db.QueryRow(queryProjectName, projectId)
+	// tests that the submission name was added correctly
+	row := db.QueryRow(querySubmissionName, submissionId)
 	if row.Err() != nil {
-		return errors.New(fmt.Sprintf("Error in project name query: %v", row.Err()))
-	} else if err = row.Scan(&projectName); err != nil {
+		return errors.New(fmt.Sprintf("Error in submission name query: %v", row.Err()))
+	} else if err = row.Scan(&submissionName); err != nil {
 		return err
-	} else if testProject.Name != projectName {
+	} else if testSubmission.Name != submissionName {
 		return errors.New(
-			fmt.Sprintf("Project name mismatch. %s vs %s",
-				testProject.Name, projectName))
+			fmt.Sprintf("Submission name mismatch. %s vs %s",
+				testSubmission.Name, submissionName))
 	}
 
 	// tests that the authors were added correctly
-	rows, err := db.Query(queryAuthors, projectId)
+	rows, err := db.Query(queryAuthors, submissionId)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error querying project Authors: %v", err))
+		return errors.New(fmt.Sprintf("Error querying submission Authors: %v", err))
 	}
 	var author string
 	for rows.Next() {
 		rows.Scan(&author)
 		authors = append(authors, author)
 	}
-	if !(reflect.DeepEqual(testProject.Authors, authors)) {
+	if !(reflect.DeepEqual(testSubmission.Authors, authors)) {
 		return errors.New("authors arrays do not match")
 	}
 
 	// tests that the reviewers were added correctly
-	rows, err = db.Query(queryReviewers, projectId)
+	rows, err = db.Query(queryReviewers, submissionId)
 	if err != nil {
-		return errors.New(fmt.Sprintf("error querying project Reviewers: %v", err))
+		return errors.New(fmt.Sprintf("error querying submission Reviewers: %v", err))
 	}
 	var reviewer string
 	for rows.Next() {
 		rows.Scan(&reviewer)
 		reviewers = append(reviewers, reviewer)
 	}
-	if !(reflect.DeepEqual(testProject.Reviewers, reviewers)) {
+	if !(reflect.DeepEqual(testSubmission.Reviewers, reviewers)) {
 		return errors.New("reviewers arrays do not match")
 	}
 
 	// checks that the filesystem has a proper corresponding entry and metadata file
-	projectDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(projectId))
-	fileDataPath := filepath.Join(projectDirPath, DATA_DIR_NAME, projectName + ".json")
+	submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId))
+	fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, submissionName + ".json")
 	dataString, err := ioutil.ReadFile(fileDataPath)
 	if err != nil {
 		return err
 	}
 	// marshalls the string of data into a struct
-	projectData := &CodeProjectData{}
-	if err := json.Unmarshal(dataString, projectData); err != nil {
+	submissionData := &CodeSubmissionData{}
+	if err := json.Unmarshal(dataString, submissionData); err != nil {
 		return err
 	}
 	// tests that the metadata is properly formatted
-	if projectData.Abstract != testProject.MetaData.Abstract {
+	if submissionData.Abstract != testSubmission.MetaData.Abstract {
 		return errors.New(fmt.Sprintf(
-			"project metadata not added to filesystem properly. Abstracts %s, %s do not match",
-			projectData.Abstract, testProject.MetaData.Abstract))
-	} else if !(reflect.DeepEqual(projectData.Reviews, testProject.MetaData.Reviews)) {
-		return errors.New("Project Reviews do not match")
+			"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
+			submissionData.Abstract, testSubmission.MetaData.Abstract))
+	} else if !(reflect.DeepEqual(submissionData.Reviews, testSubmission.MetaData.Reviews)) {
+		return errors.New("Submission Reviews do not match")
 	}
 	return nil
 }
 
-// tests that a single valid project can be added to the db and filesystem properly
-func TestAddOneProject(t *testing.T) {
-	project := testProjects[0]
+// tests that a single valid submission can be added to the db and filesystem properly
+func TestAddOneSubmission(t *testing.T) {
+	submission := testSubmissions[0]
 
 	// initializes the test environment, returning an error if any occurs
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// adds the project and tests that it was added properly
-	if err := testAddProject(project); err != nil {
+	// adds the submission and tests that it was added properly
+	if err := testAddSubmission(submission); err != nil {
 		t.Errorf("%v", err) // error already formatted here
 	}
 	// tears down the test environment
@@ -156,18 +156,18 @@ func TestAddOneProject(t *testing.T) {
 	}
 }
 
-// tests that multiple projects can be added in a row properly
-func TestAddMultipleProjects(t *testing.T) {
-	projects := testProjects[0:2] // list of projects to add to the db
+// tests that multiple submissions can be added in a row properly
+func TestAddMultipleSubmissions(t *testing.T) {
+	submissions := testSubmissions[0:2] // list of submissions to add to the db
 
 	// initializes the test environment, returning an error if any occurs
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// adds a range all projects in the projects slice
-	for _, project := range projects {
-		// adds the project and tests that it was added properly
-		if err := testAddProject(project); err != nil {
+	// adds a range all submissions in the submissions slice
+	for _, submission := range submissions {
+		// adds the submission and tests that it was added properly
+		if err := testAddSubmission(submission); err != nil {
 			t.Errorf("%v", err)
 		}
 	}
@@ -177,15 +177,15 @@ func TestAddMultipleProjects(t *testing.T) {
 	}
 }
 
-// tests that trying to add a nil project to the db and filesystem will return an error
-func TestAddNilProject(t *testing.T) {
+// tests that trying to add a nil submission to the db and filesystem will return an error
+func TestAddNilSubmission(t *testing.T) {
 	// initializes the test environment
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// tries to add a nil project
-	if _, err := addProject(nil); err == nil {
-		t.Error("Nil project added to the db without error")
+	// tries to add a nil submission
+	if _, err := addSubmission(nil); err == nil {
+		t.Error("Nil submission added to the db without error")
 	}
 	// tears down the test environment
 	if err := clearTestEnvironment(); err != nil {
@@ -193,11 +193,11 @@ func TestAddNilProject(t *testing.T) {
 	}
 }
 
-// utility function which tests that an author can be added to a valid project properly
-// this test depends on the add projects tests
-func testAddAuthor(projectId int, author *Credentials) error {
+// utility function which tests that an author can be added to a valid submission properly
+// this test depends on the add submissions tests
+func testAddAuthor(submissionId int, author *Credentials) error {
 	// declares test variables
-	var queriedProjectId int   // gotten from db after adding author
+	var queriedSubmissionId int   // gotten from db after adding author
 	var queriedAuthorId string // gotten from db after adding author
 
 	authorId, err := registerUser(author)
@@ -206,23 +206,23 @@ func testAddAuthor(projectId int, author *Credentials) error {
 	}
 
 	// adds the author to the database
-	if err = addAuthor(authorId, projectId); err != nil {
+	if err = addAuthor(authorId, submissionId); err != nil {
 		return errors.New(fmt.Sprintf("Error adding the author to the db: %v", err))
 	}
 
-	// checks the author ID and project ID for matches
+	// checks the author ID and submission ID for matches
 	queryAuthor := fmt.Sprintf(SELECT_ROW, "*", TABLE_AUTHORS, "userId")
 	row := db.QueryRow(queryAuthor, authorId)
-	if err := row.Scan(&queriedProjectId, &queriedAuthorId); err != nil {
+	if err := row.Scan(&queriedSubmissionId, &queriedAuthorId); err != nil {
 		return errors.New(
 			fmt.Sprintf("error while querying db for authors: %v", row.Err()))
 	}
 
 	// checks data returned from the database
-	if projectId != queriedProjectId {
+	if submissionId != queriedSubmissionId {
 		return errors.New(
-			fmt.Sprintf("Author added to the wrong project: Wanted: %d Got: %d",
-				projectId, queriedProjectId))
+			fmt.Sprintf("Author added to the wrong submission: Wanted: %d Got: %d",
+				submissionId, queriedSubmissionId))
 	} else if authorId != queriedAuthorId {
 		return errors.New(
 			fmt.Sprintf("Author Ids do not match: Added: %s Gotten Back: %s",
@@ -232,20 +232,20 @@ func testAddAuthor(projectId int, author *Credentials) error {
 }
 
 func TestAddOneAuthor(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testAuthor := testAuthors[0]
 
 	// initializes the test environment
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// adds a valid project and user to the db and filesystem so that an author can be added
-	projectId, err := addProject(testProject)
+	// adds a valid submission and user to the db and filesystem so that an author can be added
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error occurred while adding test project: %v", err)
+		t.Errorf("Error occurred while adding test submission: %v", err)
 	}
 	// adds the author to the db and filesystem
-	if err := testAddAuthor(projectId, testAuthor); err != nil {
+	if err := testAddAuthor(submissionId, testAuthor); err != nil {
 		t.Errorf("Error occurred while adding test author: %v", err)
 	}
 	// tears down the test environment
@@ -256,20 +256,20 @@ func TestAddOneAuthor(t *testing.T) {
 
 // attemps to add an author without the correct permissions, if addAuthor succeeds, an error is thrown
 func TestAddInvalidAuthor(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testAuthor := testAuthors[1] // user without publisher permissions
 
 	// initializes the test environment
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// adds a valid project and user to the db and filesystem so that an author can be added
-	projectId, err := addProject(testProject)
+	// adds a valid submission and user to the db and filesystem so that an author can be added
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error adding test project: %v", err)
+		t.Errorf("Error adding test submission: %v", err)
 	}
 	// if adding the author is successful, throw an error
-	if err = testAddAuthor(projectId, testAuthor); err == nil {
+	if err = testAddAuthor(submissionId, testAuthor); err == nil {
 		t.Error("Incorrect permissions added to authors table.")
 	}
 	// tears down the test environment
@@ -280,20 +280,20 @@ func TestAddInvalidAuthor(t *testing.T) {
 
 // tests that a user must be registered with the db before being and author
 func TestAddNonUserAuthor(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	authorId := "u881jafjka" // non-user fake id
 
 	// initializes the test environment, returning an error if any occurs
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in test environment init: %v", err)
 	}
-	// adds a valid project to the db and filesystem
-	projectId, err := addProject(testProject)
+	// adds a valid submission to the db and filesystem
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error while adding test project: %v", err)
+		t.Errorf("Error while adding test submission: %v", err)
 	}
 	// if adding the author is successful, throw an error
-	if err = addAuthor(authorId, projectId); err == nil {
+	if err = addAuthor(authorId, submissionId); err == nil {
 		t.Error("Added unregistered user id as author.")
 	}
 	// clears the test environment
@@ -302,10 +302,10 @@ func TestAddNonUserAuthor(t *testing.T) {
 	}
 }
 
-// utility function which tests that a reviewer can be added to a valid project properly
-// this test depends on the add projects tests
-func testAddReviewer(projectId int, reviewer *Credentials) error {
-	var queriedProjectId int   // gotten from db after adding reviewer
+// utility function which tests that a reviewer can be added to a valid submission properly
+// this test depends on the add submissions tests
+func testAddReviewer(submissionId int, reviewer *Credentials) error {
+	var queriedSubmissionId int   // gotten from db after adding reviewer
 	var queriedReviewerId string // gotten from db after adding reviewer
 
 	reviewerId, err := registerUser(reviewer)
@@ -314,23 +314,23 @@ func testAddReviewer(projectId int, reviewer *Credentials) error {
 	}
 
 	// adds the reviewer to the database
-	if err = addReviewer(reviewerId, projectId); err != nil {
+	if err = addReviewer(reviewerId, submissionId); err != nil {
 		return errors.New(fmt.Sprintf("Error adding the reviewer to the db: %v", err))
 	}
 
-	// checks the reviewer ID and project ID for matches
+	// checks the reviewer ID and submission ID for matches
 	queryReviewer := fmt.Sprintf(SELECT_ROW, "*", TABLE_REVIEWERS, "userId")
 	row := db.QueryRow(queryReviewer, reviewerId)
-	if err := row.Scan(&queriedProjectId, &queriedReviewerId); err != nil {
+	if err := row.Scan(&queriedSubmissionId, &queriedReviewerId); err != nil {
 		return errors.New(
 			fmt.Sprintf("error while querying db for reviewers: %v", row.Err()))
 	}
 
 	// checks data returned from the database
-	if projectId != queriedProjectId {
+	if submissionId != queriedSubmissionId {
 		return errors.New(
-			fmt.Sprintf("Reviewer added to the wrong project: Wanted: %d Got: %d",
-				projectId, queriedProjectId))
+			fmt.Sprintf("Reviewer added to the wrong submission: Wanted: %d Got: %d",
+				submissionId, queriedSubmissionId))
 	} else if reviewerId != queriedReviewerId {
 		return errors.New(
 			fmt.Sprintf("Reviewer Ids do not match: Added: %s Gotten Back: %s",
@@ -341,20 +341,20 @@ func testAddReviewer(projectId int, reviewer *Credentials) error {
 
 // tests that a single valid reviewer can be added to the database properly
 func TestAddOneReviewer(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testReviewer := testReviewers[0]
 
 	// initializes the test environment
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// adds a valid project and user to the db and filesystem so that an author can be added
-	projectId, err := addProject(testProject)
+	// adds a valid submission and user to the db and filesystem so that an author can be added
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error occurred while adding test project: %v", err)
+		t.Errorf("Error occurred while adding test submission: %v", err)
 	}
 	// adds the reviewer to the db and filesystem
-	if err := testAddReviewer(projectId, testReviewer); err != nil {
+	if err := testAddReviewer(submissionId, testReviewer); err != nil {
 		t.Errorf("Error occurred while adding test reviewer: %v", err)
 	}
 	// tears down the test environment
@@ -365,20 +365,20 @@ func TestAddOneReviewer(t *testing.T) {
 
 // attemps to add a reviewere without the correct permissions, if addReviewer succeeds, an error is thrown
 func TestAddInvalidReviewer(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	testReviewer := testReviewers[1] // reviewer without reviewer permissions
 
 	// initializes the test environment
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in db init: %v", err)
 	}
-	// adds a valid project and user to the db and filesystem so that an reviewer can be added
-	projectId, err := addProject(testProject)
+	// adds a valid submission and user to the db and filesystem so that an reviewer can be added
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error adding test project: %v", err)
+		t.Errorf("Error adding test submission: %v", err)
 	}
 	// if adding the reviewer is successful, throw an error
-	if err = testAddReviewer(projectId, testReviewer); err == nil {
+	if err = testAddReviewer(submissionId, testReviewer); err == nil {
 		t.Error("Incorrect permissions added to reviewers table.")
 	}
 	// tears down the test environment
@@ -389,20 +389,20 @@ func TestAddInvalidReviewer(t *testing.T) {
 
 // tests that a user must be registered with the db before being and author
 func TestAddNonUserReviewer(t *testing.T) {
-	testProject := testProjects[0]
+	testSubmission := testSubmissions[0]
 	reviewerId := "u881jafjka" // non-user fake id
 
 	// initializes the test environment, returning an error if any occurs
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in test environment init: %v", err)
 	}
-	// adds a valid project to the db and filesystem
-	projectId, err := addProject(testProject)
+	// adds a valid submission to the db and filesystem
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error while adding test project: %v", err)
+		t.Errorf("Error while adding test submission: %v", err)
 	}
 	// if adding the author is successful, throw an error
-	if err = addReviewer(reviewerId, projectId); err == nil {
+	if err = addReviewer(reviewerId, submissionId); err == nil {
 		t.Error("Added unregistered user id as reviewer.")
 	}
 	// clears the test environment
@@ -411,33 +411,33 @@ func TestAddNonUserReviewer(t *testing.T) {
 	}
 }
 
-// This function tests the getProjectMetaData function
+// This function tests the getSubmissionMetaData function
 //
 // This test depends on:
-// 	- addProject()
-func TestGetProjectMetaData(t *testing.T) {
-	testProject := testProjects[0]
+// 	- addSubmission()
+func TestGetSubmissionMetaData(t *testing.T) {
+	testSubmission := testSubmissions[0]
 
 	// initializes the test environment, returning an error if any occurs
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in test environment init: %v", err)
 	}
-	// adds the test project to the db
-	projectId, err := addProject(testProject)
+	// adds the test submission to the db
+	submissionId, err := addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error adding project to the db and filesystem: %v", err)
+		t.Errorf("Error adding submission to the db and filesystem: %v", err)
 	}
 	// tests that the metadata can be read back properly
-	projectData, err := getProjectMetaData(projectId)
+	submissionData, err := getSubmissionMetaData(submissionId)
 	if err != nil {
-		t.Errorf("Error getting project metadata: %v", err)
+		t.Errorf("Error getting submission metadata: %v", err)
 	}
 	// tests for equality of the added metadata with that which was retrieved
-	if projectData.Abstract != testProject.MetaData.Abstract {
-		t.Errorf("project metadata not added to filesystem properly. Abstracts %s, %s do not match",
-			projectData.Abstract, testProject.MetaData.Abstract)
-	} else if !(reflect.DeepEqual(projectData.Reviews, testProject.MetaData.Reviews)) {
-		t.Error("Project Reviews do not match")
+	if submissionData.Abstract != testSubmission.MetaData.Abstract {
+		t.Errorf("submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
+			submissionData.Abstract, testSubmission.MetaData.Abstract)
+	} else if !(reflect.DeepEqual(submissionData.Reviews, testSubmission.MetaData.Reviews)) {
+		t.Error("Submission Reviews do not match")
 	}
 	// clears the test environment
 	if err = clearTestEnvironment(); err != nil {
@@ -445,16 +445,16 @@ func TestGetProjectMetaData(t *testing.T) {
 	}
 }
 
-// Tests that getProjectMetaData will throw an error if an incorrect project ID is passed in
-func TestGetInvalidProjectMetaData(t *testing.T) {
+// Tests that getSubmissionMetaData will throw an error if an incorrect submission ID is passed in
+func TestGetInvalidSubmissionMetaData(t *testing.T) {
 	// initializes the test environment, returning an error if any occurs
 	if err := initTestEnvironment(); err != nil {
 		t.Errorf("Error in test environment init: %v", err)
 	}
-	// tests that an error is thrown if a non-existant project ID is passed to getProjectMetaData
-	_, err := getProjectMetaData(400)
+	// tests that an error is thrown if a non-existant submission ID is passed to getSubmissionMetaData
+	_, err := getSubmissionMetaData(400)
 	if err == nil {
-		t.Errorf("No error was thrown for invalid project")
+		t.Errorf("No error was thrown for invalid submission")
 	}
 	// clears the test environment
 	if err = clearTestEnvironment(); err != nil {
@@ -462,11 +462,11 @@ func TestGetInvalidProjectMetaData(t *testing.T) {
 	}
 }
 
-// Tests the ability of the getAllProjects() function to get all projects from the db at once
+// Tests the ability of the getAllSubmissions() function to get all submissions from the db at once
 //
 // Test Depends On:
-// 	- TestCreateProjects()
-func TestGetAllProjects(t *testing.T) {
+// 	- TestCreateSubmissions()
+func TestGetAllSubmissions(t *testing.T) {
 	var err error
 
 	// Set up server to listen with the getFile() function.
@@ -476,28 +476,28 @@ func TestGetAllProjects(t *testing.T) {
 	go srv.ListenAndServe()
 
 	/*
-		test for basic functionality. Adds 2 projects to the db, then queries them and tests for equality
+		test for basic functionality. Adds 2 submissions to the db, then queries them and tests for equality
 	*/
-	testGetTwoProjects := func() {
-		var projectId int                    // variable to temporarily store project ids as they are added to the db
-		sentProjects := make(map[int]string) // variable to hold the id: project name mappings which are sent to the db
+	testGetTwoSubmissions := func() {
+		var submissionId int                    // variable to temporarily store submission ids as they are added to the db
+		sentSubmissions := make(map[int]string) // variable to hold the id: submission name mappings which are sent to the db
 
 		// sets up the test environment (db and filesystem)
 		if err = initTestEnvironment(); err != nil {
 			t.Errorf("Error initializing the test environment %s", err)
 		}
-		// uses a slice here so that we can add more projects to testProjects without breaking the test
-		for _, proj := range testProjects[0:2] {
-			projectId, err = addProject(proj)
+		// uses a slice here so that we can add more submissions to testSubmissions without breaking the test
+		for _, proj := range testSubmissions[0:2] {
+			submissionId, err = addSubmission(proj)
 			if err != nil {
-				t.Errorf("Error adding project %s: %v", proj.Name, err)
+				t.Errorf("Error adding submission %s: %v", proj.Name, err)
 			}
-			// saves the added project with its id
-			sentProjects[projectId] = proj.Name
+			// saves the added submission with its id
+			sentSubmissions[submissionId] = proj.Name
 		}
 
 		// builds and sends and http get request
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/projects", TEST_URL, TEST_SERVER_PORT), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/submissions", TEST_URL, TEST_SERVER_PORT), nil)
 		resp, err := sendSecureRequest(req, TEAM_ID)
 		if err != nil {
 			t.Errorf("Error occurred while sending get request to the Go server: %v", err)
@@ -507,14 +507,14 @@ func TestGetAllProjects(t *testing.T) {
 			t.Error(err)
 		}
 
-		// checks the returned list of projects for equality with the sent list
-		returnedProjects := make(map[int]string)
-		json.NewDecoder(resp.Body).Decode(&returnedProjects)
+		// checks the returned list of submissions for equality with the sent list
+		returnedSubmissions := make(map[int]string)
+		json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
 
 		// tests that the proper values have been returned
-		for k, v := range returnedProjects {
-			if v != sentProjects[k] {
-				t.Errorf("Projects of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentProjects[k], v)
+		for k, v := range returnedSubmissions {
+			if v != sentSubmissions[k] {
+				t.Errorf("Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
 			}
 		}
 
@@ -525,7 +525,7 @@ func TestGetAllProjects(t *testing.T) {
 	}
 
 	// runs tests
-	testGetTwoProjects()
+	testGetTwoSubmissions()
 
 	// Close server.
 	if err = srv.Shutdown(context.Background()); err != nil {
@@ -539,16 +539,16 @@ func TestGetAllProjects(t *testing.T) {
 }
 
 	
-// test for basic functionality. Adds 2 projects to the db with different authors, then queries them and tests for equality
+// test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
 // Test Depends On:
-// 	- TestCreateProjects()
+// 	- TestCreateSubmissions()
 // 	- TestAddReviewers()
 // 	- TestAddAuthors()
-func TestGetSingleProject(t *testing.T) {
-	testProject1 := testProjects[0] // test project to return on getUserProjects()
-	testProject2 := testProjects[1] // test project to not return on getUserProjects()
-	testAuthor := testAuthors[0]    // test author of the project being queried
-	testNonAuthor := testAuthors[3] // test author of project not being queried
+func TestGetSingleSubmission(t *testing.T) {
+	testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
+	testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
+	testAuthor := testAuthors[0]    // test author of the submission being queried
+	testNonAuthor := testAuthors[3] // test author of submission not being queried
 
 	// sets up the test environment (db and filesystem)
 	if err := initTestEnvironment(); err != nil {
@@ -565,35 +565,35 @@ func TestGetSingleProject(t *testing.T) {
 		t.Errorf("Error occurred while registering user: %v", err)
 	}
 
-	// adds two test projects to the db
-	testProject1.Id, err = addProject(testProject1)
+	// adds two test submissions to the db
+	testSubmission1.Id, err = addSubmission(testSubmission1)
 	if err != nil {
-		t.Errorf("Error occurred while adding project1: %v", err)
+		t.Errorf("Error occurred while adding submission1: %v", err)
 	}
-	testProject2.Id, err = addProject(testProject2)
+	testSubmission2.Id, err = addSubmission(testSubmission2)
 	if err != nil {
-		t.Errorf("Error occurred while adding project2: %v", err)
+		t.Errorf("Error occurred while adding submission2: %v", err)
 	}
 
-	// adds authors to the test projects
-	if err = addAuthor(authorId, testProject1.Id); err != nil {
+	// adds authors to the test submissions
+	if err = addAuthor(authorId, testSubmission1.Id); err != nil {
 		t.Errorf("Failed to add author")
 	}
-	if err = addAuthor(nonAuthorId, testProject2.Id); err != nil {
+	if err = addAuthor(nonAuthorId, testSubmission2.Id); err != nil {
 		t.Errorf("Failed to add author")
 	}
 
-	// queries all of testAuthor's projects
-	projects, err := getUserProjects(authorId)
+	// queries all of testAuthor's submissions
+	submissions, err := getUserSubmissions(authorId)
 	if err != nil {
-		t.Errorf("Error getting user projects: %v", err)
+		t.Errorf("Error getting user submissions: %v", err)
 	}
 
-	// tests for equality of project Id and that testProject2.Id is not in the map
-	if _, ok := projects[testProject2.Id]; ok {
-		t.Errorf("Returned project where the test author is not an author")
-	} else if projects[testProject1.Id] != testProject1.Name {
-		t.Errorf("Returned incorrect project name: %s", projects[testProject1.Id])
+	// tests for equality of submission Id and that testSubmission2.Id is not in the map
+	if _, ok := submissions[testSubmission2.Id]; ok {
+		t.Errorf("Returned submission where the test author is not an author")
+	} else if submissions[testSubmission1.Id] != testSubmission1.Name {
+		t.Errorf("Returned incorrect submission name: %s", submissions[testSubmission1.Id])
 	}
 
 	// destroys the test environment
@@ -602,16 +602,16 @@ func TestGetSingleProject(t *testing.T) {
 	}
 }
 
-// Tests the ability of the CodeFiles module to get a project from the db
+// Tests the ability of the CodeFiles module to get a submission from the db
 // 
 // Test Depends On:
-// 	- TestCreateProjects()
+// 	- TestCreateSubmissions()
 // 	- TestAddFiles()
 // 	- TestAddReviewers()
 // 	- TestAddAuthors()
-func TestGetProject(t *testing.T) {
+func TestGetSubmission(t *testing.T) {
 	var err error
-	var projectId int // holds the project id as returned from the addProject() function
+	var submissionId int // holds the submission id as returned from the addSubmission() function
 
 	// Set up server to listen with the getFile() function.
 	srv := setupCORSsrv()
@@ -620,25 +620,25 @@ func TestGetProject(t *testing.T) {
 	go srv.ListenAndServe()
 
 	testFile := testFiles[0]         // defines the file to use for the test here so that it can be easily changed
-	testProject := testProjects[0]   // defines the project to use for the test here so that it can be easily changed
-	testAuthor := testAuthors[0]     // defines the author of the project
-	testReviewer := testReviewers[0] // defines the reviewer of the project
+	testSubmission := testSubmissions[0]   // defines the submission to use for the test here so that it can be easily changed
+	testAuthor := testAuthors[0]     // defines the author of the submission
+	testReviewer := testReviewers[0] // defines the reviewer of the submission
 
 	// initializes the filesystem and db
 	if err = initTestEnvironment(); err != nil {
 		t.Errorf("Error initializing the test environment: %v", err)
 	}
-	// adds the test project to the filesystem and database
-	projectId, err = addProject(testProject)
+	// adds the test submission to the filesystem and database
+	submissionId, err = addSubmission(testSubmission)
 	if err != nil {
-		t.Errorf("Error adding project %v", err)
+		t.Errorf("Error adding submission %v", err)
 	}
 	// adds the test file to the filesystem and database
-	_, err = addFileTo(testFile, projectId)
+	_, err = addFileTo(testFile, submissionId)
 	if err != nil {
-		t.Errorf("Error adding file to the project %v", err)
+		t.Errorf("Error adding file to the submission %v", err)
 	}
-	// adds an author and reviewer to the project
+	// adds an author and reviewer to the submission
 	authorId, err := registerUser(testAuthor)
 	if err != nil {
 		t.Errorf("Error registering author in the db: %v", err)
@@ -648,23 +648,23 @@ func TestGetProject(t *testing.T) {
 		t.Errorf("Error registering reviewer in the db: %v", err)
 	}
 
-	// adds reviewer and author to the project
-	if err = addAuthor(authorId, projectId); err != nil {
-		t.Errorf("Error adding author to the project: %v", err)
+	// adds reviewer and author to the submission
+	if err = addAuthor(authorId, submissionId); err != nil {
+		t.Errorf("Error adding author to the submission: %v", err)
 	}
-	if err = addReviewer(reviewerId, projectId); err != nil {
-		t.Errorf("Error adding reviewer to the project: %v", err)
+	if err = addReviewer(reviewerId, submissionId); err != nil {
+		t.Errorf("Error adding reviewer to the submission: %v", err)
 	}
 
-	// creates a request to get a project of a given id
+	// creates a request to get a submission of a given id
 	reqBody, err := json.Marshal(map[string]interface{}{
-		getJsonTag(&Project{}, "Id"): projectId,
+		getJsonTag(&Submission{}, "Id"): submissionId,
 	})
 	if err != nil {
-		t.Errorf("Error Retrieving Project: %v", err)
+		t.Errorf("Error Retrieving Submission: %v", err)
 	}
-	// sets a custom header of "project":id to query the specific project id
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_PROJECT), bytes.NewBuffer(reqBody))
+	// sets a custom header of "submission":id to query the specific submission id
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_SUBMISSION), bytes.NewBuffer(reqBody))
 	resp, err := sendSecureRequest(req, TEAM_ID)
 	if err != nil {
 		t.Errorf("Error while sending Get request: %v", err)
@@ -676,27 +676,27 @@ func TestGetProject(t *testing.T) {
 		t.Errorf("Error: %d", resp.StatusCode)
 	}
 
-	// marshals the json response into a Project struct
-	project := &Project{}
-	err = json.NewDecoder(resp.Body).Decode(&project)
+	// marshals the json response into a Submission struct
+	submission := &Submission{}
+	err = json.NewDecoder(resp.Body).Decode(&submission)
 	if err != nil {
 		t.Error("Error while decoding server response: ", err)
 	}
 
-	// tests that the project matches the passed in data
-	if testProject.Id != project.Id {
-		t.Errorf("Project IDs do not match. Given: %d != Returned: %d", testProject.Id, project.Id)
-	} else if testProject.Name != project.Name {
-		t.Errorf("Project Names do not match. Given: %s != Returned: %s", testProject.Name, project.Name)
+	// tests that the submission matches the passed in data
+	if testSubmission.Id != submission.Id {
+		t.Errorf("Submission IDs do not match. Given: %d != Returned: %d", testSubmission.Id, submission.Id)
+	} else if testSubmission.Name != submission.Name {
+		t.Errorf("Submission Names do not match. Given: %s != Returned: %s", testSubmission.Name, submission.Name)
 		// tests that file paths match (done directly here as there is only one constituent file)
-	} else if testProject.FilePaths[0] != project.FilePaths[0] {
-		t.Errorf("Project file path lists do not match. Given: %s != Returned: %s", testProject.FilePaths[0], project.FilePaths[0])
+	} else if testSubmission.FilePaths[0] != submission.FilePaths[0] {
+		t.Errorf("Submission file path lists do not match. Given: %s != Returned: %s", testSubmission.FilePaths[0], submission.FilePaths[0])
 		// tests that the authors lists match (done directly here as there is only one author)
-	} else if authorId != project.Authors[0] {
-		t.Errorf("Authors do not match. Expected: %s Given: %s", authorId, testProject.Authors[0])
+	} else if authorId != submission.Authors[0] {
+		t.Errorf("Authors do not match. Expected: %s Given: %s", authorId, testSubmission.Authors[0])
 		// tests that the reviewer lists match (done directly here as there is only one reviewer)
-	} else if reviewerId != project.Reviewers[0] {
-		t.Errorf("Authors do not match. Expected: %s Given: %s", reviewerId, testProject.Reviewers[0])
+	} else if reviewerId != submission.Reviewers[0] {
+		t.Errorf("Authors do not match. Expected: %s Given: %s", reviewerId, testSubmission.Reviewers[0])
 	}
 
 	// destroys the filesystem and clears the db

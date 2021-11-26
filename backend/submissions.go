@@ -1,23 +1,22 @@
-/*
-submissions.go
-author: 190010425
-created: November 18, 2021
-
-This file handles the reading/writing of all submissions (just the submission
-with its data, not the files themselves)
-
-The filesystem structure is as follows
-Project ID (as stored in db Projects table)
-	> <project_name>/ (as stored in the projects table)
-		... (project directory structure)
-	> .data/
-		> project_data.json
-		... (project directory structure)
-notice that in the filesystem, the .data dir structure mirrors the
-project, so that each file in the project can have a .json file storing
-its data which is named in the same way as the source code (the only difference
-being the extension)
-*/
+// =============================================================================
+// submissions.go
+// Authors: 190010425
+// Created: November 18, 2021
+//
+// This file handles the reading/writing of all submissions (just the submission
+// with its data, not the files themselves)
+//
+// Submission ID (as stored in db submissions table)
+// 	> <submission_name>/ (as stored in the submissions table)
+// 		... (submission directory structure)
+// 	> .data/
+// 		> submission_data.json
+// 		... (submission directory structure)
+// notice that in the filesystem, the .data dir structure mirrors the
+// submission, so that each file in the submission can have a .json file storing
+// its data which is named in the same way as the source code (the only difference
+// being the extension)
+// =============================================================================
 
 package main
 
@@ -38,16 +37,16 @@ import (
 // Router Functions
 // ------
 
-// Router function to get the names and id's of every project currently saved
+// Router function to get the names and id's of every submission currently saved
 //
 // Response Codes:
 //	200 : if the action completed successfully
 // 	401 : if the proper security token was not given in the request
 //	500 : otherwise
 // Response Body:
-//	A JSON object of form: {...<project id>:<project name>...}
-func getAllProjects(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin getAllProjects...")
+//	A JSON object of form: {...<submission id>:<submission name>...}
+func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
+	log.Print("Begin getAllSubmissions...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
@@ -57,15 +56,15 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	}
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
-	// uses getUserProjects to get all user projects by setting authorId = *
-	projects, err := getUserProjects("*")
+	// uses getUserSubmissions to get all user submissions by setting authorId = *
+	submissions, err := getUserSubmissions("*")
 	if err != nil {
 		log.Printf("error: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	// marshals and returns the map as JSON
-	jsonString, err := json.Marshal(projects)
+	jsonString, err := json.Marshal(submissions)
 	if err != nil {
 		log.Printf("error occurred while formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -76,18 +75,18 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonString)
 }
 
-// Get project for display on frontend. ID included for file and comment queries.
+// Get submission for display on frontend. ID included for file and comment queries.
 //
 // TODO figure out what URL to have as endpoint here
 // TODO break this function into multiple?
 //
 // Response Codes:
-//	200 : if the project exists and the request succeeded
+//	200 : if the submission exists and the request succeeded
 // 	401 : if the proper security token was not given in the request
 //	400 : if the request is invalid or badly formatted
 // 	500 : if something else goes wrong in the backend
 // Response Body:
-// 	project: Object
+// 	submission: Object
 //		id: String
 //		name: String
 //		authors: Array of Author userIDs
@@ -100,8 +99,8 @@ func getAllProjects(w http.ResponseWriter, r *http.Request) {
 //				time: datetime string
 //				content: string
 //				replies: object (same as comments)
-func getProject(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin getProject...")
+func getSubmission(w http.ResponseWriter, r *http.Request) {
+	log.Print("Begin getSubmission...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
@@ -113,7 +112,7 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the file path and project Id from the request body
+	// gets the file path and submission Id from the request body
 	var request map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
@@ -121,53 +120,53 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	projectId := int(request[getJsonTag(&Project{}, "Id")].(float64))
+	submissionId := int(request[getJsonTag(&Submission{}, "Id")].(float64))
 
-	// creates a project with the given ID
-	project := &Project{Id: projectId}
+	// creates a submission with the given ID
+	submission := &Submission{Id: submissionId}
 
-	// statement to query project name
-	getProjectName := fmt.Sprintf(SELECT_ROW,
-		getDbTag(&Project{}, "Name"),
-		TABLE_PROJECTS,
-		getDbTag(&Project{}, "Id"),
+	// statement to query submission name
+	getSubmissionName := fmt.Sprintf(SELECT_ROW,
+		getDbTag(&Submission{}, "Name"),
+		TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Id"),
 	)
 	// executes query
-	row := db.QueryRow(getProjectName, projectId)
-	if err := row.Scan(&project.Name); err != nil {
+	row := db.QueryRow(getSubmissionName, submissionId)
+	if err := row.Scan(&submission.Name); err != nil {
 		log.Printf("error querying the database: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// gets project authors, reviewers, and file paths (as relpaths from the root of the project)
-	project.Authors, err = getProjectAuthors(projectId)
+	// gets submission authors, reviewers, and file paths (as relpaths from the root of the submission)
+	submission.Authors, err = getSubmissionAuthors(submissionId)
 	if err != nil {
 		log.Printf("error getting authors: %v", err)		
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	project.Reviewers, err = getProjectReviewers(projectId)
+	submission.Reviewers, err = getSubmissionReviewers(submissionId)
 	if err != nil {
 		log.Printf("error getting reviewers: %v", err)		
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	project.FilePaths, err = getProjectFiles(projectId)
+	submission.FilePaths, err = getSubmissionFiles(submissionId)
 	if err != nil {
-		log.Printf("error getting project files: %v", err)		
+		log.Printf("error getting submission files: %v", err)		
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	project.MetaData, err = getProjectMetaData(projectId)
+	submission.MetaData, err = getSubmissionMetaData(submissionId)
 	if err != nil {
-		log.Printf("error getting project metadata: %v", err)		
+		log.Printf("error getting submission metadata: %v", err)		
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// writes JSON data for the project to the HTTP connection
-	response, err := json.Marshal(project)
+	// writes JSON data for the submission to the HTTP connection
+	response, err := json.Marshal(submission)
 	if err != nil {
 		log.Printf("error formatting response: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -177,7 +176,7 @@ func getProject(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-// Router function to import Journal submissions (projects) from other journals
+// Router function to import Journal submissions (submissions) from other journals
 //
 // TODO: fix this function
 // 
@@ -199,8 +198,8 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// parses the data into a structure
-	var submission *SupergroupSubmission
-	err := json.NewDecoder(r.Body).Decode(submission)
+	var importedSubmission *SupergroupSubmission
+	err := json.NewDecoder(r.Body).Decode(importedSubmission)
 	if err != nil {
 		log.Printf("error decoding submission: %v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -210,48 +209,48 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 	// moves the data from the structure into a locally compliant format
 	// don't receive user email, so it creates a fake one
 	authorEmail := fmt.Sprintf("%s@email.com",
-		strings.Replace(submission.Metadata.AuthorName, " ", "_", 4))
+		strings.Replace(importedSubmission.Metadata.AuthorName, " ", "_", 4))
 	author := &Credentials{
-		Fname:    strings.Split(submission.Metadata.AuthorName, " ")[0],
-		Lname:    strings.Split(submission.Metadata.AuthorName, " ")[1],
+		Fname:    strings.Split(importedSubmission.Metadata.AuthorName, " ")[0],
+		Lname:    strings.Split(importedSubmission.Metadata.AuthorName, " ")[1],
 		Email:    authorEmail,
 		Pw:       "password", // defaults to password here as we have no way of identifying users
 		Usertype: USERTYPE_PUBLISHER,
 	}
 	authorId, err := registerUser(author)
-	// formats the data in a project
-	project := &Project{
-		Name:      strings.Replace(submission.Name, " ", "_", 10), // default is 10 spaces to replace
+	// formats the data in a submission
+	submission := &Submission{
+		Name:      strings.Replace(importedSubmission.Name, " ", "_", 10), // default is 10 spaces to replace
 		Reviewers: []string{},
 		Authors:   []string{authorId},
 		FilePaths: []string{},
-		MetaData: &CodeProjectData{ // TODO figure this out
+		MetaData: &CodeSubmissionData{ // TODO figure this out
 			Abstract: "",
 			Reviews: []*Comment{},
 		},
 	}
 
-	// adds the project
-	projectId, err := addProject(project)
+	// adds the submission
+	submissionId, err := addSubmission(submission)
 	if err != nil {
 		log.Printf("error adding the imported proejct: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	project.Id = projectId
+	submission.Id = submissionId
 
 	// adds the file
-	for _, submissionFile := range submission.Files {
+	for _, submissionFile := range importedSubmission.Files {
 		file := &File{
-			ProjectId:   projectId,
-			ProjectName: project.Name,
+			SubmissionId:   submissionId,
+			SubmissionName: importedSubmission.Name,
 			Name:        submissionFile.Name,
 			Path:        submissionFile.Name,
 			Content:     submissionFile.Content,
 		}
-		_, err = addFileTo(file, projectId)
+		_, err = addFileTo(file, submissionId)
 		if err != nil {
-			log.Printf("error adding file to the imported project: %v\n", err)
+			log.Printf("error adding file to the imported submission: %v\n", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -265,75 +264,75 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 // Helper Functions
 // ------
 
-// Add project to filesystem and database.
-// Note: project ID is set by this function.
+// Add submission to filesystem and database.
+// Note: submission ID is set by this function.
 // Params:
-//	project (*Project) : the project to be added to the db (all fields but Id MUST be set)
+//	submission (*Submission) : the submission to be added to the db (all fields but Id MUST be set)
 // Returns:
-//	(int) : the id of the added project
+//	(int) : the id of the added submission
 //	(error) : if the operation fails
-func addProject(project *Project) (int, error) {
+func addSubmission(submission *Submission) (int, error) {
 	// error cases
-	if project == nil {
-		return 0, errors.New("Project cannot be nil")
-	} else if project.Name == "" {
-		return 0, errors.New("Project.Name must be set to a valid string")
-	} else if project.Authors == nil {
+	if submission == nil {
+		return 0, errors.New("Submission cannot be nil")
+	} else if submission.Name == "" {
+		return 0, errors.New("Submission.Name must be set to a valid string")
+	} else if submission.Authors == nil {
 		return 0, errors.New("Authors array cannot be nil")
-	} else if project.Reviewers == nil {
+	} else if submission.Reviewers == nil {
 		return 0, errors.New("Reviewers array cannot be nil")
 	}
 
 	// declares return values
-	var projectId int
+	var submissionId int
 	var err error
 
-	// formats query to insert the project into the db
-	insertProject := fmt.Sprintf(
-		INSERT_PROJ, TABLE_PROJECTS,
-		getDbTag(&Project{}, "Name"))
+	// formats query to insert the submission into the db
+	insertSubmission := fmt.Sprintf(
+		INSERT_PROJ, TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Name"))
 
-	// executes the query and gets the project id
-	row := db.QueryRow(insertProject, project.Name)
+	// executes the query and gets the submission id
+	row := db.QueryRow(insertSubmission, submission.Name)
 	if row.Err() != nil {
 		return 0, row.Err()
 	}
-	// gets the id from the inserted project
-	if err = row.Scan(&projectId); err != nil {
+	// gets the id from the inserted submission
+	if err = row.Scan(&submissionId); err != nil {
 		return 0, err
 	}
 
 	// adds the authors and reviewers to their respective tables
 	// (here we work with the assumption that author and reviewer arrays are very small)
-	for _, authorId := range project.Authors {
-		if err = addAuthor(authorId, projectId); err != nil {
+	for _, authorId := range submission.Authors {
+		if err = addAuthor(authorId, submissionId); err != nil {
 			return 0, err
 		}
 	}
-	for _, reviewerId := range project.Reviewers {
-		if err = addReviewer(reviewerId, projectId); err != nil {
+	for _, reviewerId := range submission.Reviewers {
+		if err = addReviewer(reviewerId, submissionId); err != nil {
 			return 0, err
 		}
 	}
 
-	// adds a project to the filesystem
-	projectPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), project.Name)
-	projectDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME, project.Name)
-	if err = os.MkdirAll(projectPath, DIR_PERMISSIONS); err != nil {
+	// adds a submission to the filesystem
+	submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), submission.Name)
+	submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submission.Name)
+	if err = os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
 	}
-	if err = os.MkdirAll(projectDataPath, DIR_PERMISSIONS); err != nil {
+	if err = os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
 	}
 
-	// inserts the project's metadata into the filesystem
+	// inserts the submission's metadata into the filesystem
 	dataFile, err := os.OpenFile(
-		projectDataPath + ".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+		submissionDataPath + ".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
 		return 0, err
 	}
-	// Write project metadata to the created file
-	jsonString, err := json.Marshal(project.MetaData)
+	// Write submission metadata to the created file
+	jsonString, err := json.Marshal(submission.MetaData)
 	if err != nil {
 		return 0, err
 	}
@@ -342,23 +341,23 @@ func addProject(project *Project) (int, error) {
 	}
 	dataFile.Close()
 
-	// if the action was successful, the project id of the project struct is set and returned
-	project.Id = projectId
-	return projectId, nil
+	// if the action was successful, the submission id of the submission struct is set and returned
+	submission.Id = submissionId
+	return submissionId, nil
 }
 
-// Add an author to the given project provided the id given corresponds to a valid
+// Add an author to the given submission provided the id given corresponds to a valid
 // user with publisher or publisher-reviewer permissions
 //
 // Params:
-//	authorId (int) : the global id of the author to add to the project
-//	projectId (int) : the id of the project to be added to
+//	authorId (int) : the global id of the author to add to the submission
+//	submissionId (int) : the id of the submission to be added to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
-func addAuthor(authorId string, projectId int) error {
-	if projectId < 0 {
+func addAuthor(authorId string, submissionId int) error {
+	if submissionId < 0 {
 		return errors.New(
-			fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
+			fmt.Sprintf("Submission IDs must be integers 0 or greater, not: %d", submissionId))
 	}
 
 	// checks that the author is a valid user with publisher or publisher-reviewer permissions
@@ -378,25 +377,25 @@ func addAuthor(authorId string, projectId int) error {
 	// checks permissions, and if they are correct, the author is added
 	if permissions == USERTYPE_PUBLISHER || permissions == USERTYPE_REVIEWER_PUBLISHER {
 		_, err := db.Query(
-			fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), projectId, authorId)
+			fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), submissionId, authorId)
 		return err
 	} else {
 		return errors.New("User must be authorized as Publisher " +
-			"to be listed as project Author" + fmt.Sprint(permissions))
+			"to be listed as submission Author" + fmt.Sprint(permissions))
 	}
 }
 
-// Add a user to a project as a reviewer
+// Add a user to a submission as a reviewer
 //
 // Params:
-//	reviewerId (int) : the id of the reviewer to add to the project
-//	projectId (int) : the id of the project to be added to
+//	reviewerId (int) : the id of the reviewer to add to the submission
+//	submissionId (int) : the id of the submission to be added to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
-func addReviewer(reviewerId string, projectId int) error {
+func addReviewer(reviewerId string, submissionId int) error {
 	var err error
-	if projectId < 0 {
-		return errors.New(fmt.Sprintf("Project IDs must be integers 0 or greater, not: %d", projectId))
+	if submissionId < 0 {
+		return errors.New(fmt.Sprintf("Submission IDs must be integers 0 or greater, not: %d", submissionId))
 	}
 
 	// checks that the reviewer is a valid user with reviewer or publisher-reviewer permissions
@@ -421,7 +420,7 @@ func addReviewer(reviewerId string, projectId int) error {
 	if permissions != USERTYPE_REVIEWER && permissions != USERTYPE_REVIEWER_PUBLISHER {
 		return errors.New("User must be authorized as a Reviewer")
 	} else {
-		_, err = db.Query(fmt.Sprintf(INSERT_REVIEWER, TABLE_REVIEWERS), projectId, reviewerId)
+		_, err = db.Query(fmt.Sprintf(INSERT_REVIEWER, TABLE_REVIEWERS), submissionId, reviewerId)
 		return err
 	}
 }
@@ -431,55 +430,55 @@ func addReviewer(reviewerId string, projectId int) error {
 // Params:
 // 	authorId (string) : the global id of the author as stored in the db
 // Return:
-// 	(map[int]string) : map of project Ids to project names
+// 	(map[int]string) : map of submission Ids to submission names
 // 	(error) : an error if something goes wrong, nil otherwise
-func getUserProjects(authorId string) (map[int]string, error) {
-	// queries the database for the project ID and name pairs
+func getUserSubmissions(authorId string) (map[int]string, error) {
+	// queries the database for the submission ID and name pairs
 	columns := fmt.Sprintf("%s, %s",
-		getDbTag(&AuthorsReviewers{}, "ProjectId"),
-		getDbTag(&Project{}, "Name"),
+		getDbTag(&AuthorsReviewers{}, "SubmissionId"),
+		getDbTag(&Submission{}, "Name"),
 	)
-	stmt := fmt.Sprintf(SELECT_ROW, columns, VIEW_PROJECTLIST, "userId")
+	stmt := fmt.Sprintf(SELECT_ROW, columns, VIEW_SUBMISSIONLIST, "userId")
 	rows, err := db.Query(stmt, authorId)
 	if err != nil {
 		return nil, err
 	}
 
-	// parses query result into { id : project name } mappings
+	// parses query result into { id : submission name } mappings
 	var id int
-	var projectName string
-	projects := make(map[int]string)
+	var submissionName string
+	submissions := make(map[int]string)
 	for rows.Next() {
 		// if there is an error returned by scanning the row, the error is returned
 		// without the array
-		if err := rows.Scan(&id, &projectName); err != nil {
+		if err := rows.Scan(&id, &submissionName); err != nil {
 			if err == sql.ErrNoRows {
 				return nil, nil
 			}
 			return nil, err
 		}
-		projects[id] = projectName
+		submissions[id] = submissionName
 	}
-	return projects, nil
+	return submissions, nil
 }
 
-// Query the authors of a given project from the database
+// Query the authors of a given submission from the database
 //
 // Params:
-//	projectId (int) : the id of the project to get authors of
+//	submissionId (int) : the id of the submission to get authors of
 // Returns:
 //	[]string of the author's names
 //	error if something goes wrong during the query
-func getProjectAuthors(projectId int) ([]string, error) {
+func getSubmissionAuthors(submissionId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
 		SELECT_ROW,
 		getDbTag(&AuthorsReviewers{}, "Id"),
 		TABLE_AUTHORS,
-		getDbTag(&AuthorsReviewers{}, "ProjectId"),
+		getDbTag(&AuthorsReviewers{}, "SubmissionId"),
 	)
 	// executes query
-	rows, err := db.Query(stmt, projectId)
+	rows, err := db.Query(stmt, submissionId)
 	if err != nil {
 		return nil, err
 	}
@@ -498,23 +497,23 @@ func getProjectAuthors(projectId int) ([]string, error) {
 	return authors, nil
 }
 
-// Query the reviewers of a given project from the database
+// Query the reviewers of a given submission from the database
 //
 // Params:
-//	projectId (int) : the id of the project to get reviewers of
+//	submissionId (int) : the id of the submission to get reviewers of
 // Returns:
 //	([]int) : of the reviewer's names
 //	(error) : if something goes wrong during the query
-func getProjectReviewers(projectId int) ([]string, error) {
+func getSubmissionReviewers(submissionId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
 		SELECT_ROW,
 		getDbTag(&AuthorsReviewers{}, "Id"),
 		TABLE_REVIEWERS,
-		getDbTag(&AuthorsReviewers{}, "ProjectId"),
+		getDbTag(&AuthorsReviewers{}, "SubmissionId"),
 	)
 	// executes query
-	rows, err := db.Query(stmt, projectId)
+	rows, err := db.Query(stmt, submissionId)
 	if err != nil {
 		return nil, err
 	}
@@ -533,23 +532,23 @@ func getProjectReviewers(projectId int) ([]string, error) {
 	return reviewers, nil
 }
 
-// Queries the database for file paths with the given project ID
-// (i.e. files in the project)
+// Queries the database for file paths with the given submission ID
+// (i.e. files in the submission)
 //
 // Params:
-//	projectId (int) : the id of the project to get the files of
+//	submissionId (int) : the id of the submission to get the files of
 //Returns:
 //	([]string) : of the file paths
 //	(error) : if something goes wrong during the query
-func getProjectFiles(projectId int) ([]string, error) {
+func getSubmissionFiles(submissionId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(SELECT_ROW,
 		getDbTag(&File{}, "Path"),
 		TABLE_FILES,
-		getDbTag(&File{}, "ProjectId"),
+		getDbTag(&File{}, "SubmissionId"),
 	)
 	// executes query
-	rows, err := db.Query(stmt, projectId)
+	rows, err := db.Query(stmt, submissionId)
 	if err != nil {
 		return nil, err
 	}
@@ -568,38 +567,38 @@ func getProjectFiles(projectId int) ([]string, error) {
 	return files, nil
 }
 
-// This function gets a project's meta-data from its file in the filesystem
+// This function gets a submission's meta-data from its file in the filesystem
 //
 // Parameters:
-// 	projectId (int) : the unique id of the project
+// 	submissionId (int) : the unique id of the submission
 // Returns:
-//	(*CodeProjectData) : the project's metadata if found
+//	(*CodeSubmissionData) : the submission's metadata if found
 // 	(error) : if anything goes wrong while retrieving the metadata
-func getProjectMetaData(projectId int) (*CodeProjectData, error) {
-	// gets the project name from the database
-	var projectName string
-	queryProjectName := fmt.Sprintf(
+func getSubmissionMetaData(submissionId int) (*CodeSubmissionData, error) {
+	// gets the submission name from the database
+	var submissionName string
+	querySubmissionName := fmt.Sprintf(
 		SELECT_ROW,
-		getDbTag(&Project{}, "Name"),
-		TABLE_PROJECTS,
-		getDbTag(&Project{}, "Id"),
+		getDbTag(&Submission{}, "Name"),
+		TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Id"),
 	)
-	row := db.QueryRow(queryProjectName, projectId)
-	if err := row.Scan(&projectName); err != nil {
+	row := db.QueryRow(querySubmissionName, submissionId)
+	if err := row.Scan(&submissionName); err != nil {
 		return nil, err
 	}
 
 	// reads the data file into a string
-	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME, projectName + ".json")
+	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submissionName + ".json")
 	dataString, err := ioutil.ReadFile(dataPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// marshalls the string of data into a struct
-	projectData := &CodeProjectData{}
-	if err := json.Unmarshal(dataString, projectData); err != nil {
+	submissionData := &CodeSubmissionData{}
+	if err := json.Unmarshal(dataString, submissionData); err != nil {
 		return nil, err
 	}
-	return projectData, nil
+	return submissionData, nil
 }

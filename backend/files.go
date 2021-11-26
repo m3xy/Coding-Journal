@@ -1,24 +1,24 @@
-/*
-files.go
-author: 190010425
-created: November 23, 2021
-
-This file handles reading/writing code files along with their
-data.
-
-The directory structure for the filesystem is as follows:
-
-Project ID (as stored in db Projects table)
-	> <project_name>/ (as stored in the projects table)
-		... (project directory structure)
-	> .data/
-		> project_data.json
-		... (project directory structure)
-notice that in the filesystem, the .data dir structure mirrors the
-project, so that each file in the project can have a .json file storing
-its data which is named in the same way as the source code (the only difference
-being the extension)
-*/
+// ================================================================================
+// files.go
+// Authors: 190010425
+// Created: November 23, 2021
+//
+// This file handles reading/writing code files along with their
+// data.
+//
+// The directory structure for the filesystem is as follows:
+//
+// Submission ID (as stored in db submissions table)
+// 	> <submission_name>/ (as stored in the submissions table)
+// 		... (submission directory structure)
+// 	> .data/
+// 		> submission_data.json
+// 		... (submission directory structure)
+// notice that in the filesystem, the .data dir structure mirrors the
+// submission, so that each file in the submission can have a .json file storing
+// its data which is named in the same way as the source code (the only difference
+// being the extension)
+// ================================================================================
 
 package main
 
@@ -38,21 +38,21 @@ import (
 // file constants, includes
 const (
 	// TEMP: hard coded for testing
-	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all project directories TEMP: maybe set with an env variable?
-	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the project directory structure
+	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories TEMP: maybe set with an env variable?
+	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
 	// File Mode Constants
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
-	FILE_PERMISSIONS = 0644 // permissions for project files
+	FILE_PERMISSIONS = 0644 // permissions for submission files
 )
 
 // -----
 // Router functions
 // -----
 
-// Upload lone code file to system. File is wrapped to dummy project with same name.
+// Upload lone code file to system. File is wrapped to dummy submission with same name.
 //
-// TODO: Replace this function with a generalized project upload method in the submissions.go file
+// TODO: Replace this function with a generalized submission upload method in the submissions.go file
 //
 // Responses:
 //	- 200 : if action completes successfully
@@ -60,7 +60,7 @@ const (
 // 	- 400 : for malformatted request
 // 	- 500 : if something goes wrong in the backend
 // Response Body:
-// 	project: Object
+// 	submission: Object
 //		id: String
 //		name: String
 //		authors: Array of Author userIDs
@@ -92,41 +92,41 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	fileAuthor := request["author"]                        // author's user Id
 	fileContent := request[getJsonTag(&File{}, "Content")] // base64 encoding of file content
 
-	// Put parsed values into a file object and a project object
-	wrapperProject := &Project{
+	// Put parsed values into a file object and a submission object
+	wrapperSubmission := &Submission{
 		Name:      fileName.(string),
 		Authors:   []string{fileAuthor.(string)},
 		Reviewers: []string{},
 		FilePaths: []string{fileName.(string)},
-		MetaData: &CodeProjectData{
+		MetaData: &CodeSubmissionData{
 			Abstract: "",
 			Reviews: []*Comment{},
 		},
 	}
 	file := &File{
-		ProjectName: fileName.(string),
-		Path:        fileName.(string),
-		Name:        fileName.(string),
-		Content:     fileContent.(string),
+		SubmissionName: fileName.(string),
+		Path:           fileName.(string),
+		Name:           fileName.(string),
+		Content:        fileContent.(string),
 	}
 
 	// adds file to the db and filesystem
-	projectId, err := addProject(wrapperProject)
+	submissionId, err := addSubmission(wrapperSubmission)
 	if err != nil {
-		log.Printf("error while adding project: %v\n", err)
+		log.Printf("error while adding submission: %v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	_, err = addFileTo(file, projectId)
+	_, err = addFileTo(file, submissionId)
 	if err != nil {
 		log.Printf("error while adding file: %v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	wrapperProject.Id = projectId
+	wrapperSubmission.Id = submissionId
 
-	// writes the wraper project as a response
-	jsonString, err := json.Marshal(wrapperProject)
+	// writes the wraper submission as a response
+	jsonString, err := json.Marshal(wrapperSubmission)
 	if err != nil {
 		log.Printf("error while formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -138,20 +138,20 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 
 // Retrieve code files from filesystem. Returns
 // file content with comments and metadata. Recieves
-// a FilePath and projectId as header strings in
+// a FilePath and submissionId as header strings in
 // the request
 //
 // Response Codes:
 //	200 : File exists, getter success.
 //	401 : if the request does not have the proper security token
-//	400 : malformatted request, or non-existent project/file id
+//	400 : malformatted request, or non-existent submission/file id
 //	500 : if something else goes wrong in the backend
 // Response Body:
 // 		file: object
 // 			fileName: string
 //			filePath: string
-//			projectName: string
-//			projectId: int
+//			submissionName: string
+//			submissionId: int
 // 			content: string
 // 			comments: array of objects
 // 				author: int
@@ -171,7 +171,7 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the file path and project Id from the request body
+	// gets the file path and submission Id from the request body
 	var request map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
@@ -180,32 +180,32 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filePath := request[getJsonTag(&File{}, "Path")].(string)
-	projectId := int(request[getJsonTag(&File{}, "ProjectId")].(float64))
+	submissionId := int(request[getJsonTag(&File{}, "SubmissionId")].(float64))
 
-	// queries the project name from the database
-	var projectName string
-	queryProjectName := fmt.Sprintf(
+	// queries the submission name from the database
+	var submissionName string
+	querySubmissionName := fmt.Sprintf(
 		SELECT_ROW,
-		getDbTag(&Project{}, "Name"),
-		TABLE_PROJECTS,
-		getDbTag(&Project{}, "Id"),
+		getDbTag(&Submission{}, "Name"),
+		TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Id"),
 	)
-	row := db.QueryRow(queryProjectName, projectId)
-	if err = row.Scan(&projectName); err != nil {
+	row := db.QueryRow(querySubmissionName, submissionId)
+	if err = row.Scan(&submissionName); err != nil {
 		log.Printf("error querying the database: %v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	// builds path to the file and it's corresponding data file using the queried project name
-	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), projectName, filePath)
-	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
-		projectName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
+	// builds path to the file and it's corresponding data file using the queried submission name
+	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), submissionName, filePath)
+	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
+		submissionName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
 
 	// constructs a file object to return to the frontend
 	file := &File{
-		ProjectId:   projectId,
-		ProjectName: projectName,
+		SubmissionId:   submissionId,
+		SubmissionName: submissionName,
 		Path:        filePath,
 		Name:        filepath.Base(filePath),
 	}
@@ -264,9 +264,9 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// gets project Id and file path
+	// gets submission Id and file path
 	filePath := request[getJsonTag(&File{}, "Path")].(string)
-	projectId := int(request[getJsonTag(&File{}, "ProjectId")].(float64))
+	submissionId := int(request[getJsonTag(&File{}, "SubmissionId")].(float64))
 	// Parse data into Comment structure
 	comment := &Comment{
 		AuthorId: request[getJsonTag(&Comment{}, "AuthorId")].(string), // authors user id
@@ -281,10 +281,10 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		SELECT_ROW_TWO_CONDITION,
 		getDbTag(&File{}, "Id"),
 		TABLE_FILES,
-		getDbTag(&File{}, "ProjectId"),
+		getDbTag(&File{}, "SubmissionId"),
 		getDbTag(&File{}, "Path"),
 	)
-	row := db.QueryRow(queryFileId, projectId, filePath)
+	row := db.QueryRow(queryFileId, submissionId, filePath)
 	if err = row.Scan(&fileId); err != nil {
 		log.Printf("error querying database: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -305,17 +305,17 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 // Helper Functions
 // -----
 
-// Add file into project, and store it to FS and DB.
-// Note: Need valid project. No comments on file creation.
+// Add file into submission, and store it to FS and DB.
+// Note: Need valid submission. No comments on file creation.
 //
 // Params:
-//	file (*File) : the file to add to the db and filesystem (all fields but Id and ProjectId MUST be set)
-//	projectId (int) : the id of the project which the added file is to be linked
+//	file (*File) : the file to add to the db and filesystem (all fields but Id and SubmissionId MUST be set)
+//	submissionId (int) : the id of the submission which the added file is to be linked
 //		to as an unsigned integer
 // Returns:
 //	(int) : the id of the added file (0 if an error occurs)
 //	(error) : if the operation fails
-func addFileTo(file *File, projectId int) (int, error) {
+func addFileTo(file *File, submissionId int) (int, error) {
 	// declares return value variables
 	var fileId int
 	var err error
@@ -324,21 +324,21 @@ func addFileTo(file *File, projectId int) (int, error) {
 	insertFile := fmt.Sprintf(
 		INSERT_FILE,
 		TABLE_FILES,
-		getDbTag(&File{}, "ProjectId"),
+		getDbTag(&File{}, "SubmissionId"),
 		getDbTag(&File{}, "Path"),
 	)
 	// executes the formatted query, returning the fileId
-	// (note that here SQL implicitly checks that the projectId exists in the projects table via Foreign key constraint)
-	row := db.QueryRow(insertFile, projectId, file.Path)
+	// (note that here SQL implicitly checks that the submissionId exists in the submissions table via Foreign key constraint)
+	row := db.QueryRow(insertFile, submissionId, file.Path)
 	// gets the id from the just inserted file
 	if err = row.Scan(&fileId); err != nil {
 		return 0, err
 	}
 
 	// Add file to filesystem
-	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), file.ProjectName, file.Path)
-	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
-		file.ProjectName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
+	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), file.SubmissionName, file.Path)
+	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
+		file.SubmissionName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
 
 	// file paths without the file name (to create dirs if they don't exist yet)
 	fileDirPath := filepath.Dir(filePath)
@@ -381,7 +381,7 @@ func addFileTo(file *File, projectId int) (int, error) {
 
 	// Operation was successful ==> file Id set in file object and file returned.
 	file.Id = fileId
-	file.ProjectId = projectId
+	file.SubmissionId = submissionId
 	return fileId, nil
 }
 
@@ -419,32 +419,32 @@ func addComment(comment *Comment, fileId int) error {
 	}
 
 	// queries the database to get the file path so that the file's data file can be found
-	var projectId string
-	var projectName string
+	var submissionId string
+	var submissionName string
 	var filePath string
-	// builds a query to get the file's name, project id, and it's project's name
+	// builds a query to get the file's name, submission id, and it's submission's name
 	columns := fmt.Sprintf(
 		"%s, %s, %s",
-		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
-		getDbTag(&Project{}, "Name"),
+		TABLE_SUBMISSIONS+"."+getDbTag(&Submission{}, "Id"),
+		getDbTag(&Submission{}, "Name"),
 		getDbTag(&File{}, "Path"),
 	)
 	queryPath := fmt.Sprintf(
 		SELECT_ROW_INNER_JOIN,
 		columns,
 		TABLE_FILES,
-		TABLE_PROJECTS,
-		TABLE_FILES+"."+getDbTag(&File{}, "ProjectId"),
-		TABLE_PROJECTS+"."+getDbTag(&Project{}, "Id"),
+		TABLE_SUBMISSIONS,
+		TABLE_FILES+"."+getDbTag(&File{}, "SubmissionId"),
+		TABLE_SUBMISSIONS+"."+getDbTag(&Submission{}, "Id"),
 		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
 	)
 	// executes the query and builds the file path if it was successful
 	row = db.QueryRow(queryPath, fileId)
-	if err = row.Scan(&projectId, &projectName, &filePath); err != nil {
+	if err = row.Scan(&submissionId, &submissionName, &filePath); err != nil {
 		return err
 	}
-	dataFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(projectId), DATA_DIR_NAME,
-		projectName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
+	dataFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
+		submissionName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
 
 	// reads the data file content and formats it into a CodeFileData struct
 	data := &CodeFileData{}
