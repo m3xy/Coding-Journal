@@ -8,7 +8,6 @@
 // Hence if a test breaks, fix the top one first and then re-run.
 // ===================================================================
 
-
 package main
 
 import (
@@ -92,10 +91,10 @@ func clearTestEnvironment() error {
 
 // test function to add a single file. This function is not called directly as a test, but is a utility method for other tests
 func testAddFile(file *File, submissionId int) error {
-	var submissionName string        // name of the submission as queried from the SQL db
+	var submissionName string     // name of the submission as queried from the SQL db
 	var fileId int                // id of the file as returned from addFileTo()
 	var queriedFileContent string // the content of the file
-	var queriedSubmissionId int      // the id of the submission as gotten from the files table
+	var queriedSubmissionId int   // the id of the submission as gotten from the files table
 	var queriedFilePath string    // the file path as queried from the files table
 
 	// adds file to the already instantiated submission
@@ -181,7 +180,7 @@ func TestAddOneFile(t *testing.T) {
 	} else if err = testAddFile(testFile, submissionId); err != nil {
 		t.Errorf("Error occurred while adding file: %v", err)
 	}
-	
+
 	// tears down the test environment
 	if err = clearTestEnvironment(); err != nil {
 		t.Errorf("error while tearing down test environment: %v", err)
@@ -253,8 +252,8 @@ func testAddComment(comment *Comment, testFile *File) error {
 // tests adding one valid comment. Uses the testAddComment() utility method
 func TestAddOneComment(t *testing.T) {
 	testSubmission := testSubmissions[0] // test submission to add testFile to
-	testFile := testFiles[0]       // test file to add comments to
-	testAuthor := testAuthors[0]   // test author of comment
+	testFile := testFiles[0]             // test file to add comments to
+	testAuthor := testAuthors[0]         // test author of comment
 	testComment := testComments[0]
 
 	// initializes the test environment, returning an error if any occurs
@@ -290,10 +289,11 @@ func TestAddOneComment(t *testing.T) {
 	}
 }
 
-
 // Tests the basic ability of the CodeFiles module to load the data from a
 // valid file path passed to it. Simple valid one code file submission
-
+// 
+// TODO : test whether having / in file path query param breaks the function
+// 
 // Test Depends On:
 // 	- TestCreateSubmission()
 // 	- TestAddFiles()
@@ -306,8 +306,8 @@ func TestGetOneFile(t *testing.T) {
 	// Start server.
 	go srv.ListenAndServe()
 
-	var submissionId int              // stores submission id returned by addSubmission()
-	testFile := testFiles[0]       // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+	var submissionId int                 // stores submission id returned by addSubmission()
+	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
 	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	// initializes the filesystem and db
@@ -327,19 +327,13 @@ func TestGetOneFile(t *testing.T) {
 	// sets the submission id of the added file to link it with the submission on this end (just in case. This should happen in addFileTo)
 	testFile.SubmissionId = submissionId
 
-	// sets a custom header "file": file path and "submission": submissionId to indicate which file is being queried to the server
-	reqBody, err := json.Marshal(map[string]interface{}{
-		getJsonTag(&File{}, "Path"):      testFile.Path,
-		getJsonTag(&File{}, "SubmissionId"): testFile.SubmissionId,
-	})
-	if err != nil {
-		t.Errorf("Error formatting request body: %v", err)
-	}
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_FILE), bytes.NewBuffer(reqBody))
-	if err != nil {
-		t.Errorf("Error creating request: %v\n", err)
-	}
-	// send POST request
+	// builds the request url inserting query parameters
+	urlString := fmt.Sprintf("%s:%s%s?%s=%d&%s=%s", TEST_URL, TEST_SERVER_PORT, 
+		ENDPOINT_FILE, getJsonTag(&File{}, "SubmissionId"), testFile.SubmissionId, 
+		getJsonTag(&File{}, "Path"), testFile.Path)
+	req, err := http.NewRequest("GET", urlString, nil)
+
+	// send GET request
 	resp, err := sendSecureRequest(req, TEAM_ID)
 	if err != nil {
 		t.Errorf("Error occurred in request: %v", err)
@@ -360,13 +354,13 @@ func TestGetOneFile(t *testing.T) {
 	// tests that the file path
 	if testFile.Path != file.Path {
 		t.Errorf("File Path %d != %d", file.Id, testFile.Id)
-	// tests for submission id correctness
+		// tests for submission id correctness
 	} else if testFile.SubmissionId != file.SubmissionId {
 		t.Errorf("File Submission Id %d != %d", file.SubmissionId, testFile.SubmissionId)
-	// tests if the file paths are identical
+		// tests if the file paths are identical
 	} else if testFile.Path != file.Path {
 		t.Errorf("File Path %s != %s", file.Path, testFile.Path)
-	// tests that the file content is correct
+		// tests that the file content is correct
 	} else if testFile.Content != file.Content {
 		t.Error("File Content does not match")
 	}
@@ -400,7 +394,6 @@ func TestUploadOneFile(t *testing.T) {
 
 	// Start server.
 	go srv.ListenAndServe()
-
 
 	// initializes the filesystem and db
 	if err = initTestEnvironment(); err != nil {
@@ -496,10 +489,10 @@ func TestUploadUserComment(t *testing.T) {
 
 	// formats the request body to send to the server to add a comment
 	reqBody, err := json.Marshal(map[string]interface{}{
-		getJsonTag(&File{}, "SubmissionId"):   submissionId,
-		getJsonTag(&File{}, "Path"):        testFile.Path,
-		getJsonTag(&Comment{}, "AuthorId"): testAuthor.Id,
-		getJsonTag(&Comment{}, "Content"):  testComment.Content,
+		getJsonTag(&File{}, "SubmissionId"): submissionId,
+		getJsonTag(&File{}, "Path"):         testFile.Path,
+		getJsonTag(&Comment{}, "AuthorId"):  testAuthor.Id,
+		getJsonTag(&Comment{}, "Content"):   testComment.Content,
 	})
 	if err != nil {
 		t.Errorf("Error formatting request body: %v", err)

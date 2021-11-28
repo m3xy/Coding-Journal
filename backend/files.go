@@ -27,12 +27,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"log"
+	"strconv"
 )
 
 // file constants, includes
@@ -100,7 +101,7 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 		FilePaths: []string{fileName.(string)},
 		MetaData: &CodeSubmissionData{
 			Abstract: "",
-			Reviews: []*Comment{},
+			Reviews:  []*Comment{},
 		},
 	}
 	file := &File{
@@ -171,16 +172,15 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the file path and submission Id from the request body
-	var request map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&request)
+	// gets the submission Id from the URL parameters
+	params := r.URL.Query()
+	submissionId, err := strconv.Atoi(params[getJsonTag(&File{}, "SubmissionId")][0])
 	if err != nil {
-		log.Printf("error decoding request body: %v\n", err)
+		log.Printf("invalid submission id: %s\n", params[getJsonTag(&File{}, "SubmissionId")][0])
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	filePath := request[getJsonTag(&File{}, "Path")].(string)
-	submissionId := int(request[getJsonTag(&File{}, "SubmissionId")].(float64))
+	filePath := params[getJsonTag(&File{}, "Path")][0]
 
 	// queries the submission name from the database
 	var submissionName string
@@ -206,8 +206,8 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	file := &File{
 		SubmissionId:   submissionId,
 		SubmissionName: submissionName,
-		Path:        filePath,
-		Name:        filepath.Base(filePath),
+		Path:           filePath,
+		Name:           filepath.Base(filePath),
 	}
 	// gets file content and comments
 	file.Content, err = getFileContent(fullFilePath)

@@ -25,19 +25,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"io/ioutil"
+	"strconv"
 )
 
 // ------
 // Router Functions
 // ------
 
-// Router function to get the names and id's of every submission currently saved
+// Router function to get the names and id's of every submission of a given user
+// if no user id is given in the query parameters, return all valid submissions
 //
 // Response Codes:
 //	200 : if the action completed successfully
@@ -54,10 +56,20 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	// gets the userId from the URL
+	var userId string
+	params := r.URL.Query()
+	userIds := params[getJsonTag(&Credentials{}, "Id")]
+	if userIds == nil {
+		userId = "*"
+	} else {
+		userId = userIds[0]
+	}
+	
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
 	// uses getUserSubmissions to get all user submissions by setting authorId = *
-	submissions, err := getUserSubmissions("*")
+	submissions, err := getUserSubmissions(userId)
 	if err != nil {
 		log.Printf("error: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -76,9 +88,6 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get submission for display on frontend. ID included for file and comment queries.
-//
-// TODO figure out what URL to have as endpoint here
-// TODO break this function into multiple?
 //
 // Response Codes:
 //	200 : if the submission exists and the request succeeded
@@ -112,16 +121,14 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the file path and submission Id from the request body
-	var request map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&request)
+	// gets the submission Id from the URL parameters
+	params := r.URL.Query()
+	submissionId, err := strconv.Atoi(params[getJsonTag(&Submission{}, "Id")][0])
 	if err != nil {
-		log.Printf("Error decoding request body: %v\n", err)
+		log.Printf("invalid id: %s\n", params[getJsonTag(&Submission{}, "Id")][0])
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	submissionId := int(request[getJsonTag(&Submission{}, "Id")].(float64))
-
 	// creates a submission with the given ID
 	submission := &Submission{Id: submissionId}
 
@@ -142,25 +149,25 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 	// gets submission authors, reviewers, and file paths (as relpaths from the root of the submission)
 	submission.Authors, err = getSubmissionAuthors(submissionId)
 	if err != nil {
-		log.Printf("error getting authors: %v", err)		
+		log.Printf("error getting authors: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	submission.Reviewers, err = getSubmissionReviewers(submissionId)
 	if err != nil {
-		log.Printf("error getting reviewers: %v", err)		
+		log.Printf("error getting reviewers: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	submission.FilePaths, err = getSubmissionFiles(submissionId)
 	if err != nil {
-		log.Printf("error getting submission files: %v", err)		
+		log.Printf("error getting submission files: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	submission.MetaData, err = getSubmissionMetaData(submissionId)
 	if err != nil {
-		log.Printf("error getting submission metadata: %v", err)		
+		log.Printf("error getting submission metadata: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -179,7 +186,7 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 // Router function to import Journal submissions (submissions) from other journals
 //
 // TODO: fix this function
-// 
+//
 // Responses:
 // 	- 200 : if the action completed successfully
 // 	- 400 : if the request is badly formatted
@@ -226,7 +233,7 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 		FilePaths: []string{},
 		MetaData: &CodeSubmissionData{ // TODO figure this out
 			Abstract: "",
-			Reviews: []*Comment{},
+			Reviews:  []*Comment{},
 		},
 	}
 
@@ -244,9 +251,9 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 		file := &File{
 			SubmissionId:   submissionId,
 			SubmissionName: importedSubmission.Name,
-			Name:        submissionFile.Name,
-			Path:        submissionFile.Name,
-			Content:     submissionFile.Content,
+			Name:           submissionFile.Name,
+			Path:           submissionFile.Name,
+			Content:        submissionFile.Content,
 		}
 		_, err = addFileTo(file, submissionId)
 		if err != nil {
@@ -327,7 +334,7 @@ func addSubmission(submission *Submission) (int, error) {
 
 	// inserts the submission's metadata into the filesystem
 	dataFile, err := os.OpenFile(
-		submissionDataPath + ".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+		submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
 		return 0, err
 	}
@@ -589,7 +596,7 @@ func getSubmissionMetaData(submissionId int) (*CodeSubmissionData, error) {
 	}
 
 	// reads the data file into a string
-	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submissionName + ".json")
+	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submissionName+".json")
 	dataString, err := ioutil.ReadFile(dataPath)
 	if err != nil {
 		return nil, err

@@ -3,22 +3,21 @@
 // Authors: 190010425
 // Created: November 18, 2021
 //
-// This file takes care of 
+// This file takes care of
 // ===========================
 
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"testing"
-	"io/ioutil"
-	"path/filepath"
 )
 
 // data to use in the tests
@@ -29,7 +28,7 @@ var testSubmissions []*Submission = []*Submission{
 		Authors: []string{}, FilePaths: []string{"testFile2.txt"}, MetaData: testSubmissionMetaData[0]},
 }
 var testSubmissionMetaData = []*CodeSubmissionData{
-	{Abstract: "test abstract, this means nothing", Reviews:nil}, // TODO: add comments here
+	{Abstract: "test abstract, this means nothing", Reviews: nil}, // TODO: add comments here
 }
 var testAuthors []*Credentials = []*Credentials{
 	{Email: "test@test.com", Pw: "123456aB$", Fname: "test",
@@ -117,7 +116,7 @@ func testAddSubmission(testSubmission *Submission) error {
 
 	// checks that the filesystem has a proper corresponding entry and metadata file
 	submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId))
-	fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, submissionName + ".json")
+	fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, submissionName+".json")
 	dataString, err := ioutil.ReadFile(fileDataPath)
 	if err != nil {
 		return err
@@ -197,8 +196,8 @@ func TestAddNilSubmission(t *testing.T) {
 // this test depends on the add submissions tests
 func testAddAuthor(submissionId int, author *Credentials) error {
 	// declares test variables
-	var queriedSubmissionId int   // gotten from db after adding author
-	var queriedAuthorId string // gotten from db after adding author
+	var queriedSubmissionId int // gotten from db after adding author
+	var queriedAuthorId string  // gotten from db after adding author
 
 	authorId, err := registerUser(author)
 	if err != nil {
@@ -305,7 +304,7 @@ func TestAddNonUserAuthor(t *testing.T) {
 // utility function which tests that a reviewer can be added to a valid submission properly
 // this test depends on the add submissions tests
 func testAddReviewer(submissionId int, reviewer *Credentials) error {
-	var queriedSubmissionId int   // gotten from db after adding reviewer
+	var queriedSubmissionId int  // gotten from db after adding reviewer
 	var queriedReviewerId string // gotten from db after adding reviewer
 
 	reviewerId, err := registerUser(reviewer)
@@ -475,57 +474,44 @@ func TestGetAllSubmissions(t *testing.T) {
 	// Start server.
 	go srv.ListenAndServe()
 
-	/*
-		test for basic functionality. Adds 2 submissions to the db, then queries them and tests for equality
-	*/
-	testGetTwoSubmissions := func() {
-		var submissionId int                    // variable to temporarily store submission ids as they are added to the db
-		sentSubmissions := make(map[int]string) // variable to hold the id: submission name mappings which are sent to the db
+	var submissionId int                    // variable to temporarily store submission ids as they are added to the db
+	sentSubmissions := make(map[int]string) // variable to hold the id: submission name mappings which are sent to the db
 
-		// sets up the test environment (db and filesystem)
-		if err = initTestEnvironment(); err != nil {
-			t.Errorf("Error initializing the test environment %s", err)
-		}
-		// uses a slice here so that we can add more submissions to testSubmissions without breaking the test
-		for _, proj := range testSubmissions[0:2] {
-			submissionId, err = addSubmission(proj)
-			if err != nil {
-				t.Errorf("Error adding submission %s: %v", proj.Name, err)
-			}
-			// saves the added submission with its id
-			sentSubmissions[submissionId] = proj.Name
-		}
-
-		// builds and sends and http get request
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s/submissions", TEST_URL, TEST_SERVER_PORT), nil)
-		resp, err := sendSecureRequest(req, TEAM_ID)
+	// sets up the test environment (db and filesystem)
+	if err = initTestEnvironment(); err != nil {
+		t.Errorf("Error initializing the test environment %s", err)
+	}
+	// uses a slice here so that we can add more submissions to testSubmissions without breaking the test
+	for _, proj := range testSubmissions[0:2] {
+		submissionId, err = addSubmission(proj)
 		if err != nil {
-			t.Errorf("Error occurred while sending get request to the Go server: %v", err)
+			t.Errorf("Error adding submission %s: %v", proj.Name, err)
 		}
-		defer resp.Body.Close()
-		if err != nil {
-			t.Error(err)
-		}
-
-		// checks the returned list of submissions for equality with the sent list
-		returnedSubmissions := make(map[int]string)
-		json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
-
-		// tests that the proper values have been returned
-		for k, v := range returnedSubmissions {
-			if v != sentSubmissions[k] {
-				t.Errorf("Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
-			}
-		}
-
-		// destroys the test environment
-		if err = clearTestEnvironment(); err != nil {
-			t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
-		}
+		// saves the added submission with its id
+		sentSubmissions[submissionId] = proj.Name
 	}
 
-	// runs tests
-	testGetTwoSubmissions()
+	// builds and sends and http get request
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_ALL_SUBMISSIONS), nil)
+	resp, err := sendSecureRequest(req, TEAM_ID)
+	if err != nil {
+		t.Errorf("Error occurred while sending get request to the Go server: %v", err)
+	}
+	defer resp.Body.Close()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// checks the returned list of submissions for equality with the sent list
+	returnedSubmissions := make(map[int]string)
+	json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
+
+	// tests that the proper values have been returned
+	for k, v := range returnedSubmissions {
+		if v != sentSubmissions[k] {
+			t.Errorf("Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
+		}
+	}
 
 	// Close server.
 	if err = srv.Shutdown(context.Background()); err != nil {
@@ -538,7 +524,6 @@ func TestGetAllSubmissions(t *testing.T) {
 	}
 }
 
-	
 // test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
 // Test Depends On:
 // 	- TestCreateSubmissions()
@@ -547,8 +532,8 @@ func TestGetAllSubmissions(t *testing.T) {
 func TestGetSingleSubmission(t *testing.T) {
 	testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
 	testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
-	testAuthor := testAuthors[0]    // test author of the submission being queried
-	testNonAuthor := testAuthors[3] // test author of submission not being queried
+	testAuthor := testAuthors[0]          // test author of the submission being queried
+	testNonAuthor := testAuthors[3]       // test author of submission not being queried
 
 	// sets up the test environment (db and filesystem)
 	if err := initTestEnvironment(); err != nil {
@@ -603,7 +588,7 @@ func TestGetSingleSubmission(t *testing.T) {
 }
 
 // Tests the ability of the CodeFiles module to get a submission from the db
-// 
+//
 // Test Depends On:
 // 	- TestCreateSubmissions()
 // 	- TestAddFiles()
@@ -619,10 +604,10 @@ func TestGetSubmission(t *testing.T) {
 	// Start server.
 	go srv.ListenAndServe()
 
-	testFile := testFiles[0]         // defines the file to use for the test here so that it can be easily changed
-	testSubmission := testSubmissions[0]   // defines the submission to use for the test here so that it can be easily changed
-	testAuthor := testAuthors[0]     // defines the author of the submission
-	testReviewer := testReviewers[0] // defines the reviewer of the submission
+	testFile := testFiles[0]             // defines the file to use for the test here so that it can be easily changed
+	testSubmission := testSubmissions[0] // defines the submission to use for the test here so that it can be easily changed
+	testAuthor := testAuthors[0]         // defines the author of the submission
+	testReviewer := testReviewers[0]     // defines the reviewer of the submission
 
 	// initializes the filesystem and db
 	if err = initTestEnvironment(); err != nil {
@@ -656,15 +641,10 @@ func TestGetSubmission(t *testing.T) {
 		t.Errorf("Error adding reviewer to the submission: %v", err)
 	}
 
-	// creates a request to get a submission of a given id
-	reqBody, err := json.Marshal(map[string]interface{}{
-		getJsonTag(&Submission{}, "Id"): submissionId,
-	})
-	if err != nil {
-		t.Errorf("Error Retrieving Submission: %v", err)
-	}
-	// sets a custom header of "submission":id to query the specific submission id
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_SUBMISSION), bytes.NewBuffer(reqBody))
+	// creates a request to send to the test server
+	urlString := fmt.Sprintf("%s:%s%s?%s=%d", TEST_URL, TEST_SERVER_PORT, 
+		ENDPOINT_SUBMISSION, getJsonTag(&Submission{}, "Id"), submissionId)
+	req, err := http.NewRequest("GET", urlString, nil)
 	resp, err := sendSecureRequest(req, TEAM_ID)
 	if err != nil {
 		t.Errorf("Error while sending Get request: %v", err)
