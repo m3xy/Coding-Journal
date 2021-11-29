@@ -23,7 +23,7 @@ const (
 	password = "secret"
 	dbname   = "mydb"
 
-	BACKEND_ADDRESS = "http://localhost:3333/"
+	BACKEND_ADDRESS = "http://localhost:3333"
 	PORT            = ":3333"
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 	ENV_DIR         = "../frontend/.env"
