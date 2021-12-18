@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -27,7 +28,7 @@ import (
 
 const (
 	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//://_//-//+//-//=//\"//'"
-	A_NUMS = "a-zA-Z0-9"
+	A_NUMS        = "a-zA-Z0-9"
 	HASH_COST     = 8
 )
 
@@ -43,6 +44,7 @@ const (
  Returns: userId
 */
 func logIn(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received log in request from %v", r.RemoteAddr)
 	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 	respMap := make(map[string]string)
@@ -51,6 +53,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	creds := &Credentials{}
 	err := json.NewDecoder(r.Body).Decode(creds)
 	if err != nil {
+		log.Printf("[ERROR] JSON decoder failed on log in.")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -62,8 +65,10 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			w.WriteHeader(http.StatusUnauthorized)
+			log.Printf("[INFO] Incorrect email: %s", creds.Email)
 		} else {
 			fmt.Println(err)
+			log.Printf("[ERROR] SQL query failure on login: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
@@ -71,6 +76,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 	// Compare password to hash in database, and conclude status.
 	if !comparePw(creds.Pw, storedCreds.Pw) {
+		log.Printf("[INFO] Given password and password registered on %s do not match.", creds.Email)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -82,6 +88,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write(jsonResp)
 	}
+	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, creds.Email)
 }
 
 /*
@@ -91,8 +98,10 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	Failure: 404, User not found.
 */
 func getUserProfile(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received user credential request from %s", r.RemoteAddr)
 	// Check security token.
 	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		log.Printf("[WARN] Invalid security token received from %s.", r.RemoteAddr)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -100,18 +109,20 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user from parameters.
 	vars := mux.Vars(r)
 	if checkUnique(TABLE_IDMAPPINGS,
-	getDbTag(&IdMappings{}, "GlobalId"), vars[getJsonTag(&Credentials{}, "Id")]) {
+		getDbTag(&IdMappings{}, "GlobalId"), vars[getJsonTag(&Credentials{}, "Id")]) {
+		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&Credentials{}, "Id")])
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	// Get user details from user ID.
-	info := &Credentials{ Pw: ""}
+	info := &Credentials{Pw: ""}
 	err := db.QueryRow(fmt.Sprintf(SELECT_ROW, "*", VIEW_USER_INFO,
-	getDbTag(&IdMappings{}, "GlobalId")), vars[getJsonTag(&Credentials{}, "Id")]).
-	Scan(&info.Id, &info.Email, &info.Fname, &info.Lname, &info.Usertype,
-	&info.PhoneNumber, &info.Organization)
+		getDbTag(&IdMappings{}, "GlobalId")), vars[getJsonTag(&Credentials{}, "Id")]).
+		Scan(&info.Id, &info.Email, &info.Fname, &info.Lname, &info.Usertype,
+			&info.PhoneNumber, &info.Organization)
 	if err != nil {
+		log.Printf("[ERROR] SQL query error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -119,24 +130,27 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	// Get map of project IDs to project names.
 	projectsMap, err := getUserProjects(vars[getJsonTag(&Credentials{}, "Id")])
 	if err != nil {
+		log.Printf("[ERROR] Failed to retrieve user (%s)'s projects: %v'", vars[getJsonTag(&Credentials{}, "Id")], err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	buffMap := map[string]interface{} {
-		getJsonTag(&Credentials{}, "Email"): info.Email,
-		getJsonTag(&Credentials{}, "Fname"): info.Fname,
-		getJsonTag(&Credentials{}, "Lname"): info.Lname,
-		getJsonTag(&Credentials{}, "Usertype"): info.Usertype,
-		getJsonTag(&Credentials{}, "PhoneNumber"): info.PhoneNumber,
+	buffMap := map[string]interface{}{
+		getJsonTag(&Credentials{}, "Email"):        info.Email,
+		getJsonTag(&Credentials{}, "Fname"):        info.Fname,
+		getJsonTag(&Credentials{}, "Lname"):        info.Lname,
+		getJsonTag(&Credentials{}, "Usertype"):     info.Usertype,
+		getJsonTag(&Credentials{}, "PhoneNumber"):  info.PhoneNumber,
 		getJsonTag(&Credentials{}, "Organization"): info.Organization,
 		"projects": projectsMap,
 	}
 	err = json.NewEncoder(w).Encode(buffMap)
 	if err != nil {
+		log.Printf("[ERROR] User data JSON encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
+	log.Printf("[INFO] User credential request from %s successful.", r.RemoteAddr)
 }
-
-
 
 /*
 	Log in to website with any server's database.
@@ -147,9 +161,11 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	Returns: userId
 */
 func logInGlobal(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received global login request from %s.", r.RemoteAddr)
 	propsMap := make(map[string]string)
 	err := json.NewDecoder(r.Body).Decode(&propsMap)
 	if err != nil {
+		log.Printf("[WARN] Invalid security token received from %s.", r.RemoteAddr)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -160,8 +176,10 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow(stmt, propsMap[getJsonTag(&Servers{}, "GroupNumber")]).Scan(getCols(retServer)...)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			log.Printf("[WARN] Group number %s doesn't exist in database.", propsMap[getJsonTag(&Servers{}, "GroupNumber")])
 			w.WriteHeader(http.StatusUnauthorized)
 		} else {
+			log.Printf("[ERROR] SQL query error: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		return
@@ -171,32 +189,36 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 	delete(propsMap, getJsonTag(&Servers{}, "GroupNumber"))
 	jsonBody, err := json.Marshal(propsMap)
 	if err != nil {
+		log.Printf("[ERROR] JSON body encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	globalReq, _ := http.NewRequest(
-		"POST", retServer.Url + "/login", bytes.NewBuffer(jsonBody))
+		"POST", retServer.Url+"/login", bytes.NewBuffer(jsonBody))
 	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
 	client := &http.Client{}
 
 	// Get response from login request.
 	res, err := client.Do(globalReq)
 	if err != nil {
+		log.Printf("[ERROR] HTTP Request error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else if res.StatusCode != http.StatusOK {
+		log.Printf("[WARN] Foreign server login request failed, mirroring...")
 		w.WriteHeader(res.StatusCode)
 		return
-	} else {
-		err = json.NewDecoder(res.Body).Decode(&propsMap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		err = json.NewEncoder(w).Encode(&propsMap)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+	}
+	err = json.NewDecoder(res.Body).Decode(&propsMap)
+	if err != nil {
+		log.Printf("[ERROR] JSON decoding error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = json.NewEncoder(w).Encode(&propsMap)
+	if err != nil {
+		log.Printf("[ERROR] JSON encoding error: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -211,26 +233,31 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
   Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received sign up request from %s.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
 	creds := newUser()
 	err := json.NewDecoder(r.Body).Decode(creds)
 	if err != nil {
+		log.Printf("[ERROR] JSON decoding failed: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	validator.SetValidationFunc("validpw", validpw)
 	if validator.Validate(*creds) != nil {
+		log.Printf("[WARN] Invalid password format received.")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	_, err = registerUser(creds)
 	if err != nil {
+		log.Printf("[ERROR] User registration failed: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	log.Printf("[INFO] User signup from %s successful.", r.RemoteAddr)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -248,13 +275,13 @@ func registerUser(creds *Credentials) (string, error) {
 
 	// Make credentials insert statement for query.
 	stmt := fmt.Sprintf(INSERT_FULL, TABLE_USERS,
-			getDbTag(&Credentials{}, "Email"),
-			getDbTag(&Credentials{}, "Pw"),
-			getDbTag(&Credentials{}, "Fname"),
-			getDbTag(&Credentials{}, "Lname"),
-			getDbTag(&Credentials{}, "Usertype"),
-			getDbTag(&Credentials{}, "PhoneNumber"),
-			getDbTag(&Credentials{}, "Organization"))
+		getDbTag(&Credentials{}, "Email"),
+		getDbTag(&Credentials{}, "Pw"),
+		getDbTag(&Credentials{}, "Fname"),
+		getDbTag(&Credentials{}, "Lname"),
+		getDbTag(&Credentials{}, "Usertype"),
+		getDbTag(&Credentials{}, "PhoneNumber"),
+		getDbTag(&Credentials{}, "Organization"))
 
 	// Query full insert statement.
 	_, err := db.Exec(stmt, creds.Email, hash, creds.Fname, creds.Lname,
@@ -263,7 +290,7 @@ func registerUser(creds *Credentials) (string, error) {
 		return "", err
 	}
 
-	// Get new UUID from query 
+	// Get new UUID from query
 	err = db.QueryRow(
 		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
 			TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email).
