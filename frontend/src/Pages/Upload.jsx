@@ -7,7 +7,10 @@
 
 import React from "react";
 import DragAndDrop from "./DragAndDrop";
-import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel} from "react-bootstrap"
+import  axiosInstance from "../Web/axiosInstance";
+import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel} from "react-bootstrap";
+
+const  uploadEndpoint = '/upload'
 
 class Upload extends React.Component {
 
@@ -35,6 +38,81 @@ class Upload extends React.Component {
         })
     }
 
+    /**
+     * Sends a POST request to the go server to upload (submission) files
+     *
+     * @param {JSON} userId Submnission files' Author's User ID
+     * @param {Array.<File>} files Submission files
+     * @returns
+     */
+    uploadFiles(userId, submissionName, files) {
+
+        if(userId === null) {
+            console.log("not logged in!");
+            return;
+        }
+
+        const authorID = JSON.parse(userId).userId;  //Extract author's userId
+
+        const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = function(e) {
+                    files[i] = e.target.result;
+                    resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
+                }
+                reader.onerror = function() {
+                    reject();
+                }
+            });
+        })
+
+        // return new Promise ( (resolve, reject) => {
+        //    var request = new XMLHttpRequest();
+        //    Promise.all(filePromises) //Encode all files to upload into base 64 before uploading
+        //        .then(() => {
+        //            let data = {
+        //                author : authorID,
+        //                name : submissionName,
+        //                content : files[0]
+        //            }
+        //            console.log(data);
+                    // get a callback when the server responds
+        //            request.addEventListener('load', () => {
+                        //Return response for code page
+        //                resolve(request.responseText);
+        //            })
+        //            request.onerror = reject;
+                    // open the request with the verb and the url TEMP: this will potentially change with actual URL
+        //            request.open('POST', BACKEND_ADDRESS + uploadEndpoint)
+        //            this.sendSecureRequest(request, data)
+        //        })
+        //        .catch((error) => {
+        //            console.log(error);
+        //        })
+        // })
+        Promise.all(filePromises)
+               .then(() => {
+                   let data = {
+                       author: authorID,
+                       name: submissionName,
+                       content: files[i]
+                   }
+                   console.log(data)
+                   axiosInstance.post(uploadEndpoint, data)
+                                .then((response) => {
+                                    console.log("Submission ID: " + response.data["projId"]);
+                                    var codePage = window.open("/code");
+                                    codePage.submission = submission;
+                                    codePage.submissionName = this.state.submissionName;
+                                })
+                                .catch((error) => {
+                                    console.log(error);
+                                })
+               })
+    }
+
     handleSubmit(e) {
         e.preventDefault();
 
@@ -43,17 +121,17 @@ class Upload extends React.Component {
             return;
         }
 
-        let userID = null;                          //Preparing to get userID from session cookie
+        let userId = null;                          //Preparing to get userId from session cookie
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
         for(let i = 0; i < cookies.length; i++){    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-            if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
-                userID = cookie[1].trim();
+            if(cookie[0].trim() == "userId"){       //  If userId key exists, extract the userId value
+                userId = cookie[1].trim();
                 break;
             }
         }
 
-        if(userID === null){                        //If user has not logged in, disallow submit
+        if(userId === null){                        //If user has not logged in, disallow submit
             console.log("Not logged in");
             return;
         }
@@ -61,14 +139,15 @@ class Upload extends React.Component {
         // this.state.submissionName = this.state.files[0].name;     //Temp, 1 file uploads
         // console.log(this.state.submissionName);
 
-        this.props.upload(userID, this.state.submissionName, this.state.files).then((submission) => {
-            console.log("Submission ID: " + submission);
-            var codePage = window.open("/code");
-            codePage.submission = submission;
-            codePage.submissionName = this.state.submissionName;
-        }, (error) => {
-            console.log(error);
-        });
+        // this.props.upload(userId, this.state.submissionName, this.state.files).then((submission) => {
+        //    console.log("Submission ID: " + submission);
+        //    var codePage = window.open("/code");
+        //    codePage.submission = submission;
+        //    codePage.submissionName = this.state.submissionName;
+        // }, (error) => {
+        //    console.log(error);
+        // });
+        this.uploadFiles(userId, this.state.submissionName, this.state.files);
         
 
         document.getElementById("formFile").files = new DataTransfer().files;
@@ -88,7 +167,7 @@ class Upload extends React.Component {
 
         if(this.state.files.length === 1) return; /* Remove later for multiple files */
 
-        // if(this.writer.userID === null){
+        // if(this.writer.userId === null){
         //     console.log("Not logged in!");
         //     return;
         // }

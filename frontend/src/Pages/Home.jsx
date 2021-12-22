@@ -10,12 +10,11 @@ import { Button } from 'react-bootstrap';
 import  { Redirect } from 'react-router-dom'
 
 class Home extends React.Component {
-
     constructor(props){
         super(props);
 
         this.state = {
-            userID: this.getUserID()
+            userId: this.getUserID()
         }
 
         this.logout= this.logout.bind(this);
@@ -27,10 +26,11 @@ class Home extends React.Component {
 
     getUserID() {
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
+        console.log(cookies)
         for(let i = 0; i < cookies.length; i++){    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-            if(cookie[0].trim() == "userID"){       //  If userID key exists, extract the userID value
-                return JSON.parse(cookie[1].trim()).userId;
+            if(cookie[0].trim() == "userId"){       //  If userId key exists, extract the userId value
+                return cookie[1];
             }
         }
         return null;
@@ -45,13 +45,13 @@ class Home extends React.Component {
         }
 
         this.setState({
-            userID : null
+            userId : null
         })
     }
 
     render() {
     
-        console.log(this.state.userID);
+        console.log(this.state.userId);
 
         if(this.getUserID() === null) {
             return (<Redirect to ='/login' />);

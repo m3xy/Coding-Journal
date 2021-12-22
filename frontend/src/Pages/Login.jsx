@@ -1,5 +1,10 @@
 import React from "react";
 import { Form, Button/*, FloatingLabel*/ } from "react-bootstrap";
+import axiosInstance from "../Web/axiosInstance"
+// import cookiesInstance from '../Web/CookieHandler'
+import { history } from '../_helpers';
+
+const loginEndpoint = '/glogin'
 
 class Login extends React.Component {
 
@@ -16,10 +21,62 @@ class Login extends React.Component {
         this.handleChange = this.handleChange.bind(this);
     }
 
+    /**
+     * Method to send login credentials to the backend to be verified
+     *
+     * @param userEmail the user's email. Each email can only have one account
+     * @param userPassword the user's password as a string
+     */
+    loginUser(userEmail, userPassword, journal) {
+
+        // constructs JSON data to send to the backend
+        let data = {
+            email: userEmail,
+            password: userPassword,
+            groupNumber:journal
+        };
+
+        // TODO - Remove comments once axios alternative fully works.
+        // create a new XMLHttpRequest
+        // var request = new XMLHttpRequest()
+
+        // var response;
+
+        // get a callback when the server responds
+        // request.addEventListener('load', () => {
+            // update the state of the component with the result here
+            // console.log(request.responseText);
+            // this.userId = request.responseText;
+
+            // document.cookie = "userId=" + request.responseText + "; SameSite=Lax"; //Set a session cookie for logged in user
+            // history.push('/');
+
+            // TEMP: return response here, set the state of the login widget to be login approved
+        // })
+        // open the request and send request.
+        // request.open('POST', BACKEND_ADDRESS + loginEndpoint)
+        // this.sendSecureRequest(request, data)
+        axiosInstance.post(loginEndpoint, data)
+                     .then((response) => {
+                         console.log(response);
+                         this.userId = response.data["userId"];
+                         // cookiesInstance.set('userId', response.data["userId"], {sameSite: 'lax', path: '/'});
+                         document.cookie = "userId=" + response.data["userId"] + "; SameSite=Lax";
+                         history.push('/');
+                     })
+                     .catch((error) => {
+                         console.log(error.config)
+                         console.log(error)
+                     });
+
+        // Send request with JSON data as body.
+        // TEMP: return bool here to indicate success or failure#
+    }
+
+
     handleSubmit(e) {
         e.preventDefault();
-        this.props.login(this.state.email, this.state.password, this.state.journal);
-
+        this.loginUser(this.state.email, this.state.password, this.state.journal);
     }
 
     handleChange(e) {
@@ -51,7 +108,7 @@ class Login extends React.Component {
 
                     <Form.Group className="mb-3" controlId="journal">
                         <Form.Label>Journal</Form.Label>
-                        <Form.Select name="journal" onChange={this.handleChange} required>
+                        <Form.Select name="journal" onChange={this.handleChange} default="11" required>
                             <option value="">Select journal</option>
                             <option value="2">Journal 2</option>
                             <option value="5">Journal 5</option>
