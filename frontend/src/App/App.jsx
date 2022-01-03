@@ -14,12 +14,11 @@
 import React from 'react';
 import { Router, Route, Switch, Redirect } from 'react-router-dom';
 import { connect } from 'react-redux';
-
 import { history } from '../_helpers';
+
 import { alertActions } from '../_actions';
 // import { PrivateRoute } from '../_components';
 
-import { DataWriter } from '../backend_communication';
 import { Navigation, CommentModal, Home, Login, Register, About, Contact, Footer, Code, Upload, Profile } from '../Pages'
 
 
@@ -28,24 +27,20 @@ import { Navigation, CommentModal, Home, Login, Register, About, Contact, Footer
 // defines website constants here for ease of configuration. 
 // TEMP: could be moved to another file
 // TEMP: change constants on integration with backend
-const constants = {
-    frontend: {
-        host: 'http://localhost',
-        port: '23409' // TEMP: for now
-    },
-    backend: {
-	    host: 'http://localhost',
-        port: '3333'
-    }
-}
+// const constants = {
+    // frontend: {
+    //    host: 'http://localhost',
+    //    port: '23409' // TEMP: for now
+    // },
+    // backend: {
+	//     host: 'http://localhost',
+    //     port: '3333'
+    // }
+// }
 
 class App extends React.Component {
     constructor(props) {
         super(props);
-
-        // data writing module for communicating with the backend
-        this.writer = new DataWriter(constants.backend.host, constants.backend.port)
-
         history.listen((/*location, action*/) => {
             // clear alert on location change
             this.props.clearAlerts();
@@ -69,35 +64,23 @@ class App extends React.Component {
     }
 
     render() {
-        
         return (
-                        <Router history={history}>
-                            <Navigation />
-                            <Switch>
-                                <Route exact path="/" component={() => <Home />} />
-                                <Route path="/login" component={() => <Login 
-                                    login={(email, password, journal) => this.writer.loginUser(email, password, journal)}/>} 
-                                />
-                                <Route path="/register" component={() => <Register
-                                    register={(firstname, lastname, email, password) => this.writer.registerUser(firstname, lastname, email, password)}/>} 
-                                />
-                                <Route path="/about" exact component={() => <About />} />
-                                <Route path="/code" exact component={() => <Code
-                                     code={(file, submission) => this.writer.getCode(file, submission)}/>}
-                                />
-                                <Route path="/contact" exact component={() => <Contact />} />
-                                <Route path="/commentModal" exact component={() => <CommentModal
-                                    comment={(userID, submissionName, files, content) => this.writer.uploadComment(userID, submissionName, files, content)}/>} 
-                                    />
-                                <Route path="/upload" exact component={() => <Upload 
-                                    upload={(userID, submissionName, files) => this.writer.uploadFiles(userID, submissionName, files)}/>} />
-                                <Route path="/profile" exact component={() => <Profile
-                                    getProfile={(userID) => this.writer.getProfile(userID)}/>} />
-                                <Redirect from="*" to="/" />
-                            </Switch>
-                            <Footer />
-                        </Router>
-
+            <Router history={history}>
+                <Navigation />
+                <Switch>
+                    <Route exact path="/" component = {Home} />
+                    <Route path="/login" component = {Login} />
+                    <Route path="/register" component = {Register} />
+                    <Route path="/about" component = {About} />
+                    <Route path="/code" component = {Code} />
+                    <Route path="/contact" component = {Contact} />
+                    <Route path="/commentModal" component = {CommentModal} / >
+                    <Route path="/upload" component = {Upload} />
+                    <Route path="/profile" component = {Profile} />
+                    <Redirect from="*" to="/" />
+                </Switch>
+                <Footer />
+            </Router>
         );
     }
 }
