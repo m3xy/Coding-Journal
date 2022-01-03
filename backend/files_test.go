@@ -6,6 +6,8 @@
 // test file for files.go
 // Note that the tests are written dependency wise from top to bottom.
 // Hence if a test breaks, fix the top one first and then re-run.
+// 
+// This file depends heavily on submissions_test.go
 // ===================================================================
 
 package main
@@ -14,7 +16,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -23,6 +24,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -89,358 +92,258 @@ func clearTestEnvironment() error {
 	return nil
 }
 
-// test function to add a single file. This function is not called directly as a test, but is a utility method for other tests
-func testAddFile(file *File, submissionId int) error {
-	var submissionName string     // name of the submission as queried from the SQL db
-	var fileId int                // id of the file as returned from addFileTo()
-	var queriedFileContent string // the content of the file
-	var queriedSubmissionId int   // the id of the submission as gotten from the files table
-	var queriedFilePath string    // the file path as queried from the files table
+// tests the functionality to upload files from the backend (no use of HTTP requests in this test)
+func TestAddFile(t *testing.T) {
+	// utility function to add a single file
+	testAddFile := func(file *File, submissionId int) {
+		var submissionName string     // name of the submission as queried from the SQL db
+		var fileId int                // id of the file as returned from addFileTo()
+		var queriedFileContent string // the content of the file
+		var queriedSubmissionId int   // the id of the submission as gotten from the files table
+		var queriedFilePath string    // the file path as queried from the files table
 
-	// adds file to the already instantiated submission
-	fileId, err := addFileTo(file, submissionId)
-	if err != nil {
-		return errors.New(fmt.Sprintf("failed to add file to the given submission"))
+		// adds file to the already instantiated submission
+		fileId, err := addFileTo(file, submissionId)
+		assert.NoErrorf(t, err, "failed to add file to the given submission: %v", err)
+
+		// gets the submission name from the db
+		querySubmissionName := fmt.Sprintf(
+			SELECT_ROW,
+			getDbTag(&Submission{}, "Name"),
+			TABLE_SUBMISSIONS,
+			getDbTag(&Submission{}, "Id"),
+		)
+		// executes the query
+		row := db.QueryRow(querySubmissionName, submissionId)
+		assert.NoError(t, row.Scan(&submissionName), "Query failure on submission name")
+
+		// gets the file data from the db
+		queryFileData := fmt.Sprintf(
+			SELECT_ROW,
+			fmt.Sprintf("%s, %s", getDbTag(&File{}, "SubmissionId"), getDbTag(&File{}, "Path")),
+			TABLE_FILES,
+			getDbTag(&File{}, "Id"),
+		)
+		// executes query
+		row = db.QueryRow(queryFileData, fileId)
+		assert.NoError(t, row.Scan(&queriedSubmissionId, &queriedFilePath), "Failed to query submission name after db")
+
+		// gets the file content from the filesystem
+		filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId), submissionName, queriedFilePath)
+		fileBytes, err := ioutil.ReadFile(filePath)
+		assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err)
+		queriedFileContent = string(fileBytes)
+
+		// checks that a data file has been generated for the uploaded file
+		fileDataPath := filepath.Join(
+			TEST_FILES_DIR,
+			fmt.Sprint(submissionId),
+			DATA_DIR_NAME,
+			submissionName,
+			strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath))+".json",
+		)
+		// gets data about the file, and tests it for equality against the added file
+		_, err = os.Stat(fileDataPath)
+		assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
+		assert.Equalf(t, submissionId, queriedSubmissionId, "Submission ID mismatch: %d vs %d", submissionId, queriedSubmissionId)
+		assert.Equalf(t, file.Path, queriedFilePath, "File path mismatch:  %s vs %s", file.Path, queriedFilePath)
+		assert.Equal(t, file.Content, queriedFileContent, "file content not written to filesystem properly")
 	}
 
-	// gets the submission name from the db
-	querySubmissionName := fmt.Sprintf(
-		SELECT_ROW,
-		getDbTag(&Submission{}, "Name"),
-		TABLE_SUBMISSIONS,
-		getDbTag(&Submission{}, "Id"),
-	)
-	// executes the query
-	row := db.QueryRow(querySubmissionName, submissionId)
-	if err = row.Scan(&submissionName); err != nil {
-		return errors.New(fmt.Sprintf("Query failure on submission name: %v", err))
-	}
+	// tests that a single given valid file will be uploaded to the db and filesystem properly
+	t.Run("Upload One File", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFile := testFiles[0]
 
-	// gets the file data from the db
-	queryFileData := fmt.Sprintf(
-		SELECT_ROW,
-		fmt.Sprintf("%s, %s", getDbTag(&File{}, "SubmissionId"), getDbTag(&File{}, "Path")),
-		TABLE_FILES,
-		getDbTag(&File{}, "Id"),
-	)
-	// executes query
-	row = db.QueryRow(queryFileData, fileId)
-	if err = row.Scan(&queriedSubmissionId, &queriedFilePath); err != nil {
-		return errors.New(
-			fmt.Sprintf("Failed to query submission name after db: %v", err))
-	}
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+		submissionId, err := addSubmission(testSubmission) // adds a submission for the file to be uploaded to
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		testAddFile(testFile, submissionId)
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	})
 
-	// gets the file content from the filesystem
-	filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId), submissionName, queriedFilePath)
-	fileBytes, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return errors.New(
-			fmt.Sprintf("File read failure after added to filesystem: %v", err))
-	}
-	queriedFileContent = string(fileBytes)
+	// tests that multiple files can be successfully added to one code submission
+	t.Run("Upload Multiple Files to One Submission", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFiles := testFiles[0:2]
 
-	// checks that a data file has been generated for the uploaded file
-	fileDataPath := filepath.Join(
-		TEST_FILES_DIR,
-		fmt.Sprint(submissionId),
-		DATA_DIR_NAME,
-		submissionName,
-		strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath))+".json",
-	)
-	// gets data about the file, and tests it for equality against the added file
-	_, err = os.Stat(fileDataPath)
-	if err != nil && errors.Is(err, os.ErrNotExist) {
-		return errors.New("Data file not generated during file upload")
-	} else if submissionId != queriedSubmissionId { // Compare  test values.
-		return errors.New(fmt.Sprintf("Submission ID mismatch: %d vs %d",
-			submissionId, queriedSubmissionId))
-	} else if file.Path != queriedFilePath {
-		return errors.New(fmt.Sprintf("File path mismatch:  %s vs %s",
-			file.Path, queriedFilePath))
-	} else if file.Content != queriedFileContent {
-		return errors.New(
-			fmt.Sprintf("file content not written to filesystem properly"))
-	}
-	return nil
-}
-
-// tests that a single given valid file will be uploaded to the db and filesystem properly
-func TestAddOneFile(t *testing.T) {
-	testSubmission := testSubmissions[0]
-	testFile := testFiles[0]
-	// sets up the test environment
-	if err := initTestEnvironment(); err != nil {
-		t.Errorf("error while initializing the test environment db: %v", err)
-	}
-
-	// adds the test submission and file to the db and filesystem
-	submissionId, err := addSubmission(testSubmission)
-	if err != nil {
-		t.Errorf("Error occurred while adding test submission: %v", err)
-	} else if err = testAddFile(testFile, submissionId); err != nil {
-		t.Errorf("Error occurred while adding file: %v", err)
-	}
-
-	// tears down the test environment
-	if err = clearTestEnvironment(); err != nil {
-		t.Errorf("error while tearing down test environment: %v", err)
-	}
-}
-
-// tests that multiple files can be successfully added to one code submission
-func TestAddMultipleFiles(t *testing.T) {
-	testSubmission := testSubmissions[0]
-	testFiles := testFiles[0:2]
-
-	// sets up the test environmetn
-	if err := initTestEnvironment(); err != nil {
-		t.Errorf("error while initializing the test environment db: %v", err)
-	}
-
-	// adds a test submission to the db
-	submissionId, err := addSubmission(testSubmission)
-	if err != nil {
-		t.Errorf("Error occurred while adding test submission: %v", err)
-	}
-	// Test adding file for every file in array.
-	for _, file := range testFiles {
-		if err = testAddFile(file, submissionId); err != nil {
-			t.Errorf("Error occurred while adding file: %v", err)
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+		submissionId, err := addSubmission(testSubmission) // adds a submission for the file to be uploaded to
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		for _, testFile := range testFiles {
+			testAddFile(testFile, submissionId)
 		}
-	}
-	// clears the test environment
-	if err = clearTestEnvironment(); err != nil {
-		t.Errorf("error while tearing down test environment: %v", err)
-	}
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	})
 }
 
-// Utility function to add a comment to a given file
-func testAddComment(comment *Comment, testFile *File) error {
-	// adds a comment to the file
-	if err := addComment(comment, testFile.Id); err != nil {
-		return errors.New(fmt.Sprintf("failed to add comment to the submission: %v", err))
+// tests the ability of the backend to add comments to a given file. 
+// Test Depends On:
+// 	- TestAddSubmission (in submissions_test.go)
+// 	- TestAddFile
+func TestAddComment(t *testing.T) {
+	// Utility function to add a comment to a given file
+	testAddComment := func(comment *Comment, testFile *File) {
+		// adds a comment to the file
+		assert.NoError(t, addComment(comment, testFile.Id), "failed to add comment to the submission")
+
+		// reads the data file into a CodeDataFile struct
+		fileDataPath := filepath.Join(
+			TEST_FILES_DIR,
+			fmt.Sprint(testFile.SubmissionId),
+			DATA_DIR_NAME,
+			testFile.SubmissionName,
+			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
+		)
+		fileBytes, err := ioutil.ReadFile(fileDataPath)
+		assert.NoErrorf(t, err, "failed to read data file: %v", err)
+
+		// unmarshalls the file's meta-data to extract the added comment
+		codeData := &CodeFileData{}
+		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to unmarshal code file data")
+
+		// extracts the last comment (most recently added) from the comments and checks for equality with
+		// the passed in comment
+		addedComment := codeData.Comments[len(codeData.Comments)-1]
+		assert.Equalf(t, comment.AuthorId, addedComment.AuthorId, 
+			"Comment author ID mismatch: %s vs %s", comment.AuthorId, addedComment.AuthorId)
+		assert.Equal(t, comment.Content, addedComment.Content, "Comment content does not match")
 	}
 
-	// reads the data file into a CodeDataFile struct
-	fileDataPath := filepath.Join(
-		TEST_FILES_DIR,
-		fmt.Sprint(testFile.SubmissionId),
-		DATA_DIR_NAME,
-		testFile.SubmissionName,
-		strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
-	)
-	fileBytes, err := ioutil.ReadFile(fileDataPath)
-	if err != nil {
-		return errors.New(fmt.Sprintf("failed to read data file: %v", err))
-	}
-	codeData := &CodeFileData{}
-	err = json.Unmarshal(fileBytes, codeData)
-	if err != nil {
-		return errors.New(fmt.Sprintf("failed to unmarshal code file data: %v", err))
-	}
+	// tests adding one valid comment. Uses the testAddComment() utility method
+	t.Run("Add One Comment", func(t *testing.T) {
+		testSubmission := testSubmissions[0] // test submission to add testFile to
+		testFile := testFiles[0]             // test file to add comments to
+		testAuthor := testAuthors[0]         // test author of comment
+		testComment := testComments[0]
 
-	// extracts the last comment (most recently added) from the comments and checks for equality with
-	// the passed in comment
-	addedComment := codeData.Comments[len(codeData.Comments)-1]
-	if comment.AuthorId != addedComment.AuthorId {
-		return errors.New(fmt.Sprintf("Comment author ID mismatch: %s vs %s",
-			comment.AuthorId, addedComment.AuthorId))
-	}
-	return nil
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+
+		// adds a submission for the test file to be added to
+		submissionId, err := addSubmission(testSubmission)
+		assert.NoErrorf(t, err, "failed to add submission: %v", err)
+		testSubmission.Id = submissionId
+
+		// adds a test file to comment on
+		fileId, err := addFileTo(testFile, submissionId)
+		assert.NoErrorf(t, err, "failed to add a file to the submission: %v", err)
+		testFile.Id = fileId
+
+		// adds a test user to author a comment
+		authorId, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "failed to add user to the database: %v", err)
+		testComment.AuthorId = authorId
+
+		testAddComment(testComment, testFile)
+
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	})
 }
 
-// tests adding one valid comment. Uses the testAddComment() utility method
-func TestAddOneComment(t *testing.T) {
-	testSubmission := testSubmissions[0] // test submission to add testFile to
-	testFile := testFiles[0]             // test file to add comments to
-	testAuthor := testAuthors[0]         // test author of comment
-	testComment := testComments[0]
-
-	// initializes the test environment, returning an error if any occurs
-	if err := initTestEnvironment(); err != nil {
-		t.Errorf("error while initializing the test environment db: %v", err)
-	}
-
-	// creates a submission, adds a file to it, and adds a test user to the system
-	submissionId, err := addSubmission(testSubmission)
-	if err != nil {
-		t.Errorf("failed to add submission: %v", err)
-	}
-	fileId, err := addFileTo(testFile, submissionId)
-	if err != nil {
-		t.Errorf("failed to add a file to the submission: %v", err)
-	}
-	authorId, err := registerUser(testAuthor)
-	if err != nil {
-		t.Errorf("failed to add user to the database: %v", err)
-	}
-	testSubmission.Id = submissionId
-	testFile.Id = fileId
-	testComment.AuthorId = authorId
-
-	// adds a comment to the file and tests that it was added properly
-	if err := testAddComment(testComment, testFile); err != nil {
-		t.Errorf("error while adding comment: %v", err)
-	}
-
-	// clears the test environment
-	if err := clearTestEnvironment(); err != nil {
-		t.Errorf("error while tearing down test environment: %v", err)
-	}
-}
-
-// Tests the basic ability of the CodeFiles module to load the data from a
-// valid file path passed to it. Simple valid one code file submission
+// Tests the basic ability of the files.go code to load the data from a
+// valid file path passed to it via HTTP request
 // 
 // TODO : test whether having / in file path query param breaks the function
 // 
 // Test Depends On:
-// 	- TestCreateSubmission()
-// 	- TestAddFiles()
-func TestGetOneFile(t *testing.T) {
-	var err error
+// 	- TestAddSubmission (in submissions_test.go)
+// 	- TestAddFile
+func TestGetFile(t *testing.T) {
 
-	// Set up server to listen with the getFile() function.
-	srv := setupCORSsrv()
+	// tests getting a single valid file
+	t.Run("Get One File", func(t *testing.T) {
+		var submissionId int                 // stores submission id returned by addSubmission()
+		testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+		testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
-	// Start server.
-	go srv.ListenAndServe()
+		// Set up server and configures filesystem/db
+		srv := setupCORSsrv()
+		go srv.ListenAndServe()
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
-	var submissionId int                 // stores submission id returned by addSubmission()
-	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
-	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
+		// adds a submission to the database and filesystem
+		submissionId, err := addSubmission(testSubmission)
+		assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err)
 
-	// initializes the filesystem and db
-	if err = initTestEnvironment(); err != nil {
-		t.Errorf("Error initializing the test environment %s", err)
-	}
-	// adds a submission to the database and filesystem
-	submissionId, err = addSubmission(testSubmission)
-	if err != nil {
-		t.Errorf("Error adding submission %s: %v", testSubmission.Name, err)
-	}
-	// adds a file to the database and filesystem
-	_, err = addFileTo(testFile, submissionId)
-	if err != nil {
-		t.Errorf("Error adding file %s: %v", testFile.Name, err)
-	}
-	// sets the submission id of the added file to link it with the submission on this end (just in case. This should happen in addFileTo)
-	testFile.SubmissionId = submissionId
+		// adds a file to the database and filesystem
+		_, err = addFileTo(testFile, submissionId)
+		assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Name, err)
 
-	// builds the request url inserting query parameters
-	urlString := fmt.Sprintf("%s:%s%s?%s=%d&%s=%s", TEST_URL, TEST_SERVER_PORT, 
-		ENDPOINT_FILE, getJsonTag(&File{}, "SubmissionId"), testFile.SubmissionId, 
-		getJsonTag(&File{}, "Path"), testFile.Path)
-	req, err := http.NewRequest("GET", urlString, nil)
+		// builds the request url inserting query parameters
+		urlString := fmt.Sprintf("%s:%s%s?%s=%d&%s=%s", TEST_URL, TEST_SERVER_PORT, 
+			ENDPOINT_FILE, getJsonTag(&File{}, "SubmissionId"), testFile.SubmissionId, 
+			getJsonTag(&File{}, "Path"), testFile.Path)
+		req, err := http.NewRequest("GET", urlString, nil)
 
-	// send GET request
-	resp, err := sendSecureRequest(req, TEAM_ID)
-	if err != nil {
-		t.Errorf("Error occurred in request: %v", err)
-	}
-	defer resp.Body.Close()
-	// if an error occurred while querying, it's status code is printed here
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Error: %d", resp.StatusCode)
-	}
+		// send GET request
+		resp, err := sendSecureRequest(req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error occurred in request: %v", err)
+		defer resp.Body.Close()
+		assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode) // fails if status code is not 200
 
-	// marshals the json response into a file struct
-	file := &File{}
-	err = json.NewDecoder(resp.Body).Decode(&file)
-	if err != nil {
-		t.Error(err)
-	}
+		// marshals the json response into a file struct
+		file := &File{}
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&file), "Error decoding JSON in server response")
 
-	// tests that the file path
-	if testFile.Path != file.Path {
-		t.Errorf("File Path %d != %d", file.Id, testFile.Id)
-		// tests for submission id correctness
-	} else if testFile.SubmissionId != file.SubmissionId {
-		t.Errorf("File Submission Id %d != %d", file.SubmissionId, testFile.SubmissionId)
-		// tests if the file paths are identical
-	} else if testFile.Path != file.Path {
-		t.Errorf("File Path %s != %s", file.Path, testFile.Path)
-		// tests that the file content is correct
-	} else if testFile.Content != file.Content {
-		t.Error("File Content does not match")
-	}
+		// tests that the file was retrieved with the correct information
+		assert.Equalf(t, testFile.Path, file.Path, "Incorrect file path %d != %d", file.Id, testFile.Id)
+		assert.Equalf(t, testFile.SubmissionId, file.SubmissionId, 
+			"Incorrect file submission Id %d != %d", file.SubmissionId, testFile.SubmissionId)
+		assert.Equal(t, testFile.Content, file.Content, "File Content does not match")
 
-	// destroys the filesystem and db
-	if err = clearTestEnvironment(); err != nil {
-		t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
-	}
-
-	// Close server.
-	if err = srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
+		// clears environment
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
+	})
 }
 
-// Tests the basic ability of the CodeFiles module to upload a single file
-// code submission
+
+// Tests the ability of the files.go code to upload files to the backend
 //
 // Test Depends on:
 // 	- TestCreateSubmission()
 // 	- TestAddFile()
-func TestUploadOneFile(t *testing.T) {
-	var err error
+func TestUploadFile(t *testing.T) {
+	// uploads a single valid file
+	t.Run("Upload Single File", func(t *testing.T) {
+		// the test values added to the db and filesystem (saved here so it can be easily changed)
+		testFile := testFiles[0]
+		testAuthor := testAuthors[0]
 
-	// the test values added to the db and filesystem (saved here so it can be easily changed)
-	testFile := testFiles[0]
-	testAuthor := testAuthors[0]
+		// Set up server and configures filesystem/db
+		srv := setupCORSsrv()
+		go srv.ListenAndServe()
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
-	// Set up server to listen with the getFile() function.
-	srv := setupCORSsrv()
+		// registers test author
+		var err error
+		testAuthor.Id, err = registerUser(testAuthor)
+		assert.NoErrorf(t, err, "failed to add test author: %v", err)
 
-	// Start server.
-	go srv.ListenAndServe()
+		// formats the request body to send to the server to add a comment
+		reqBody, err := json.Marshal(map[string]string{
+			"author":                       testAuthor.Id,
+			getJsonTag(&File{}, "Name"):    testFile.Name,
+			getJsonTag(&File{}, "Content"): testFile.Content,
+		})
+		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
-	// initializes the filesystem and db
-	if err = initTestEnvironment(); err != nil {
-		t.Errorf("Error initializing the test environment %s", err)
-	}
+		// formats and executes the request
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", 
+			TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWFILE), bytes.NewBuffer(reqBody))
+		assert.NoErrorf(t, err, "Error creating request: %v", err)
+		resp, err := sendSecureRequest(req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error executing request: %v", err)
+		defer resp.Body.Close()
 
-	// registers test author
-	testAuthor.Id, err = registerUser(testAuthor)
-	if err != nil {
-		t.Errorf("failed to add test author: %v", err)
-	}
+		// TODO : maybe add more checks for correctness here??
+		// tests that the result is as desired
+		assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode)
 
-	// formats the request body to send to the server to add a comment
-	reqBody, err := json.Marshal(map[string]string{
-		"author":                       testAuthor.Id,
-		getJsonTag(&File{}, "Name"):    testFile.Name,
-		getJsonTag(&File{}, "Content"): testFile.Content,
+		// clears environment
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
 	})
-	if err != nil {
-		t.Errorf("Error formatting request body: %v", err)
-	}
-
-	// formats and executes the request
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWFILE), bytes.NewBuffer(reqBody))
-	if err != nil {
-		t.Errorf("Error creating request: %v", err)
-	}
-	resp, err := sendSecureRequest(req, TEAM_ID)
-	if err != nil {
-		t.Errorf("Error executing request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// tests that the result is as desired
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Error: %d", resp.StatusCode)
-	}
-
-	// destroys the filesystem and db
-	if err = clearTestEnvironment(); err != nil {
-		t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
-	}
-
-	// Close server.
-	if err = srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
 }
 
 // Tests the basic ability of the CodeFiles module to add a comment to a file
@@ -451,103 +354,78 @@ func TestUploadOneFile(t *testing.T) {
 // 	- TestCreateSubmission()
 // 	- TestAddFiles()
 func TestUploadUserComment(t *testing.T) {
-	var err error
+	// upload a single user comment to a valid file in a valid submission
+	t.Run("Upload Single User Comment", func(t *testing.T) {
+		// the test values added to the db and filesystem (saved here so it can be easily changed)
+		testFile := testFiles[0]
+		testSubmission := testSubmissions[0]
+		testAuthor := testAuthors[0]
+		testComment := testComments[0]
 
-	// the test values added to the db and filesystem (saved here so it can be easily changed)
-	testFile := testFiles[0]
-	testSubmission := testSubmissions[0]
-	testAuthor := testAuthors[0]
-	testComment := testComments[0]
+		// Set up server and configures filesystem/db
+		srv := setupCORSsrv()
+		go srv.ListenAndServe()
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
-	// Set up server to listen with the getFile() function.
-	srv := setupCORSsrv()
+		// adds test values to the db and filesystem
+		submissionId, err := addSubmission(testSubmission)
+		assert.NoErrorf(t, err, "error occurred while adding testSubmission: %v", err)
 
-	// Start server.
-	go srv.ListenAndServe()
+		// adds the file to the submission
+		_, err = addFileTo(testFile, submissionId)
+		assert.NoErrorf(t, err, "error occurred while adding testSubmission: %v", err)
 
-	var submissionId int // stores submission id returned by addSubmission()
+		// registers the test author for the comment
+		testAuthor.Id, err = registerUser(testAuthor)
+		assert.NoErrorf(t, err, "error occurred while adding testAuthor: %v", err)
+		testComment.AuthorId = testAuthor.Id // sets test comment author
+	
+		// formats the request body to send to the server to add a comment
+		reqBody, err := json.Marshal(map[string]interface{}{
+			getJsonTag(&File{}, "SubmissionId"): submissionId,
+			getJsonTag(&File{}, "Path"):         testFile.Path,
+			getJsonTag(&Comment{}, "AuthorId"):  testAuthor.Id,
+			getJsonTag(&Comment{}, "Content"):   testComment.Content,
+		})
+		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
+	
+		// formats and executes the request
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWCOMMENT), bytes.NewBuffer(reqBody))
+		assert.NoErrorf(t, err, "Error creating request: %v", err)
 
-	// initializes the filesystem and db
-	if err = initTestEnvironment(); err != nil {
-		t.Errorf("Error initializing the test environment %s", err)
-	}
+		// sends a request to the server to post a user comment
+		resp, err := sendSecureRequest(req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error executing request: %v", err)
+		defer resp.Body.Close()
+	
+		// tests that the result is as desired
+		assert.Equalf(t, resp.StatusCode, http.StatusOK, "HTTP request error: %d", resp.StatusCode)
+	
+		// tests that the comment was added properly
+		fileDataPath := filepath.Join(
+			TEST_FILES_DIR,
+			fmt.Sprint(testSubmission.Id),
+			DATA_DIR_NAME,
+			testSubmission.Name,
+			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
+		)
+		fileBytes, err := ioutil.ReadFile(fileDataPath)
+		assert.NoErrorf(t, err, "failed to read data file: %v", err)
 
-	// adds test values to the db and filesystem
-	submissionId, err = addSubmission(testSubmission)
-	if err != nil {
-		t.Errorf("error occurred while adding testSubmission: %v", err)
-	}
-	_, err = addFileTo(testFile, submissionId)
-	if err != nil {
-		t.Errorf("error occurred while adding testSubmission: %v", err)
-	}
-	testAuthor.Id, err = registerUser(testAuthor)
-	if err != nil {
-		t.Errorf("error occurred while adding testAuthor: %v", err)
-	}
-	testComment.AuthorId = testAuthor.Id // sets test comment author
+		// decodes the json from the file's metadata
+		codeData := &CodeFileData{}
+		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to decode file metadata")
+	
+		// extracts the last comment (most recently added) from the comments and checks for equality with
+		// the passed in comment
+		addedComment := codeData.Comments[len(codeData.Comments)-1]
+		assert.Equalf(t, testComment.AuthorId, addedComment.AuthorId, 
+			"Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
+		assert.Equalf(t, testComment.Content, addedComment.Content,
+			"Comment content mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
 
-	// formats the request body to send to the server to add a comment
-	reqBody, err := json.Marshal(map[string]interface{}{
-		getJsonTag(&File{}, "SubmissionId"): submissionId,
-		getJsonTag(&File{}, "Path"):         testFile.Path,
-		getJsonTag(&Comment{}, "AuthorId"):  testAuthor.Id,
-		getJsonTag(&Comment{}, "Content"):   testComment.Content,
+		// clears environment
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
 	})
-	if err != nil {
-		t.Errorf("Error formatting request body: %v", err)
-	}
-
-	// formats and executes the request
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWCOMMENT), bytes.NewBuffer(reqBody))
-	if err != nil {
-		t.Errorf("Error creating request: %v", err)
-	}
-	resp, err := sendSecureRequest(req, TEAM_ID)
-	if err != nil {
-		t.Errorf("Error executing request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// tests that the result is as desired
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Error: %d", resp.StatusCode)
-	}
-
-	// tests that the comment was added properly
-	fileDataPath := filepath.Join(
-		TEST_FILES_DIR,
-		fmt.Sprint(testSubmission.Id),
-		DATA_DIR_NAME,
-		testSubmission.Name,
-		strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
-	)
-	fileBytes, err := ioutil.ReadFile(fileDataPath)
-	if err != nil {
-		t.Errorf("failed to read data file: %v", err)
-	}
-	codeData := &CodeFileData{}
-	err = json.Unmarshal(fileBytes, codeData)
-	if err != nil {
-		t.Errorf("failed to unmarshal code file data: %v", err)
-	}
-
-	// extracts the last comment (most recently added) from the comments and checks for equality with
-	// the passed in comment
-	addedComment := codeData.Comments[len(codeData.Comments)-1]
-	if testComment.AuthorId != addedComment.AuthorId {
-		t.Errorf("Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
-	} else if testComment.Content != addedComment.Content {
-		t.Errorf("Comment content mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
-	}
-
-	// destroys the filesystem and db
-	if err = clearTestEnvironment(); err != nil {
-		t.Errorf("Error occurred while destroying the database and filesystem: %v", err)
-	}
-
-	// Close server.
-	if err = srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
 }

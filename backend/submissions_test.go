@@ -116,28 +116,28 @@ func TestAddSubmission(t *testing.T) {
 
 	// tests that a single valid submission can be added to the db and filesystem properly
 	t.Run("Add One Submission", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		submission := testSubmissions[0]
 		testAddSubmission(submission)
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// tests that multiple submissions can be added in a row properly
 	t.Run("Add Multiple Submissions", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		submissions := testSubmissions[0:2] // list of submissions to add to the db
 		for _, submission := range submissions {
 			testAddSubmission(submission)
 		}
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// tests that trying to add a nil submission to the db and filesystem will result in an error
 	t.Run("Add Nil Submission", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		_, err := addSubmission(nil)
 		assert.Error(t, err, "No error occurred while uploading nil submission")
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
 
@@ -168,7 +168,7 @@ func TestAddAuthor(t *testing.T) {
 
 	// tests adding one author to a valid project
 	t.Run("Adding One Author", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		// defines test submission and author to use for this test, and uploads the submission
 		testSubmission := testSubmissions[0]
 		testAuthor := testAuthors[0]
@@ -177,12 +177,12 @@ func TestAddAuthor(t *testing.T) {
 
 		// uses the utility function to add the author, and test that it was done properly
 		testAddAuthor(submissionId, testAuthor)
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// attemps to add an author without the correct permissions, if addAuthor succeeds, an error is thrown
 	t.Run("Add Invalid Author", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		testSubmission := testSubmissions[0]
 		testAuthor := testAuthors[1] // user without publisher permissions
 
@@ -195,18 +195,18 @@ func TestAddAuthor(t *testing.T) {
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
 		assert.Error(t, addAuthor(authorId, submissionId), "Author without publisher permissions registered")
 
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// tests that a user must be registered with the db before being and author
 	t.Run("Add Non-User Author", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		testSubmission := testSubmissions[0]
 		authorId := "u881jafjka" // non-user fake id
 		submissionId, err := addSubmission(testSubmission)
 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
 		assert.Error(t, addAuthor(authorId, submissionId), "Non-user added as author")
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
 
@@ -237,7 +237,7 @@ func TestAddReviewer(t *testing.T) {
 
 	// tests adding one reviewer to a valid project
 	t.Run("Adding One Reviewer", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		// defines test submission and reviewer to use for this test, and uploads the submission
 		testSubmission := testSubmissions[0]
 		testReviewer := testReviewers[0]
@@ -246,12 +246,12 @@ func TestAddReviewer(t *testing.T) {
 
 		// uses the utility function to add the reviewer, and test that it was done properly
 		testAddReviewer(submissionId, testReviewer)
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// attemps to add an reviewer without the correct permissions, if addReviewer succeeds, an error is thrown
 	t.Run("Add Invalid Reviewer", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		testSubmission := testSubmissions[0]
 		testReviewer := testReviewers[1] // user without publisher permissions
 
@@ -264,12 +264,12 @@ func TestAddReviewer(t *testing.T) {
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
 		assert.Error(t, addReviewer(reviewerId, submissionId), "Reviewer without reviewer permissions registered")
 
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// tests that a user must be registered with the db before being and reviewer
 	t.Run("Add Non-User Reviewer", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
 		testSubmission := testSubmissions[0]
 		reviewerId := "u881jafjka" // non-user fake id
@@ -277,7 +277,7 @@ func TestAddReviewer(t *testing.T) {
 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
 		assert.Error(t, addReviewer(reviewerId, submissionId), "Non-user added as reviewer")
 		
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
 
@@ -289,7 +289,7 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	// valid metadata file and format
 	t.Run("Valid Metadata", func(t *testing.T) {
 		// sets up the test environment, and uploads a test submission
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		testSubmission := testSubmissions[0]
 		submissionId, err := addSubmission(testSubmission)
 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
@@ -302,15 +302,15 @@ func TestGetSubmissionMetaData(t *testing.T) {
 			submissionData.Abstract, testSubmission.MetaData.Abstract)
 		assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
 
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 
 	// Tests that getSubmissionMetaData will throw an error if an incorrect submission ID is passed in
 	t.Run("Invalid Submission Id", func(t *testing.T) {
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		_, err := getSubmissionMetaData(400)
 		assert.Errorf(t, err, "No error was thrown for invalid submission")
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
 
@@ -324,7 +324,7 @@ func TestGetAllSubmissions(t *testing.T) {
 	// tests that multiple valid submissions can be uploaded, then retrieved from the database
 	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
 		// Set up server and test environment
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		srv := setupCORSsrv()
 		go srv.ListenAndServe()
 
@@ -352,7 +352,7 @@ func TestGetAllSubmissions(t *testing.T) {
 
 		// clears test env and shuts down the test server
 		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
 
@@ -368,7 +368,7 @@ func TestGetUserSubmissions(t *testing.T) {
 		testAuthor := testAuthors[0]          // test author of the submission being queried
 		testNonAuthor := testAuthors[3]       // test author of submission not being queried
 
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
 		// adds two test users to the db
 		authorId, err := registerUser(testAuthor)
@@ -396,7 +396,7 @@ func TestGetUserSubmissions(t *testing.T) {
 		assert.Equalf(t, submissions[testSubmission1.Id], testSubmission1.Name,
 			"Returned incorrect submission name: %s", submissions[testSubmission1.Id])
 		
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
 
@@ -416,7 +416,7 @@ func TestGetSubmission(t *testing.T) {
 		testReviewer := testReviewers[0]     // defines the reviewer of the submission	
 
 		// Set up server and test environment
-		assert.NoErrorf(t, initTestEnvironment(), "failed to initialise test environment")
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 		srv := setupCORSsrv()
 		go srv.ListenAndServe()
 
@@ -458,6 +458,6 @@ func TestGetSubmission(t *testing.T) {
 
 		// clears test env and shuts down the test server
 		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-		assert.NoErrorf(t, clearTestEnvironment(), "failed to tear down test environment")
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 	})
 }
