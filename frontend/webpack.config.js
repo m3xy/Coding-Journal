@@ -2,7 +2,7 @@ var HtmlWebpackPlugin = require('html-webpack-plugin');
 const Dotenv = require('dotenv-webpack')
 
 module.exports = {
-    mode: 'development',
+    mode: 'production',
     resolve: {
         extensions: ['.js', '.jsx']
     },
@@ -21,6 +21,11 @@ module.exports = {
                 use: 'raw-loader',
             },
         ]
+    },
+    optimization: {
+        splitChunks: {
+	    chunks: 'all',
+        },
     },
     plugins: [
         new HtmlWebpackPlugin({
