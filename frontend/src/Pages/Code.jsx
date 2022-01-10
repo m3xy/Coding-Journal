@@ -14,7 +14,7 @@ import axiosInstance from "../Web/axiosInstance";
 import { Button } from "react-bootstrap"
 // import {Helmet} from "react-helmet";
 
-const codeEndpoint = 'project/file'
+const codeEndpoint = 'submission/file'
 
 class Code extends React.Component {
     constructor(props){
@@ -22,7 +22,7 @@ class Code extends React.Component {
 
         this.state = {
             file: 'CountToFifteen.java',
-            project: 8,
+            submission: 8,
             content: 'hello',
             authorID: '11d38ba6c5-435b-11ec-bb68-320e0198aa16'
 
@@ -37,13 +37,13 @@ class Code extends React.Component {
      * Sends a POST request to the go server to register a new user
      *
      * @param file the file ID for which we wish to render the code
-     * @param project the project ID in which the file is located
+     * @param submission the submission ID in which the file is located
      */
-    getCode(file, project) {
+    getCode(file, submission) {
         // constructs JSON data to send to the backend
         let data = {
             filePath: file,
-            projectId: project
+            submissionId: submission
         };
 
         //return new Promise((resolve, reject) => {
@@ -64,16 +64,16 @@ class Code extends React.Component {
         //    this.sendSecureRequest(request, data)
         // })
         axiosInstance.post(codeEndpoint, data)
-                     .then(() => {console.log("received: " + files)})
+                     .then(() => {console.log("received: " + file)})
                      .catch((error) => {console.log(error)});
 
     }
 
     redirectToComment() {
         var commentPage = window.open('/commentModal')
-        commentPage.project = this.project 
+        commentPage.submission = this.submission 
         commentPage.file = this.file
-        console.log('project: ' + this.project)
+        console.log('submission: ' + this.submission)
         console.log('file: ' + this.file)
 
     }
@@ -81,7 +81,7 @@ class Code extends React.Component {
     componentDidMount() {
         // You can call the Prism.js API here
         setTimeout(() => Prism.highlightAll(), 0)
-        console.log(window.project);
+        console.log(window.submission);
 
         let userId = null;                          //Preparing to get userId from session cookie
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
@@ -98,12 +98,12 @@ class Code extends React.Component {
             return;
         }
 
-        // this.props.code(this.state.file, this.state.project).then((files) => {
+        // this.props.code(this.state.file, this.state.submission).then((files) => {
         //    console.log("received:" + files);
         // }, (error) => {
         //    console.log(error);
         //});
-        this.getCode(this.state.file, this.state.project);
+        this.getCode(this.state.file, this.state.submission);
 
 
         console.log("Code submitted");
@@ -111,7 +111,7 @@ class Code extends React.Component {
 
     render() {
         // const code = ''
-        // console.log('Type: ' + typeof window.project)
+        // console.log('Type: ' + typeof window.submission)
         return (
         <div className="renderCode">
             <h2 style={{textAlign: 'center',}} >Circular Queue</h2>
@@ -121,7 +121,7 @@ class Code extends React.Component {
             </Button>
             <pre className="line-numbers">
                 <code className="language-java">
-                {window.project.content}
+                {window.submission.content}
                 </code>
             </pre>
         </div>

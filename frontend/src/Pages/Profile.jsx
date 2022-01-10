@@ -30,11 +30,11 @@ function Profile() {
 	const [email, setEmail] = useState('')
 	const [phonenumber, setPhoneNumber] = useState('000000')
 	const [organization, setOrganization] = useState('None')
-	const [userProjects, setProjects] = useState('')
+	const [userSubmissions, setSubmissions] = useState('')
 
 
-    function openProject(projectID) {
-        navigate("/code/" + projectID)
+    function openSubmission(submissionsID) {
+        navigate("/code/" + submissionsID)
     }
 
 	if(getUserID() === null) {
@@ -51,7 +51,7 @@ function Profile() {
 						setEmail(response.data.email)
 						setPhoneNumber(response.data.phonenumber)
 						setOrganization(response.data.organization)
-						setProjects(response.data.projects)
+						setSubmissions(response.data.submissions)
 					})
 					.catch(() => {
 						return(<div></div>)
@@ -61,9 +61,9 @@ function Profile() {
 	//Get user comments
 	const comments = []
 	const userTypes = ["None", "Publisher", "Reviewer", "Reviewer-Publisher", "User"]
-	const projects = Object.entries(userProjects).map(([id, name]) => {
+	const submissions = Object.entries(userSubmissions).map(([id, name]) => {
 		return (
-			<ListGroup.Item as="li" key={id} action onClick={() => {openProject(id)}}>
+			<ListGroup.Item as="li" key={id} action onClick={() => {openSubmission(id)}}>
 				<label>{name}</label>
 			</ListGroup.Item>
 		);
@@ -76,8 +76,8 @@ function Profile() {
 			<br/><br/>
 			<Tabs justify defaultActiveKey="profile" id="profileTabs" className="mb-3">
 				<Tab eventKey="posts" title="Posts">
-					{projects.length > 0 ? (
-						<ListGroup>{projects}</ListGroup>
+					{submissions.length > 0 ? (
+						<ListGroup>{submissions}</ListGroup>
 					) : (
 						<div className="text-center" style={{color:"grey"}}><i>No posts</i></div>
 					)

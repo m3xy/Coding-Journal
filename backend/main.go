@@ -30,12 +30,12 @@ const (
 	ENDPOINT_LOGIN        = "/login"
 	ENDPOINT_LOGIN_GLOBAL = "/glogin"
 	ENDPOINT_SIGNUP       = "/register"
-	ENDPOINT_ALL_PROJECTS = "/projects"
-	ENDPOINT_PROJECT      = "/project"
-	ENDPOINT_FILE         = "/project/file"
+	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
+	ENDPOINT_SUBMISSION      = "/submission"
+	ENDPOINT_FILE         = "/submission/file"
 	ENDPOINT_NEWFILE      = "/upload"
 	ENDPOINT_USERINFO     = "/users"
-	ENDPOINT_NEWCOMMENT   = "/project/file/newcomment"
+	ENDPOINT_NEWCOMMENT   = "/submission/file/newcomment"
 	ENDPOINT_VALIDATE     = "/validate"
 )
 
@@ -85,9 +85,9 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_ALL_PROJECTS, getAllProjects).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_PROJECT, getProject).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_SUBMISSION, getSubmission).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
