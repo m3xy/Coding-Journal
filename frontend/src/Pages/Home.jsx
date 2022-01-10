@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { Button } from 'react-bootstrap';
-import  { Redirect } from 'react-router-dom'
+import  { Navigate } from 'react-router-dom'
 
 class Home extends React.Component {
     constructor(props){
@@ -54,7 +54,7 @@ class Home extends React.Component {
         console.log(this.state.userId);
 
         if(this.getUserID() === null) {
-            return (<Redirect to ='/login' />);
+            return (<Navigate to ='/login' replace />);
         }
 
         return (
@@ -62,7 +62,7 @@ class Home extends React.Component {
                 <br/>
                 You are logged in.
                 <br/>
-                <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
+              <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
             </div>
         );
     }

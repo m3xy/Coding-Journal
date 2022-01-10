@@ -11,7 +11,6 @@ import (
 
 	// "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 )
 
 const (
@@ -26,7 +25,6 @@ const (
 	BACKEND_ADDRESS = "http://localhost:3333"
 	PORT            = ":3333"
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
-	ENV_DIR         = "../frontend/.env"
 
 	// end points for URLs
 	ENDPOINT_LOGIN        = "/login"
@@ -41,14 +39,11 @@ const (
 	ENDPOINT_VALIDATE     = "/validate"
 )
 
-// Environment variables setter map.
-var dotenvMap map[string]string = map[string]string{}
-
 func main() {
 	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
-	dbInit(user, password, protocol, host, port, dbname)
+	dbInit(dbname)
 	setup()
 
 	done := make(chan os.Signal)
@@ -110,7 +105,7 @@ func setupCORSsrv() *http.Server {
 func setup() error {
 	// Set log file logging.
 	var err error = nil
-	file, err := os.OpenFile(LOG_FILE_PATH, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(os.Getenv("LOG_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Log file creation failure: %v! Exitting...", err)
 		goto RETURN
@@ -139,10 +134,6 @@ func setup() error {
 		log.Fatalf("FATAL - Foreign server set up error: %v\n", err)
 		goto RETURN
 	}
-
-	// Write needed environment variables to dotenv file.
-	dotenvMap[ADDRESS_KEY] = BACKEND_ADDRESS
-	err = godotenv.Write(dotenvMap, ENV_DIR)
 
 RETURN:
 	return err

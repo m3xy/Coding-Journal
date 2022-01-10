@@ -50,7 +50,7 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 
 // Initialise the database for testing.
 func testInit() {
-	dbInit(user, password, protocol, host, port, TEST_DB)
+	dbInit(TEST_DB)
 	setup()
 	if err := dbClear(); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
@@ -78,7 +78,7 @@ func sendJsonRequest(endpoint string, method string, data interface{}) (*http.Re
 
 func testAuth(t *testing.T) {
 	// Set up database.
-	dbInit(user, password, protocol, host, port, TEST_DB)
+	dbInit(TEST_DB)
 	setup()
 	if err := dbClear(); err != nil {
 		fmt.Printf("Error occured while clearing Db: %v", err)

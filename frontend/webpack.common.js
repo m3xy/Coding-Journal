@@ -10,11 +10,11 @@ module.exports = {
         rules: [
             {
                 test: /\.jsx?$/,
-                loader: 'babel-loader'
+                use: 'babel-loader'
             },
             {
                 test: /\.css/,
-                loader: 'style-loader!css-loader'
+                use: ['style-loader','css-loader']
             },
             {
                 test: /\.log$/i,
@@ -23,6 +23,7 @@ module.exports = {
         ]
     },
     optimization: {
+        runtimeChunk: true,
         splitChunks: {
 	    chunks: 'all',
         },
@@ -31,12 +32,14 @@ module.exports = {
         new HtmlWebpackPlugin({
             template: './src/index.html'
         }),
-        new Dotenv({path: './.env'})
+        new Dotenv({
+            path: '.env'
+        }),
     ],
     devServer: {
         historyApiFallback: true,
-        port: 23409,
-        injectClient: false,
+        host: '0.0.0.0',
+        port: 3000,
     },
     externals: {
         // global app config object

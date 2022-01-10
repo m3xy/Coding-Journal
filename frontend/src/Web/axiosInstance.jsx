@@ -7,9 +7,6 @@
 
 import axios from 'axios'
 
-const BACKEND_TOKEN = process.env.BACKEND_TOKEN;
-const BACKEND_ADDRESS = process.env.BACKEND_ADDRESS;
-
 // Axios instance used for making needed requests.
 const axiosInstance = axios.create({
   baseURL: process.env.BACKEND_ADDRESS,

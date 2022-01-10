@@ -1,0 +1,5 @@
+.env
+nodocker.env
+**/.git
+**/.DS_Store
+build

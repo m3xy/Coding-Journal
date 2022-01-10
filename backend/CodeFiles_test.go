@@ -92,7 +92,7 @@ var testFileData []*CodeFileData = []*CodeFileData{
 
 // Initialise and clear filesystem and database.
 func initTestEnvironment() error {
-	dbInit(user, password, protocol, host, port, TEST_DB)
+	dbInit(TEST_DB)
 	dbClear()
 	err := setup()
 	if err != nil {
