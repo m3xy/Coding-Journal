@@ -64,7 +64,7 @@ class Code extends React.Component {
         //    this.sendSecureRequest(request, data)
         // })
         axiosInstance.post(codeEndpoint, data)
-                     .then(() => {console.log("received: " + files)})
+                     .then(() => {console.log("received: " + file)})
                      .catch((error) => {console.log(error)});
 
     }

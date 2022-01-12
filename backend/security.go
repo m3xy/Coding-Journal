@@ -178,11 +178,13 @@ func tokenValidation(w http.ResponseWriter, r *http.Request) {
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
+	log.Printf("[INFO] Token validation request from %v.", r.RemoteAddr)
 	token := r.Header.Get(SECURITY_TOKEN_KEY)
 	if !validateToken(token) {
 		w.WriteHeader(http.StatusUnauthorized)
+		log.Print("[WARN] Received token is invalid.")
 	}
-	log.Printf("Token validation request sent!")
+	log.Printf("[INFO] Token validation from %v successful.", r.RemoteAddr)
 }
 
 // Add CORS headers to response.

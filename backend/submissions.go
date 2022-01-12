@@ -30,8 +30,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 // ------
@@ -48,7 +48,6 @@ import (
 // Response Body:
 //	A JSON object of form: {...<submission id>:<submission name>...}
 func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin getAllSubmissions...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
@@ -56,6 +55,7 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	log.Printf("[INFO] GetAllSubmissions request received from %v", r.RemoteAddr)
 	// gets the userId from the URL
 	var userId string
 	params := r.URL.Query()
@@ -65,25 +65,24 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 	} else {
 		userId = userIds[0]
 	}
-	
+
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
 	// uses getUserSubmissions to get all user submissions by setting authorId = *
 	submissions, err := getUserSubmissions(userId)
 	if err != nil {
-		log.Printf("error: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	// marshals and returns the map as JSON
 	jsonString, err := json.Marshal(submissions)
 	if err != nil {
-		log.Printf("error occurred while formatting response: %v\n", err)
+		log.Printf("[ERROR] JSON formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	// writes json string
-	log.Print("success\n")
+	log.Printf("[INFO] getAllSubmission request from %v successful", r.RemoteAddr)
 	w.Write(jsonString)
 }
 
@@ -109,18 +108,16 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 //				content: string
 //				replies: object (same as comments)
 func getSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin getSubmission...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
 	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		log.Print("invalid security token\n")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	// Set up writer response.
-	w.Header().Set("Content-Type", "application/json")
+	log.Printf("getSubmission request received from %v", r.RemoteAddr)
 
+	w.Header().Set("Content-Type", "application/json")
 	// gets the submission Id from the URL parameters
 	params := r.URL.Query()
 	submissionId, err := strconv.Atoi(params[getJsonTag(&Submission{}, "Id")][0])
@@ -141,37 +138,34 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 	// executes query
 	row := db.QueryRow(getSubmissionName, submissionId)
 	if err := row.Scan(&submission.Name); err != nil {
-		log.Printf("error querying the database: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		goto sqlerror
 	}
 
 	// gets submission authors, reviewers, and file paths (as relpaths from the root of the submission)
 	submission.Authors, err = getSubmissionAuthors(submissionId)
 	if err != nil {
-		log.Printf("error getting authors: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		goto sqlerror
 	}
 	submission.Reviewers, err = getSubmissionReviewers(submissionId)
 	if err != nil {
-		log.Printf("error getting reviewers: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		goto sqlerror
 	}
 	submission.FilePaths, err = getSubmissionFiles(submissionId)
 	if err != nil {
-		log.Printf("error getting submission files: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		goto sqlerror
 	}
 	submission.MetaData, err = getSubmissionMetaData(submissionId)
 	if err != nil {
-		log.Printf("error getting submission metadata: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		goto sqlerror
 	}
+	goto success
 
+sqlerror:
+	log.Printf("[ERROR] getSubmissions SQL query error: %v", err)
+	w.WriteHeader(http.StatusInternalServerError)
+	return
+
+success:
 	// writes JSON data for the submission to the HTTP connection
 	response, err := json.Marshal(submission)
 	if err != nil {
@@ -181,6 +175,7 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Print("success\n")
 	w.Write(response)
+	return
 }
 
 // Router function to import Journal submissions (submissions) from other journals
@@ -192,23 +187,21 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 // 	- 400 : if the request is badly formatted
 // 	- 500 : if something goes wrong on our end
 func importFromJournal(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin importFromJournal...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
 	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		log.Print("invalid security token\n")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	// set content type for return
-	w.Header().Set("Content-Type", "application/json")
+	log.Printf("importFromJournal request received from %v", r.RemoteAddr)
 
+	w.Header().Set("Content-Type", "application/json")
 	// parses the data into a structure
 	var importedSubmission *SupergroupSubmission
 	err := json.NewDecoder(r.Body).Decode(importedSubmission)
 	if err != nil {
-		log.Printf("error decoding submission: %v\n", err)
+		log.Printf("[ERROR] submission decoding failed: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -240,7 +233,7 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 	// adds the submission
 	submissionId, err := addSubmission(submission)
 	if err != nil {
-		log.Printf("error adding the imported proejct: %v\n", err)
+		log.Printf("[ERROR] submission import failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -257,13 +250,13 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 		}
 		_, err = addFileTo(file, submissionId)
 		if err != nil {
-			log.Printf("error adding file to the imported submission: %v\n", err)
+			log.Printf("[ERROR] file import to submission %d failed: %v", submissionId, err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}
 	// writes status OK if nothing goes wrong
-	log.Print("Success\n")
+	log.Printf("[INFO] importFromJournal request from %v successful.", r.RemoteAddr)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -448,6 +441,7 @@ func getUserSubmissions(authorId string) (map[int]string, error) {
 	stmt := fmt.Sprintf(SELECT_ROW, columns, VIEW_SUBMISSIONLIST, "userId")
 	rows, err := db.Query(stmt, authorId)
 	if err != nil {
+		log.Printf("[WARN] User does exist: %s", authorId)
 		return nil, err
 	}
 
@@ -456,12 +450,12 @@ func getUserSubmissions(authorId string) (map[int]string, error) {
 	var submissionName string
 	submissions := make(map[int]string)
 	for rows.Next() {
-		// if there is an error returned by scanning the row, the error is returned
-		// without the array
 		if err := rows.Scan(&id, &submissionName); err != nil {
 			if err == sql.ErrNoRows {
+				log.Printf("[WARN] Submission does not exist: %d", id)
 				return nil, nil
 			}
+			log.Printf("[ERROR] SQL Error on submission retrieval.")
 			return nil, err
 		}
 		submissions[id] = submissionName

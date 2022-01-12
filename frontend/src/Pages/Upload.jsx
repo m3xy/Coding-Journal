@@ -41,7 +41,7 @@ class Upload extends React.Component {
     /**
      * Sends a POST request to the go server to upload (submission) files
      *
-     * @param {JSON} userId Submnission files' Author's User ID
+     * @param {JSON} userId Submission files' Author's User ID
      * @param {Array.<File>} files Submission files
      * @returns
      */
@@ -148,7 +148,6 @@ class Upload extends React.Component {
         //    console.log(error);
         // });
         this.uploadFiles(userId, this.state.submissionName, this.state.files);
-        
 
         document.getElementById("formFile").files = new DataTransfer().files;
         document.getElementById("submissionName").value = "";

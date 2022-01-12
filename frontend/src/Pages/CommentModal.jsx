@@ -54,7 +54,7 @@ class CommentModal extends React.Component{
     };
     axiosInstance.post(commentEndpoint, data)
                  .then(() => {
-                   console.log("Received: " + files);
+                   console.log("Received: " + file);
                  })
                  .catch((error) => {
                    console.log(error)
@@ -67,6 +67,8 @@ class CommentModal extends React.Component{
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
     console.log(window.submission);
+    
+    
 
     let userID = null;                          //Preparing to get userID from session cookie
     let cookies = document.cookie.split(';');   //Split all cookies into key value pairs

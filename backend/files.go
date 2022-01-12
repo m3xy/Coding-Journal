@@ -31,9 +31,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 // file constants, includes
@@ -75,7 +75,6 @@ const (
 //				content: string
 //				replies: object (same as comments)
 func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin uploadSingleFile...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
@@ -84,6 +83,8 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	log.Printf("uploadSingleFile request received from %v", r.RemoteAddr)
+
 	w.Header().Set("Content-Type", "application/json")
 	var request map[string]interface{}
 	json.NewDecoder(r.Body).Decode(&request)
@@ -114,13 +115,13 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	// adds file to the db and filesystem
 	submissionId, err := addSubmission(wrapperSubmission)
 	if err != nil {
-		log.Printf("error while adding submission: %v\n", err)
+		log.Printf("[ERROR] Submission creation failure: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	_, err = addFileTo(file, submissionId)
 	if err != nil {
-		log.Printf("error while adding file: %v\n", err)
+		log.Printf("[ERROR] File import failure: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -129,11 +130,11 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	// writes the wraper submission as a response
 	jsonString, err := json.Marshal(wrapperSubmission)
 	if err != nil {
-		log.Printf("error while formatting response: %v\n", err)
+		log.Printf("[ERROR] JSON formatting failure: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Print("success\n")
+	log.Printf("uploadSingleFile request from %v successful.", r.RemoteAddr)
 	w.Write([]byte(jsonString))
 }
 
@@ -160,7 +161,6 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 //				content: string
 //				replies: object (same as comments)
 func getFile(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin getFile...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
@@ -169,14 +169,14 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	// Set up writer response.
+	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// gets the submission Id from the URL parameters
 	params := r.URL.Query()
 	submissionId, err := strconv.Atoi(params[getJsonTag(&File{}, "SubmissionId")][0])
 	if err != nil {
-		log.Printf("invalid submission id: %s\n", params[getJsonTag(&File{}, "SubmissionId")][0])
+		log.Printf("[ERROR] Invalid submission ID: %s", params[getJsonTag(&File{}, "SubmissionId")][0])
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -192,7 +192,7 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	)
 	row := db.QueryRow(querySubmissionName, submissionId)
 	if err = row.Scan(&submissionName); err != nil {
-		log.Printf("error querying the database: %v\n", err)
+		log.Printf("[ERROR] Database query failed: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -212,13 +212,13 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	// gets file content and comments
 	file.Content, err = getFileContent(fullFilePath)
 	if err != nil {
-		log.Printf("failed to retrieve file content: %v\n", err)
+		log.Printf("[ERROR] Failed to retrieve file content: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	file.Comments, err = getFileComments(fullDataPath)
 	if err != nil {
-		log.Printf("failed to retrieve file comments: %v\n", err)
+		log.Printf("[ERROR] Failed to retrieve file comments: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -226,11 +226,11 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	// writes JSON data for the file to the HTTP connection if no error has occured
 	response, err := json.Marshal(file)
 	if err != nil {
-		log.Printf("error formatting response: %v\n", err)
+		log.Printf("[ERROR] JSON formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Print("success\n")
+	log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
 	w.Write(response)
 }
 
@@ -244,22 +244,21 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 // 	500 : if something else goes wrong in the backend
 // Response Body: empty
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
-	log.Print("Begin uploadUserComment...")
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
 	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		log.Print("invalid security token\n")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// parses the json request body into a map
 	var request map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		log.Printf("error decoding request body: %v\n", err)
+		log.Printf("[ERROR] JSON decoding failed: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -286,18 +285,18 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	)
 	row := db.QueryRow(queryFileId, submissionId, filePath)
 	if err = row.Scan(&fileId); err != nil {
-		log.Printf("error querying database: %v\n", err)
+		log.Printf("[ERROR] Database query failed: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	// adds the comment to the file, returns code OK if successful
 	if err = addComment(comment, fileId); err != nil {
-		log.Printf("error adding comment: %v\n", err)
+		log.Printf("[ERROR] Comment creation failed: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Print("success\n")
+	log.Printf("uploadUserComment request from %v successful.", r.RemoteAddr)
 	w.WriteHeader(http.StatusOK)
 }
 
