@@ -149,7 +149,6 @@ class Upload extends React.Component {
         // });
         this.uploadFiles(userId, this.state.submissionName, this.state.files);
 
-
         document.getElementById("formFile").files = new DataTransfer().files;
         document.getElementById("submissionName").value = "";
         this.setState({
