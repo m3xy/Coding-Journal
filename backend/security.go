@@ -7,8 +7,9 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -91,8 +92,14 @@ func securityCheck() error {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Println("Server token not set! Setting up...")
-			securityToken := os.Getenv("BACKEND_TOKEN")
-			_, err := db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
+			myEnv, err := godotenv.Read("secrets.env")
+			if err != nil {
+				log.Fatal("No token has been set!")
+				return err
+			}
+
+			securityToken := myEnv["BACKEND_TOKEN"]
+			_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
 				TEAM_ID, securityToken, BACKEND_ADDRESS)
 			if err != nil {
 				log.Fatalf("Critical token failure! %v\n", err)

@@ -69,7 +69,7 @@ var testFileData []*CodeFileData = []*CodeFileData{
 func initTestEnvironment() error {
 	dbInit(TEST_DB)
 	dbClear()
-	err := setup()
+	err := setup(TEST_LOG_PATH)
 	if err != nil {
 		return err
 	}

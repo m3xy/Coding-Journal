@@ -27,16 +27,16 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
-	ENDPOINT_LOGIN        = "/login"
-	ENDPOINT_LOGIN_GLOBAL = "/glogin"
-	ENDPOINT_SIGNUP       = "/register"
+	ENDPOINT_LOGIN           = "/login"
+	ENDPOINT_LOGIN_GLOBAL    = "/glogin"
+	ENDPOINT_SIGNUP          = "/register"
 	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
 	ENDPOINT_SUBMISSION      = "/submission"
-	ENDPOINT_FILE         = "/submission/file"
-	ENDPOINT_NEWFILE      = "/upload"
-	ENDPOINT_USERINFO     = "/users"
-	ENDPOINT_NEWCOMMENT   = "/submission/file/newcomment"
-	ENDPOINT_VALIDATE     = "/validate"
+	ENDPOINT_FILE            = "/submission/file"
+	ENDPOINT_NEWFILE         = "/upload"
+	ENDPOINT_USERINFO        = "/users"
+	ENDPOINT_NEWCOMMENT      = "/submission/file/newcomment"
+	ENDPOINT_VALIDATE        = "/validate"
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 
 	// Initialise database with production credentials.
 	dbInit(dbname)
-	setup()
+	setup(os.Getenv("LOG_PATH"))
 
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -102,10 +102,10 @@ func setupCORSsrv() *http.Server {
 }
 
 // Set up the server and it's dependencies.
-func setup() error {
+func setup(logpath string) error {
 	// Set log file logging.
 	var err error = nil
-	file, err := os.OpenFile(os.Getenv("LOG_PATH"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(logpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatalf("Log file creation failure: %v! Exitting...", err)
 		goto RETURN

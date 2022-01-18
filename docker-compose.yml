@@ -20,7 +20,6 @@ services:
     environment:
       LOG_PATH: "/var/tmp/cs3099-log/cs3099-backend.log"
       DATABASE_URL: "myuser:mypass@tcp(db:3306)"
-      BACKEND_TOKEN: ${BACKEND_TOKEN}
 
   frontend:
     build: ./frontend

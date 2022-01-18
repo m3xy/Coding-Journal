@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"os"
 	"reflect"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var db *sql.DB
