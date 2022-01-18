@@ -9,7 +9,7 @@ import React from 'react'
 import  axiosInstance  from "../Web/axiosInstance";
 import {Modal, Button, InputGroup, FormControl} from "react-bootstrap";
 
-const commentEndpoint = 'project/file/newcomment' ;
+const commentEndpoint = 'submission/file/newcomment' ;
 
 
 class CommentModal extends React.Component{
@@ -41,20 +41,20 @@ class CommentModal extends React.Component{
   * Sends a POST request to the go server to uplaod a new comment
   *
   * @param file the file ID for the file on which the comment was made
-  * @param project the project ID for the project in which the file is in
+  * @param submission the submission ID for the submission in which the file is in
   * @param author the author of the comment
   * @param content the content of the comment
   */
-  uploadComment(file, project, author, content) {
+  uploadComment(file, submission, author, content) {
     let data = {
         filePath: file,
-        projectId: project,
+        submissionId: submission,
         author: author,
         content: content
     };
     axiosInstance.post(commentEndpoint, data)
                  .then(() => {
-                   console.log("Received: " + files);
+                   console.log("Received: " + file);
                  })
                  .catch((error) => {
                    console.log(error)
@@ -66,7 +66,9 @@ class CommentModal extends React.Component{
   componentDidMount() {
     // You can call the Prism.js API here
     setTimeout(() => Prism.highlightAll(), 0)
-    console.log(window.project);
+    console.log(window.submission);
+    
+    
 
     let userID = null;                          //Preparing to get userID from session cookie
     let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
