@@ -26,6 +26,6 @@ services:
     depends_on:
       - backend
     ports:
-      - "23409:3000"
+      - "23409:23409"
     environment:
       NODE_ENV: "nodocker"
