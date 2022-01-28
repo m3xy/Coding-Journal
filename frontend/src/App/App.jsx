@@ -12,9 +12,9 @@
  */
 
 import React from 'react';
-import { Router, Route, Switch, Redirect } from 'react-router-dom';
+import { BrowserRouter, Route, Routes/*, Navigate*/ } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { history } from '../_helpers';
+// import { history } from '../_helpers';
 
 import { alertActions } from '../_actions';
 // import { PrivateRoute } from '../_components';
@@ -41,10 +41,10 @@ import { Navigation, CommentModal, Home, Login, Register, About, Contact, Footer
 class App extends React.Component {
     constructor(props) {
         super(props);
-        history.listen((/*location, action*/) => {
+        // history.listen((/*location, action*/) => {
             // clear alert on location change
-            this.props.clearAlerts();
-        });
+        //     this.props.clearAlerts();
+        // });
     }
 
     componentDidMount() {
@@ -65,22 +65,22 @@ class App extends React.Component {
 
     render() {
         return (
-            <Router history={history}>
+            <BrowserRouter history={history} >
                 <Navigation />
-                <Switch>
-                    <Route exact path="/" component = {Home} />
-                    <Route path="/login" component = {Login} />
-                    <Route path="/register" component = {Register} />
-                    <Route path="/about" component = {About} />
-                    <Route path="/code" component = {Code} />
-                    <Route path="/contact" component = {Contact} />
-                    <Route path="/commentModal" component = {CommentModal} / >
-                    <Route path="/upload" component = {Upload} />
-                    <Route path="/profile" component = {Profile} />
-                    <Redirect from="*" to="/" />
-                </Switch>
+                <Routes>
+                    <Route exact path="/" element = {<Home/>} />
+                    <Route path="/login" element = {<Login />} />
+                    <Route path="/register" element = {<Register />} />
+                    <Route path="/about" element = {<About />} />
+                    <Route path="/code" element = {<Code />} />
+                    <Route path="/contact" element = {<Contact/>} />
+                    <Route path="/commentModal" element = {<CommentModal />} / >
+                    <Route path="/upload" element = {<Upload/>} />
+                    <Route path="/profile" element = {<Profile/>} />
+                    {/*<Route path="*" element={<Navigate to='/' replace />} />*/}
+                </Routes>
                 <Footer />
-            </Router>
+            </ BrowserRouter>
         );
     }
 }
