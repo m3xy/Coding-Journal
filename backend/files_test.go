@@ -41,26 +41,26 @@ const (
 
 var testFiles []*File = []*File{
 	{Id: -1, SubmissionId: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
-		Name: "testFile1.txt", Content: "hello world", Comments: nil},
+		Name: "testFile1.txt", Base64Value: "hello world", MetaData: nil},
 	{Id: -1, SubmissionId: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
-		Name: "testFile2.txt", Content: "hello world", Comments: nil},
+		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
 }
 
 var testComments []*Comment = []*Comment{
 	{
 		AuthorId: "",
 		Time:     fmt.Sprint(time.Now()),
-		Content:  "Hello World",
+		Base64Value:  "Hello World",
 		Replies:  []*Comment{},
 	},
 	{
 		AuthorId: "",
 		Time:     fmt.Sprint(time.Now()),
-		Content:  "Goodbye World",
+		Base64Value:  "Goodbye World",
 		Replies:  []*Comment{},
 	},
 }
-var testFileData []*CodeFileData = []*CodeFileData{
+var testFileData []*FileData = []*FileData{
 	{Comments: testComments},
 }
 
@@ -68,8 +68,11 @@ var testFileData []*CodeFileData = []*CodeFileData{
 // Initialise and clear filesystem and database.
 func initTestEnvironment() error {
 	dbInit(user, password, protocol, host, port, TEST_DB)
-	dbClear()
-	err := setup()
+	err := dbClear()
+	if err != nil {
+		return err
+	}
+	err = setup()
 	if err != nil {
 		return err
 	}
@@ -147,7 +150,7 @@ func TestAddFile(t *testing.T) {
 		assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
 		assert.Equalf(t, submissionId, queriedSubmissionId, "Submission ID mismatch: %d vs %d", submissionId, queriedSubmissionId)
 		assert.Equalf(t, file.Path, queriedFilePath, "File path mismatch:  %s vs %s", file.Path, queriedFilePath)
-		assert.Equal(t, file.Content, queriedFileContent, "file content not written to filesystem properly")
+		assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly")
 	}
 
 	// tests that a single given valid file will be uploaded to the db and filesystem properly
@@ -156,6 +159,8 @@ func TestAddFile(t *testing.T) {
 		testFile := testFiles[0]
 
 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+		testSubmission.Authors = registerUsers(t, testAuthors[:1])
+		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
 		submissionId, err := addSubmission(testSubmission) // adds a submission for the file to be uploaded to
 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
 		testAddFile(testFile, submissionId)
@@ -168,6 +173,8 @@ func TestAddFile(t *testing.T) {
 		testFiles := testFiles[0:2]
 
 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+		testSubmission.Authors = registerUsers(t, testAuthors[:1])
+		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
 		submissionId, err := addSubmission(testSubmission) // adds a submission for the file to be uploaded to
 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
 		for _, testFile := range testFiles {
@@ -199,7 +206,7 @@ func TestAddComment(t *testing.T) {
 		assert.NoErrorf(t, err, "failed to read data file: %v", err)
 
 		// unmarshalls the file's meta-data to extract the added comment
-		codeData := &CodeFileData{}
+		codeData := &FileData{}
 		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to unmarshal code file data")
 
 		// extracts the last comment (most recently added) from the comments and checks for equality with
@@ -207,19 +214,21 @@ func TestAddComment(t *testing.T) {
 		addedComment := codeData.Comments[len(codeData.Comments)-1]
 		assert.Equalf(t, comment.AuthorId, addedComment.AuthorId, 
 			"Comment author ID mismatch: %s vs %s", comment.AuthorId, addedComment.AuthorId)
-		assert.Equal(t, comment.Content, addedComment.Content, "Comment content does not match")
+		assert.Equal(t, comment.Base64Value, addedComment.Base64Value, "Comment content does not match")
 	}
 
 	// tests adding one valid comment. Uses the testAddComment() utility method
 	t.Run("Add One Comment", func(t *testing.T) {
 		testSubmission := testSubmissions[0] // test submission to add testFile to
 		testFile := testFiles[0]             // test file to add comments to
-		testAuthor := testAuthors[0]         // test author of comment
+		testAuthor := testAuthors[1]         // test author of comment
 		testComment := testComments[0]
 
 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
 		// adds a submission for the test file to be added to
+		testSubmission.Authors = registerUsers(t, testAuthors[3:4])
+		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
 		submissionId, err := addSubmission(testSubmission)
 		assert.NoErrorf(t, err, "failed to add submission: %v", err)
 		testSubmission.Id = submissionId
@@ -249,7 +258,6 @@ func TestAddComment(t *testing.T) {
 // 	- TestAddSubmission (in submissions_test.go)
 // 	- TestAddFile
 func TestGetFile(t *testing.T) {
-
 	// tests getting a single valid file
 	t.Run("Get One File", func(t *testing.T) {
 		var submissionId int                 // stores submission id returned by addSubmission()
@@ -262,6 +270,8 @@ func TestGetFile(t *testing.T) {
 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
 		// adds a submission to the database and filesystem
+		testSubmission.Authors = registerUsers(t, testAuthors[:1])
+		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
 		submissionId, err := addSubmission(testSubmission)
 		assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err)
 
@@ -289,7 +299,7 @@ func TestGetFile(t *testing.T) {
 		assert.Equalf(t, testFile.Path, file.Path, "Incorrect file path %d != %d", file.Id, testFile.Id)
 		assert.Equalf(t, testFile.SubmissionId, file.SubmissionId, 
 			"Incorrect file submission Id %d != %d", file.SubmissionId, testFile.SubmissionId)
-		assert.Equal(t, testFile.Content, file.Content, "File Content does not match")
+		assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match")
 
 		// clears environment
 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
@@ -324,7 +334,7 @@ func TestUploadFile(t *testing.T) {
 		reqBody, err := json.Marshal(map[string]string{
 			"author":                       testAuthor.Id,
 			getJsonTag(&File{}, "Name"):    testFile.Name,
-			getJsonTag(&File{}, "Content"): testFile.Content,
+			getJsonTag(&File{}, "Base64Value"): testFile.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
@@ -368,6 +378,8 @@ func TestUploadUserComment(t *testing.T) {
 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
 		// adds test values to the db and filesystem
+		testSubmission.Authors = registerUsers(t, testAuthors[3:4])
+		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
 		submissionId, err := addSubmission(testSubmission)
 		assert.NoErrorf(t, err, "error occurred while adding testSubmission: %v", err)
 
@@ -382,10 +394,10 @@ func TestUploadUserComment(t *testing.T) {
 	
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(map[string]interface{}{
-			getJsonTag(&File{}, "SubmissionId"): submissionId,
-			getJsonTag(&File{}, "Path"):         testFile.Path,
-			getJsonTag(&Comment{}, "AuthorId"):  testAuthor.Id,
-			getJsonTag(&Comment{}, "Content"):   testComment.Content,
+			getJsonTag(&File{}, "SubmissionId"):	submissionId,
+			getJsonTag(&File{}, "Path"):			testFile.Path,
+			getJsonTag(&Comment{}, "AuthorId"):		testAuthor.Id,
+			getJsonTag(&Comment{}, "Base64Value"):	testComment.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 	
@@ -413,7 +425,7 @@ func TestUploadUserComment(t *testing.T) {
 		assert.NoErrorf(t, err, "failed to read data file: %v", err)
 
 		// decodes the json from the file's metadata
-		codeData := &CodeFileData{}
+		codeData := &FileData{}
 		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to decode file metadata")
 	
 		// extracts the last comment (most recently added) from the comments and checks for equality with
@@ -421,7 +433,7 @@ func TestUploadUserComment(t *testing.T) {
 		addedComment := codeData.Comments[len(codeData.Comments)-1]
 		assert.Equalf(t, testComment.AuthorId, addedComment.AuthorId, 
 			"Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
-		assert.Equalf(t, testComment.Content, addedComment.Content,
+		assert.Equalf(t, testComment.Base64Value, addedComment.Base64Value,
 			"Comment content mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
 
 		// clears environment

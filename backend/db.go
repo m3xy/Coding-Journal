@@ -39,10 +39,11 @@ const (
 	SELECT_ROW_INNER_JOIN    = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"
 	SELECT_ROW_ORDER_BY      = "SELECT %s FROM %s ORDER BY ? WHERE %s = ?"
 	INSERT_CRED              = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_PROJ              = "INSERT INTO %s (%s) VALUES (?) RETURNING id"
+	INSERT_SUBMISSION		 = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
 	INSERT_FILE              = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
 	INSERT_AUTHOR            = "INSERT INTO %s VALUES (?, ?)"
 	INSERT_REVIEWER          = "INSERT INTO %s VALUES (?, ?)"
+	INSERT_CATEGORIES		 = "INSERT INTO %s VALUES (?, ?)"
 	INSERT_FULL              = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
 	UPDATE_ROWS              = "UPDATE %s SET %s = ? WHERE %s = ?"
 	DELETE_ALL_ROWS          = "DELETE FROM %s"
@@ -90,14 +91,52 @@ type Submission struct {
 	Id int `json:"id" db:"id"`
 	// name of the submission
 	Name string `json:"name" db:"submissionName"`
+	// date the code submission was created
+	CreationDate string `json:"creationDate" db:"creationDate"`
+	// license which the code is published under
+	License string `json:"license" db:"license"`
 	// the ids of the submission's reviewers
 	Reviewers []string `json:"reviewers"`
 	// the ids of the submission's authors
 	Authors []string `json:"authors"`
-	// file paths associated with the submission
+	// relative paths of the files from the root of the submission 
 	FilePaths []string `json:"files" db:"filePath"`
+	// tags for organizing/grouping code submissions
+	Categories []string `json:"categories" db:"tag"`
 	// metadata about the submission
-	MetaData *CodeSubmissionData `json:"metadata"`
+	MetaData *SubmissionData `json:"metadata"`
+}
+
+// Supergroup compliant code submissions
+type SupergroupSubmission struct {
+	// name of the submission
+	Name string `json:"name"`
+	// metadata about the submission
+	MetaData *SupergroupSubmissionData `json:"metadata"`
+	// file objects which are members of the submission
+	Files []*SupergroupFile `json:"files"`
+}
+
+// structure for meta-data of the submission. matches the structure of the submission's JSON data file
+type SubmissionData struct {
+	// abstract for the submission, to be displayed upon opening of any given submission
+	Abstract string `json:"abstract"`
+	// reviewer comments on the overall submission
+	Reviews []*Comment `json:"reviews"`
+}
+
+// supergroup compliant structure for meta-data of the submission
+type SupergroupSubmissionData struct {
+	// date the code submission was created
+	CreationDate string `json:"creationDate"`
+	// names of the authors listed on the submission
+	AuthorNames []string `json:"authorNames"`
+	// tags for organizing/grouping code submissions
+	Categories []string `json:"categories"`
+	// abstract for the submission, to be displayed upon opening of any given submission
+	Abstract string `json:"abstract"`
+	// license which the code is published under
+	License string `json:"license"`
 }
 
 // Structure for code files
@@ -111,11 +150,26 @@ type File struct {
 	// relative path to the file from the root of the submission's file structure
 	Path string `json:"filePath" db:"filePath"`
 	// base name of the file with extension
-	Name string `json:"name"`
+	Name string `json:"filename"`
 	// content of the file encoded as a Base64 string
-	Content string `json:"content"`
-	// user comments on the file
-	Comments []*Comment `json:"comments"` // TODO: adapt this to be a metadata object not directly storing comments
+	Base64Value string `json:"base64Value"`
+	// structure to hold the data from the file's metadata file
+	MetaData *FileData `json:"metadata"`
+}
+
+// Supergroup compliant file structure
+type SupergroupFile struct {
+	// name of the file as a string
+	Name string `json:"filename"`
+	// file content as a base64 encoded string
+	Base64Value string `json: "base64Value"`
+}
+
+// structure to hold json data from data files
+// no DB tags here as this data is stored in a file, not in the db
+type FileData struct {
+	// stores comments for the given code file
+	Comments []*Comment `json:"comments"`
 }
 
 // Structure for user comments on code
@@ -125,7 +179,7 @@ type Comment struct {
 	// time that the comment was recorded as a string 
 	Time string `json:"time"`
 	// content of the comment as a string
-	Content string `json:"content"`
+	Base64Value string `json:"base64Value"`
 	// replies TEMP: maybe don't allow nested replies?
 	Replies []*Comment `json:"replies"`
 }
@@ -136,41 +190,10 @@ type AuthorsReviewers struct {
 	Id string `json:"id" db:"userId"`
 }
 
-// structure for meta-data of the submission. matches the structure of the submission's JSON data file
-type CodeSubmissionData struct {
-	// abstract for the submission, to be displayed upon opening of any given submission
-	Abstract string `json:"abstract"`
-	// reviewer comments on the overall submission
-	Reviews []*Comment `json:"reviews"`
-}
-
-// structure to hold json data from data files
-type CodeFileData struct {
-	// TEMP: add IsReviewed field
-	Comments []*Comment `json:"comments"`
-}
-
-// structure to hold supergroup compliant submission metadata
-type SupergroupSubmissionMetaData struct {
-	// creation date of the submission
-	CreationDate string `json:"creationDate"`
-	// author name
-	AuthorName string `json:"authorName"`
-}
-
-type SuperGroupFile struct {
-	Name string `json:"filename"`
-	Content string `json:"base64Value"`
-}
-
-// structure to hold formatted supergroup submissions
-type SupergroupSubmission struct {
-	// name of the submission
-	Name string `json:"name"`
-	// metadata about the submission
-	Metadata *SupergroupSubmissionMetaData `json:"metadata"`
-	// files array
-	Files []*SuperGroupFile `json:"files"`
+// structure for categories
+type Categories struct {
+	SubmissionId int `db:"submissionId"`
+	Tag string `db:"tag"`
 }
 
 
@@ -259,15 +282,15 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 // WARNING: this function clears all data from the database, setting it
 // back to the state it'd be in 
 func dbClear() error {
-	// db tables to clear ORDER MATTERS HERE
+	// db tables to clear ORDER MATTERS HERE DUE TO KEY CONSTRAINTS
 	tablesToClear := []string{
-		TABLE_CATEGORIES,
 		TABLE_AUTHORS,
 		TABLE_REVIEWERS,
-		TABLE_FILES,
-		TABLE_SUBMISSIONS,
 		TABLE_IDMAPPINGS,
 		TABLE_USERS,
+		TABLE_CATEGORIES,
+		TABLE_FILES,
+		TABLE_SUBMISSIONS,
 	}
 	// formats and executes a delete command for each table
 	for _, table := range tablesToClear {

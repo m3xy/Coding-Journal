@@ -3,6 +3,11 @@
 // Authors: 190010425
 // Created: November 18, 2021
 //
+// TODO: write functionality for popularity statistics and an ordering algorithm
+// for suggested submissions
+// TODO: make sure the creation date for the submissions is written to the db
+// TODO: Change router function doc comments
+//
 // This file handles the reading/writing of all submissions (just the submission
 // with its data, not the files themselves)
 //
@@ -31,7 +36,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 // ------
@@ -82,11 +86,12 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// writes json string
-	log.Printf("[INFO] getAllSubmission request from %v successful", r.RemoteAddr)
+	log.Printf("[INFO] GetAllSubmission request from %v successful", r.RemoteAddr)
 	w.Write(jsonString)
 }
 
-// Get submission for display on frontend. ID included for file and comment queries.
+// Send submission data to the frontend for display. ID included for file
+// and comment queries.
 //
 // Response Codes:
 //	200 : if the submission exists and the request succeeded
@@ -105,9 +110,9 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 // 			reviews: array of objects
 // 				author: int
 //				time: datetime string
-//				content: string
+//				base64Value: string
 //				replies: object (same as comments)
-func getSubmission(w http.ResponseWriter, r *http.Request) {
+func sendSubmission(w http.ResponseWriter, r *http.Request) {
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
 		return
 	}
@@ -126,138 +131,25 @@ func getSubmission(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	// creates a submission with the given ID
-	submission := &Submission{Id: submissionId}
 
-	// statement to query submission name
-	getSubmissionName := fmt.Sprintf(SELECT_ROW,
-		getDbTag(&Submission{}, "Name"),
-		TABLE_SUBMISSIONS,
-		getDbTag(&Submission{}, "Id"),
-	)
-	// executes query
-	row := db.QueryRow(getSubmissionName, submissionId)
-	if err := row.Scan(&submission.Name); err != nil {
-		goto sqlerror
-	}
-
-	// gets submission authors, reviewers, and file paths (as relpaths from the root of the submission)
-	submission.Authors, err = getSubmissionAuthors(submissionId)
+	// gets the submission struct
+	submission, err := getSubmission(submissionId)
 	if err != nil {
-		goto sqlerror
-	}
-	submission.Reviewers, err = getSubmissionReviewers(submissionId)
-	if err != nil {
-		goto sqlerror
-	}
-	submission.FilePaths, err = getSubmissionFiles(submissionId)
-	if err != nil {
-		goto sqlerror
-	}
-	submission.MetaData, err = getSubmissionMetaData(submissionId)
-	if err != nil {
-		goto sqlerror
-	}
-	goto success
-
-sqlerror:
-	log.Printf("[ERROR] getSubmissions SQL query error: %v", err)
-	w.WriteHeader(http.StatusInternalServerError)
-	return
-
-success:
-	// writes JSON data for the submission to the HTTP connection
-	response, err := json.Marshal(submission)
-	if err != nil {
-		log.Printf("error formatting response: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	log.Print("success\n")
-	w.Write(response)
-	return
-}
-
-// Router function to import Journal submissions (submissions) from other journals
-//
-// TODO: fix this function
-//
-// Responses:
-// 	- 200 : if the action completed successfully
-// 	- 400 : if the request is badly formatted
-// 	- 500 : if something goes wrong on our end
-func importFromJournal(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	log.Printf("importFromJournal request received from %v", r.RemoteAddr)
-
-	w.Header().Set("Content-Type", "application/json")
-	// parses the data into a structure
-	var importedSubmission *SupergroupSubmission
-	err := json.NewDecoder(r.Body).Decode(importedSubmission)
-	if err != nil {
-		log.Printf("[ERROR] submission decoding failed: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// moves the data from the structure into a locally compliant format
-	// don't receive user email, so it creates a fake one
-	authorEmail := fmt.Sprintf("%s@email.com",
-		strings.Replace(importedSubmission.Metadata.AuthorName, " ", "_", 4))
-	author := &Credentials{
-		Fname:    strings.Split(importedSubmission.Metadata.AuthorName, " ")[0],
-		Lname:    strings.Split(importedSubmission.Metadata.AuthorName, " ")[1],
-		Email:    authorEmail,
-		Pw:       "password", // defaults to password here as we have no way of identifying users
-		Usertype: USERTYPE_PUBLISHER,
-	}
-	authorId, err := registerUser(author)
-	// formats the data in a submission
-	submission := &Submission{
-		Name:      strings.Replace(importedSubmission.Name, " ", "_", 10), // default is 10 spaces to replace
-		Reviewers: []string{},
-		Authors:   []string{authorId},
-		FilePaths: []string{},
-		MetaData: &CodeSubmissionData{ // TODO figure this out
-			Abstract: "",
-			Reviews:  []*Comment{},
-		},
-	}
-
-	// adds the submission
-	submissionId, err := addSubmission(submission)
-	if err != nil {
-		log.Printf("[ERROR] submission import failed: %v", err)
+		log.Printf("[ERROR] could not retrieve submission data properly: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	submission.Id = submissionId
 
-	// adds the file
-	for _, submissionFile := range importedSubmission.Files {
-		file := &File{
-			SubmissionId:   submissionId,
-			SubmissionName: importedSubmission.Name,
-			Name:           submissionFile.Name,
-			Path:           submissionFile.Name,
-			Content:        submissionFile.Content,
-		}
-		_, err = addFileTo(file, submissionId)
-		if err != nil {
-			log.Printf("[ERROR] file import to submission %d failed: %v", submissionId, err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	// writes JSON data for the submission to the HTTP connection
+	response, err := json.Marshal(submission)
+	if err != nil {
+		log.Printf("[ERROR] error formatting response: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
-	// writes status OK if nothing goes wrong
-	log.Printf("[INFO] importFromJournal request from %v successful.", r.RemoteAddr)
-	w.WriteHeader(http.StatusOK)
+	log.Print("[INFO] success\n")
+	w.Write(response)
+	return
 }
 
 // ------
@@ -265,9 +157,10 @@ func importFromJournal(w http.ResponseWriter, r *http.Request) {
 // ------
 
 // Add submission to filesystem and database.
-// Note: submission ID is set by this function.
+// Note: submission.Id is set by this function.
 // Params:
-//	submission (*Submission) : the submission to be added to the db (all fields but Id MUST be set)
+//	submission (*Submission) : the submission to be added to the db 
+// 		(all fields but Id MUST be set)
 // Returns:
 //	(int) : the id of the added submission
 //	(error) : if the operation fails
@@ -277,10 +170,11 @@ func addSubmission(submission *Submission) (int, error) {
 		return 0, errors.New("Submission cannot be nil")
 	} else if submission.Name == "" {
 		return 0, errors.New("Submission.Name must be set to a valid string")
-	} else if submission.Authors == nil {
-		return 0, errors.New("Authors array cannot be nil")
+	} else if submission.Authors == nil || len(submission.Authors) == 0 {
+		return 0, errors.New("Authors array cannot be nil or length 0")
+	// TODO: potentially make it so there must be at least 1 reviewer per submission
 	} else if submission.Reviewers == nil {
-		return 0, errors.New("Reviewers array cannot be nil")
+		return 0, errors.New("Reviewers array cannot be nil or length 0")
 	}
 
 	// declares return values
@@ -289,14 +183,14 @@ func addSubmission(submission *Submission) (int, error) {
 
 	// formats query to insert the submission into the db
 	insertSubmission := fmt.Sprintf(
-		INSERT_PROJ, TABLE_SUBMISSIONS,
-		getDbTag(&Submission{}, "Name"))
+		INSERT_SUBMISSION,
+		TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Name"),
+		getDbTag(&Submission{}, "License"),
+	)
 
 	// executes the query and gets the submission id
-	row := db.QueryRow(insertSubmission, submission.Name)
-	if row.Err() != nil {
-		return 0, row.Err()
-	}
+	row := db.QueryRow(insertSubmission, submission.Name, submission.License)
 	// gets the id from the inserted submission
 	if err = row.Scan(&submissionId); err != nil {
 		return 0, err
@@ -314,8 +208,14 @@ func addSubmission(submission *Submission) (int, error) {
 			return 0, err
 		}
 	}
+	// adds the submission tags to the categories table
+	for _, tag := range submission.Categories {
+		if err = addTag(tag, submissionId); err != nil {
+			return 0, err
+		}
+	}
 
-	// adds a submission to the filesystem
+	// creates the directories to hold the submission in the filesystem
 	submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), submission.Name)
 	submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submission.Name)
 	if err = os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
@@ -325,7 +225,7 @@ func addSubmission(submission *Submission) (int, error) {
 		return 0, err
 	}
 
-	// inserts the submission's metadata into the filesystem
+	// writes the submission metadata to it's corresponding file
 	dataFile, err := os.OpenFile(
 		submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
@@ -376,13 +276,10 @@ func addAuthor(authorId string, submissionId int) error {
 
 	// checks permissions, and if they are correct, the author is added
 	if permissions == USERTYPE_PUBLISHER || permissions == USERTYPE_REVIEWER_PUBLISHER {
-		_, err := db.Query(
-			fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), submissionId, authorId)
+		_, err := db.Query(fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), submissionId, authorId)
 		return err
-	} else {
-		return errors.New("User must be authorized as Publisher " +
-			"to be listed as submission Author" + fmt.Sprint(permissions))
 	}
+	return errors.New("User must be authorized as an author")
 }
 
 // Add a user to a submission as a reviewer
@@ -406,23 +303,60 @@ func addReviewer(reviewerId string, submissionId int) error {
 		VIEW_PERMISSIONS,
 		getDbTag(&IdMappings{}, "GlobalId"),
 	)
-	// executes the query, only returning one row
-	row := db.QueryRow(queryUserType, reviewerId)
-	if row.Err() != nil {
-		return row.Err()
-	}
 	// gets the user's permissions
+	row := db.QueryRow(queryUserType, reviewerId)
 	if err := row.Scan(&permissions); err != nil {
 		return err
 	}
 
 	// checks permissions, and if they are correct, the reviewer is added
-	if permissions != USERTYPE_REVIEWER && permissions != USERTYPE_REVIEWER_PUBLISHER {
-		return errors.New("User must be authorized as a Reviewer")
-	} else {
+	if permissions == USERTYPE_REVIEWER || permissions == USERTYPE_REVIEWER_PUBLISHER {
 		_, err = db.Query(fmt.Sprintf(INSERT_REVIEWER, TABLE_REVIEWERS), submissionId, reviewerId)
 		return err
 	}
+	return errors.New("User must be authorized as a Reviewer")
+}
+
+// function to add tags for a given submission
+//
+// Parameters:
+// 	submissionId (int) : the unique Id of the submission to add tags to
+// 	tag (string) : the tag to add to the submission
+// Returns:
+// 	(error) : an error if one occurs, nil otherwise
+func addTag(tag string, submissionId int) (error) {
+	if tag == "" {
+		return fmt.Errorf("Tag cannot be empty") // TODO: figure out if this should err or just log
+	}
+
+	// makes sure the given tag does not already exist for the given project
+	queryTag := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&Categories{}, "Tag"),
+		TABLE_CATEGORIES,
+		getDbTag(&Categories{}, "SubmissionId"),
+	)
+	// queries the db for the given submissions tags, and checks if they match the new tag
+	rows, err := db.Query(queryTag, submissionId)
+	var currTag string
+	for rows.Next() {
+		err = rows.Scan(&currTag)
+		if err != nil {
+			log.Printf("[ERROR] %v", err)
+			return err
+		}
+		if currTag == tag {
+			log.Print("[WARN] Tag already exists as specified")
+			return errors.New("Tag already exists as specified")
+		}
+	}
+
+	// adds the tag
+	rows, err = db.Query(fmt.Sprintf(INSERT_CATEGORIES, TABLE_CATEGORIES), submissionId, tag)
+	if rows != nil {
+		rows.Close()
+	}
+	return err
 }
 
 // gets all authors which are written by a given user and returns them
@@ -434,11 +368,13 @@ func addReviewer(reviewerId string, submissionId int) error {
 // 	(error) : an error if something goes wrong, nil otherwise
 func getUserSubmissions(authorId string) (map[int]string, error) {
 	// queries the database for the submission ID and name pairs
-	columns := fmt.Sprintf("%s, %s",
-		getDbTag(&AuthorsReviewers{}, "SubmissionId"),
+	stmt := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&AuthorsReviewers{}, "SubmissionId")+", "+
 		getDbTag(&Submission{}, "Name"),
+		VIEW_SUBMISSIONLIST, 
+		"userId",
 	)
-	stmt := fmt.Sprintf(SELECT_ROW, columns, VIEW_SUBMISSIONLIST, "userId")
 	rows, err := db.Query(stmt, authorId)
 	if err != nil {
 		log.Printf("[WARN] User does exist: %s", authorId)
@@ -463,13 +399,66 @@ func getUserSubmissions(authorId string) (map[int]string, error) {
 	return submissions, nil
 }
 
+// Get the submission struct corresponding to the id by querying the db and reading
+// the submissions meta-data file
+//
+// Parameters:
+// 	submissionId (int) : the submission's unique id
+// Returns:
+// 	(*Submission) : the data of the submission
+// 	(error) : an error if one occurs
+func getSubmission(submissionId int) (*Submission, error) {
+	submission := &Submission{ Id: submissionId }
+
+	// gets the submission name, creation date, and license
+	querySubmissionData := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&Submission{}, "Name")+", "+
+		getDbTag(&Submission{}, "CreationDate")+", "+
+		getDbTag(&Submission{}, "License"),
+		TABLE_SUBMISSIONS,
+		getDbTag(&Submission{}, "Id"),
+	)
+	row := db.QueryRow(querySubmissionData, submissionId)
+	err := row.Scan(&submission.Name,
+		&submission.CreationDate, &submission.License)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("No submission exists with ID: %d", submissionId)
+	} else if err != nil {
+		return nil, err
+	}
+
+	// gets the data which is not stored in the submissions table of the database
+	submission.Authors, err = getSubmissionAuthors(submissionId)
+	if err != nil {
+		return nil, err
+	}
+	submission.Reviewers, err = getSubmissionReviewers(submissionId)
+	if err != nil {
+		return nil, err
+	}
+	submission.Categories, err = getSubmissionCategories(submissionId)
+	if err != nil {
+		return nil, err
+	}
+	submission.FilePaths, err = getSubmissionFilePaths(submissionId)
+	if err != nil {
+		return nil, err
+	}
+	submission.MetaData, err = getSubmissionMetaData(submissionId)
+	if err != nil {
+		return nil, err
+	}
+	return submission, nil
+}
+
 // Query the authors of a given submission from the database
 //
 // Params:
 //	submissionId (int) : the id of the submission to get authors of
 // Returns:
-//	[]string of the author's names
-//	error if something goes wrong during the query
+//	([]string) : of the author's names
+//	(error) : if something goes wrong during the query
 func getSubmissionAuthors(submissionId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(
@@ -503,7 +492,7 @@ func getSubmissionAuthors(submissionId int) ([]string, error) {
 // Params:
 //	submissionId (int) : the id of the submission to get reviewers of
 // Returns:
-//	([]int) : of the reviewer's names
+//	([]string) : of the reviewer's Ids
 //	(error) : if something goes wrong during the query
 func getSubmissionReviewers(submissionId int) ([]string, error) {
 	// builds the query
@@ -533,15 +522,47 @@ func getSubmissionReviewers(submissionId int) ([]string, error) {
 	return reviewers, nil
 }
 
+// Queries the database for categories (tags) associated with the given
+// submission
+//
+// Parameters:
+// 	submissionId (int) : the submission to get the categories for
+// Returns:
+// 	([]string) : an array of the tags associated with the given submission
+// 	(error) : an error if one occurs while retrieving the tags
+func getSubmissionCategories(submissionId int) ([]string, error) {
+	// gets categories of the submission 
+	var currTag string
+	categories := []string{}
+	queryCategories := fmt.Sprintf(
+		SELECT_ROW,
+		getDbTag(&Categories{}, "Tag"),
+		TABLE_CATEGORIES,
+		getDbTag(&Categories{}, "SubmissionId"),
+	)
+	rows, err := db.Query(queryCategories, submissionId)
+	if err != nil {
+		return nil, err
+	}
+	// iterates over the results of the query, adding them to the array of tags
+	for rows.Next() {
+		if err = rows.Scan(&currTag); err != nil {
+			return nil, err
+		}
+		categories = append(categories, currTag)
+	}
+	return categories, nil
+}
+
 // Queries the database for file paths with the given submission ID
 // (i.e. files in the submission)
 //
 // Params:
 //	submissionId (int) : the id of the submission to get the files of
 //Returns:
-//	([]string) : of the file paths
+//	([]string) : Array of file paths which are members of the given submission
 //	(error) : if something goes wrong during the query
-func getSubmissionFiles(submissionId int) ([]string, error) {
+func getSubmissionFilePaths(submissionId int) ([]string, error) {
 	// builds the query
 	stmt := fmt.Sprintf(SELECT_ROW,
 		getDbTag(&File{}, "Path"),
@@ -555,15 +576,14 @@ func getSubmissionFiles(submissionId int) ([]string, error) {
 	}
 
 	// builds the array
-	var file string
+	var filePath string
 	var files []string
 	for rows.Next() {
-		// if there is an error returned by scanning the row, the error is returned
-		// without the array
-		if err := rows.Scan(&file); err != nil {
+		// returns error if one occurs
+		if err := rows.Scan(&filePath); err != nil {
 			return nil, err
 		}
-		files = append(files, file)
+		files = append(files, filePath)
 	}
 	return files, nil
 }
@@ -573,9 +593,9 @@ func getSubmissionFiles(submissionId int) ([]string, error) {
 // Parameters:
 // 	submissionId (int) : the unique id of the submission
 // Returns:
-//	(*CodeSubmissionData) : the submission's metadata if found
+//	(*SubmissionData) : the submission's metadata if found
 // 	(error) : if anything goes wrong while retrieving the metadata
-func getSubmissionMetaData(submissionId int) (*CodeSubmissionData, error) {
+func getSubmissionMetaData(submissionId int) (*SubmissionData, error) {
 	// gets the submission name from the database
 	var submissionName string
 	querySubmissionName := fmt.Sprintf(
@@ -597,9 +617,102 @@ func getSubmissionMetaData(submissionId int) (*CodeSubmissionData, error) {
 	}
 
 	// marshalls the string of data into a struct
-	submissionData := &CodeSubmissionData{}
+	submissionData := &SubmissionData{}
 	if err := json.Unmarshal(dataString, submissionData); err != nil {
 		return nil, err
 	}
 	return submissionData, nil
 }
+
+// This function takes in a struct in the local submission format, and transforms
+// it into the supergroup compliant format
+//
+// Parameters:
+// 	localSubmission (*Submission) : a valid submission struct with all relevant fields
+// 		populated. The structs data must already be in the filesystem and database
+// Returns:
+// 	(*SupergroupSubmission) : a supergroup compliant submission struct
+// 	(error) : an error if one occurs	
+func localToGlobal(localSubmission *Submission) (*SupergroupSubmission, error) {
+	// creates the Supergroup metadata struct
+	supergroupData := &SupergroupSubmissionData{
+		CreationDate: localSubmission.CreationDate,
+		Categories: localSubmission.Categories,
+		Abstract: localSubmission.MetaData.Abstract,
+		License: localSubmission.License,
+	}
+	// builds the list of author names and adds it to the metadata
+	authorIds, err := getSubmissionAuthors(localSubmission.Id)
+	var fname string
+	var lname string
+	authorNames := []string{}
+	for _, id := range authorIds {
+		// queries the author name from the credentials table
+		query := fmt.Sprintf(
+			SELECT_ROW,
+			getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
+			TABLE_USERS,
+			getDbTag(&Credentials{}, "Id"),
+		)
+		row := db.QueryRow(query, id)
+		if err = row.Scan(&fname, &lname); err != nil {
+			return nil, err
+		}
+		authorNames = append(authorNames, fname+" "+lname)
+	}
+	supergroupData.AuthorNames = authorNames
+
+	// creates the list of file structs using the file paths and files.go
+	var base64 string
+	var supergroupFile *SupergroupFile
+	supergroupFiles := []*SupergroupFile{}
+	for _, path := range localSubmission.FilePaths {
+		fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(localSubmission.Id), localSubmission.Name, path)
+		base64, err = getFileContent(fullFilePath)
+		if err != nil {
+			return nil, err
+		}
+		supergroupFile = &SupergroupFile{
+			Name: filepath.Base(path),
+			Base64Value: base64,
+		}
+		supergroupFiles = append(supergroupFiles, supergroupFile)
+	}
+	
+	// creates the supergroup submission to return
+	return &SupergroupSubmission{
+		Name: localSubmission.Name,
+		Files: supergroupFiles,
+		MetaData: supergroupData,
+	}, nil
+}
+
+// TODO : finish this function once the router function for exporting supergroup things is written
+// // Converts a supergroup compliant submission to the locally used format
+// //
+// // Parameters:
+// // 	globalSubmission (*SupergroupSubmission) : a supergroup compliant submission
+// // Returns:
+// // 	(*Submission) : the locally formatted version of the above submission
+// // 	(error) : an error if one occurs
+// func globalToLocal(globalSubmission *SupergroupSubmission) (*Submission, error) {
+// 	// creates the local metadata struct
+// 	localData := &SubmissionData{
+// 		Abstract: globalSubmission.MetaData.Abstract,
+// 		Reviews: nil,
+// 	}
+
+// 	// registers the submission
+
+// 	// creates the submission to return
+// 	localSubmission &Submission{
+// 		Name: globalSubmission.Name,
+// 		CreationDate: globalSubmission.MetaData.CreationDate,
+// 		License: globalSubmission.MetaData.License,
+// 		Reviewers: nil, // TODO: discuss with group, how do we make this non-nil
+// 		Authors: nil, // TODO: how do we do this??
+// 		FilePaths: ,
+// 		Categories: globalSubmission.MetaData.Categories,
+// 		MetaData: localData,
+// 	}, nil
+// }

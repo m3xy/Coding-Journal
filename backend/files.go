@@ -72,7 +72,7 @@ const (
 // 			reviews: array of objects
 // 				author: int
 //				time: datetime string
-//				content: string
+//				base64Value: string
 //				replies: object (same as comments)
 func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
@@ -90,17 +90,16 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&request)
 
 	// Parse data into local variables
-	fileName := request[getJsonTag(&File{}, "Name")]       // file name as a string
-	fileAuthor := request["author"]                        // author's user Id
-	fileContent := request[getJsonTag(&File{}, "Content")] // base64 encoding of file content
+	fileName := request[getJsonTag(&File{}, "Name")]			// file name as a string
+	fileAuthor := request["author"]                        		// author's user Id
+	fileContent := request[getJsonTag(&File{}, "Base64Value")]	// base64 encoding of file content
 
 	// Put parsed values into a file object and a submission object
 	wrapperSubmission := &Submission{
 		Name:      fileName.(string),
 		Authors:   []string{fileAuthor.(string)},
 		Reviewers: []string{},
-		FilePaths: []string{fileName.(string)},
-		MetaData: &CodeSubmissionData{
+		MetaData: &SubmissionData{
 			Abstract: "",
 			Reviews:  []*Comment{},
 		},
@@ -109,7 +108,7 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 		SubmissionName: fileName.(string),
 		Path:           fileName.(string),
 		Name:           fileName.(string),
-		Content:        fileContent.(string),
+		Base64Value:	fileContent.(string),
 	}
 
 	// adds file to the db and filesystem
@@ -139,9 +138,11 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // Retrieve code files from filesystem. Returns
-// file content with comments and metadata. Recieves
+// file with comments and metadata. Receives
 // a FilePath and submissionId as header strings in
 // the request
+//
+// TEMP: this might go away due to the supergroup spec
 //
 // Response Codes:
 //	200 : File exists, getter success.
@@ -154,11 +155,11 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 //			filePath: string
 //			submissionName: string
 //			submissionId: int
-// 			content: string
+// 			base64Value: string
 // 			comments: array of objects
 // 				author: int
 //				time: datetime string
-//				content: string
+//				base64Value: string
 //				replies: object (same as comments)
 func getFile(w http.ResponseWriter, r *http.Request) {
 	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
@@ -210,15 +211,15 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 		Name:           filepath.Base(filePath),
 	}
 	// gets file content and comments
-	file.Content, err = getFileContent(fullFilePath)
+	file.Base64Value, err = getFileContent(fullFilePath)
 	if err != nil {
 		log.Printf("[ERROR] Failed to retrieve file content: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	file.Comments, err = getFileComments(fullDataPath)
+	file.MetaData, err = getFileMetaData(fullDataPath)
 	if err != nil {
-		log.Printf("[ERROR] Failed to retrieve file comments: %v", err)
+		log.Printf("[ERROR] Failed to retrieve file metadata: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -270,7 +271,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	comment := &Comment{
 		AuthorId: request[getJsonTag(&Comment{}, "AuthorId")].(string), // authors user id
 		Time:     fmt.Sprint(time.Now()),
-		Content:  request[getJsonTag(&Comment{}, "Content")].(string),
+		Base64Value:  request[getJsonTag(&Comment{}, "Base64Value")].(string),
 		Replies:  nil, // replies are nil upon insertion
 	}
 
@@ -305,7 +306,8 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 // -----
 
 // Add file into submission, and store it to FS and DB.
-// Note: Need valid submission. No comments on file creation.
+// Note: Need valid submission. No comments exist on file
+// creation.
 //
 // Params:
 //	file (*File) : the file to add to the db and filesystem (all fields but Id and SubmissionId MUST be set)
@@ -362,11 +364,11 @@ func addFileTo(file *File, submissionId int) (int, error) {
 	}
 
 	// writes the file content
-	if _, err = codeFile.Write([]byte(file.Content)); err != nil {
+	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
 		return 0, err
 	}
-	// Write empty CodeFileData as json so comments and other data can be added later.
-	jsonString, err := json.Marshal(&CodeFileData{Comments: []*Comment{}})
+	// Writes given file's metadata
+	jsonString, err := json.Marshal(file.MetaData)
 	if err != nil {
 		return 0, err
 	}
@@ -445,8 +447,8 @@ func addComment(comment *Comment, fileId int) error {
 	dataFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
 		submissionName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
 
-	// reads the data file content and formats it into a CodeFileData struct
-	data := &CodeFileData{}
+	// reads the data file content and formats it into a FileData struct
+	data := &FileData{}
 	dataFileContent, err := ioutil.ReadFile(dataFilePath)
 	if err = json.Unmarshal(dataFileContent, data); err != nil {
 		return err
@@ -463,6 +465,105 @@ func addComment(comment *Comment, fileId int) error {
 	return ioutil.WriteFile(dataFilePath, dataBytes, FILE_PERMISSIONS)
 }
 
+// helper function to return a file object given its ID
+// 
+// TODO : write tests for this function
+//
+// Params:
+// 	fileId (int) : the file's unique id
+// Returns:
+//	(*File) : the a file struct corresponding to the given ID
+// 	(error) : an error if something goes wrong
+func getFileData(fileId int) (*File, error) {
+	// builds a query to get the file's name, submission id, and it's submission's name
+	var submissionId int
+	var submissionName string
+	var filePath string
+	columns := fmt.Sprintf(
+		"%s, %s, %s",
+		TABLE_SUBMISSIONS+"."+getDbTag(&Submission{}, "Id"),
+		getDbTag(&Submission{}, "Name"),
+		getDbTag(&File{}, "Path"),
+	)
+	queryPath := fmt.Sprintf(
+		SELECT_ROW_INNER_JOIN,
+		columns,
+		TABLE_FILES,
+		TABLE_SUBMISSIONS,
+		TABLE_FILES+"."+getDbTag(&File{}, "SubmissionId"),
+		TABLE_SUBMISSIONS+"."+getDbTag(&Submission{}, "Id"),
+		TABLE_FILES+"."+getDbTag(&File{}, "Id"),
+	)
+	// executes the query and builds the file path if it was successful
+	row := db.QueryRow(queryPath, fileId)
+	if err := row.Scan(&submissionId, &submissionName, &filePath); err != nil {
+		return nil, err
+	}
+
+	// builds path to the file and it's corresponding data file using the queried submission name
+	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), submissionName, filePath)
+	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
+		submissionName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
+
+	// constructs a file object to return to the frontend
+	file := &File{
+		SubmissionId:   submissionId,
+		SubmissionName: submissionName,
+		Path:           filePath,
+		Name:           filepath.Base(filePath),
+	}
+	// gets file content and metadata
+	var err error
+	file.Base64Value, err = getFileContent(fullFilePath)
+	if err != nil {
+		return nil, err
+	}
+	file.MetaData, err = getFileMetaData(fullDataPath)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+// // Gets a supergroup compliant file struct given the file id 
+// //
+// // Params:
+// // 	fileId (int) : the unique of the given file
+// // Returns:
+// // 	(*SupergroupFile) : a supergroupp compliant file object
+// // 	(error) : an error if one occurs 
+// func getSuperGroupFile(fileId int) (*SupergroupFile, error) {
+// 	// builds a query to get the file's name from the database
+// 	var fileName string
+// 	queryName := fmt.Sprintf(
+// 		SELECT_ROW,
+// 		getDbTag(&File{}, "Name"),
+// 		TABLE_FILES,
+// 		getDbTag(&File{}, "Id")
+// 	)
+// 	// executes the query and builds the file path if it was successful
+// 	row := db.QueryRow(queryPath, fileId)
+// 	if err := row.Scan(&fileName); err != nil {
+// 		return nil, err
+// 	}
+
+// 	// constructs a file object to return to the frontend
+// 	file := &SupergroupFile{
+// 		Name:           filepath.Base(filePath),
+// 	}
+// 	// gets file content and metadata
+// 	var err error
+// 	file.Base64Value, err = getFileContent(fullFilePath)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	file.MetaData, err = getFileMetaData(fullDataPath)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return file, nil
+// }
+
 // Get file content from filesystem.
 // Params:
 // 	filePath (string): an absolute path to the file
@@ -474,30 +575,30 @@ func getFileContent(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// if no error occurred, assigns file.Content a value
+	// if no error occurred, assigns file.Base64Value a value
 	return string(fileData), nil
 }
 
-// Get a file's comments from filesystem, and returns a []*Comments
-// array
+// Get a file's metadata from filesystem, and returns a FileData
+// objects
 //
 // Params:
 //	dataPath (string) : a path to the data file containing a given file's meta-data
 //Returns:
-//  ([]*Comment) : the file's comments
+//  (*FileData) : the file's metadata 
 //	(error) : if something goes wrong, nil otherwise
-func getFileComments(dataPath string) ([]*Comment, error) {
+func getFileMetaData(dataPath string) (*FileData, error) {
 	// reads the file contents into a json string
 	jsonData, err := ioutil.ReadFile(dataPath)
 	if err != nil {
 		return nil, err
 	}
-	// fileData is parsed from json into the CodeFileData struct
-	codeFileData := &CodeFileData{}
-	err = json.Unmarshal(jsonData, codeFileData)
+	// fileData is parsed from json into the FileData struct
+	fileData := &FileData{}
+	err = json.Unmarshal(jsonData, fileData)
 	if err != nil {
 		return nil, err
 	}
-	// if no error occurred, return comments
-	return codeFileData.Comments, nil
+	// if no error occurred, return metadata
+	return fileData, nil
 }

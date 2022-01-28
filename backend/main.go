@@ -91,7 +91,7 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_SUBMISSION, getSubmission).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_SUBMISSION, sendSubmission).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
