@@ -16,6 +16,13 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )
 
-require gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+require (
+	github.com/felixge/httpsnoop v1.0.1 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+)
 
-require github.com/joho/godotenv v1.4.0
+require (
+	github.com/gorilla/handlers v1.5.1
+	github.com/joho/godotenv v1.4.0
+	github.com/rs/cors v1.8.2
+)

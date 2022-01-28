@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	// "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
 const (
@@ -75,9 +75,14 @@ func setupCORSsrv() *http.Server {
 	router := mux.NewRouter()
 
 	// sets up handler for CORS
-	// headersOk := handlers.AllowedHeaders(allowedHeaders)
-	// originsOk := handlers.AllowedOrigins(allowedOrigins)
-	// methodsOk := handlers.AllowedMethods(allowedMethods)
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
+		AllowedHeaders: []string{"content-type", SECURITY_TOKEN_KEY, "bearer_token", "refresh_token", "user"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PUT"},
+	})
+
+	// Set up middleware
+	router.Use(authenticationMiddleWare)
 
 	// Setup all routes.
 	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
@@ -93,9 +98,8 @@ func setupCORSsrv() *http.Server {
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
-		Addr: PORT,
-		// Handler: handlers.CORS(originsOk, headersOk, methodsOk)(router),
-		Handler: router,
+		Addr:    PORT,
+		Handler: c.Handler(router),
 	}
 }
 

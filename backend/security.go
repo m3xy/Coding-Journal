@@ -14,7 +14,6 @@ import (
 
 const (
 	BASE64_CHARS       = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/"
-	SECURITY_TOKEN_KEY = "X-FOREIGNJOURNAL-SECURITY-TOKEN"
 	SECURITY_TOKEN_ENV = "BACKEND_TOKEN"
 	SECURITY_KEY_SIZE  = 128
 	LOG_FILE_PATH      = "./cs3099-backend.log"
@@ -178,15 +177,7 @@ func validateToken(token string) bool {
 //  200: Success - security token valid.
 //  401: Failure - security token invalid.
 func tokenValidation(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
 	log.Printf("[INFO] Token validation request from %v.", r.RemoteAddr)
-	token := r.Header.Get(SECURITY_TOKEN_KEY)
-	if !validateToken(token) {
-		w.WriteHeader(http.StatusUnauthorized)
-		log.Print("[WARN] Received token is invalid.")
-	}
 	log.Printf("[INFO] Token validation from %v successful.", r.RemoteAddr)
 }
 

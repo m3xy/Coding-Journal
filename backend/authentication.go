@@ -44,13 +44,6 @@ const (
  Returns: userId
 */
 func logIn(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("[INFO] Received log in request from %v", r.RemoteAddr)
 
 	// Set up writer response.
@@ -104,15 +97,6 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	Failure: 404, User not found.
 */
 func getUserProfile(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	// Check security token.
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		log.Printf("[WARN] Invalid security token received from %s.", r.RemoteAddr)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("[INFO] Received user credential request from %s", r.RemoteAddr)
 
 	// Get user from parameters.
@@ -170,16 +154,6 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	Returns: userId
 */
 func logInGlobal(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	// Check validity
-	log.Println("Global login request sent!")
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	log.Printf("[INFO] Received global login request from %s.", r.RemoteAddr)
 	propsMap := make(map[string]string)
 	err := json.NewDecoder(r.Body).Decode(&propsMap)
@@ -250,14 +224,6 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
   Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	log.Println("Sign up request sent!")
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("[INFO] Received sign up request from %s.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
@@ -368,11 +334,6 @@ func mapUserToGlobal(userId string) (string, error) {
 // 	email, password, first name, last name, phone number, organisation, id (global)
 // }
 func exportUser(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	w.Header().Set("Content-type", "application/json")
-
 	// Decode input into credentials and check necessary parameters.
 	inputCreds := &Credentials{}
 	err := json.NewDecoder(r.Body).Decode(inputCreds)
