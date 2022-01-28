@@ -24,4 +24,5 @@ require (
 require (
 	github.com/gorilla/handlers v1.5.1
 	github.com/joho/godotenv v1.4.0
+	github.com/rs/cors v1.8.2
 )
