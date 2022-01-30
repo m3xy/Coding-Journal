@@ -12,7 +12,7 @@ const (
 // Middleware for user authentication and security key verification.
 func authenticationMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
+		if !validateToken(gormDb, r.Header.Get(SECURITY_TOKEN_KEY)) {
 			w.WriteHeader(http.StatusUnauthorized)
 		} else {
 			if r.Header.Get("user") != "" {

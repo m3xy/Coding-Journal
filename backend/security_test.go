@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -29,7 +28,7 @@ func TestSecurityCheck(t *testing.T) {
 	testInit()
 	// Test security check
 	t.Run("First run", func(t *testing.T) {
-		err := securityCheck()
+		err := securityCheck(gormDb)
 		if err != nil {
 			t.Errorf("Security check failure: %v\n", err)
 		}
@@ -37,7 +36,7 @@ func TestSecurityCheck(t *testing.T) {
 
 	// Test security check if non-empty token server
 	t.Run("Subsequent run", func(t *testing.T) {
-		err := securityCheck()
+		err := securityCheck(gormDb)
 		if err != nil {
 			t.Errorf("Security check failure: %v\n", err)
 		}
@@ -50,19 +49,16 @@ func TestValidateToken(t *testing.T) {
 
 	// Test valid security token.
 	t.Run("Valid security token", func(t *testing.T) {
-		storedToken := ""
-		err := db.QueryRow(fmt.Sprintf(
-			SELECT_ROW, getDbTag(&Servers{}, "Token"), TABLE_SERVERS,
-			getDbTag(&Servers{}, "GroupNb")), TEAM_ID).
-			Scan(&storedToken)
+		var storedToken string
+		err := gormDb.Model(&Server{}).Select("token").Find(&storedToken, TEAM_ID)
 		assert.Nil(t, err, "Database query should not error!")
-		assert.True(t, validateToken(storedToken), "Token should be valid!")
+		assert.True(t, validateToken(gormDb, storedToken), "Token should be valid!")
 	})
 
 	// Test invalid security token.
 	t.Run("Invalid security token", func(t *testing.T) {
 		storedToken := WRONG_SECURITY_TOKEN
-		assert.False(t, validateToken(storedToken), "Token should NOT be valid!")
+		assert.False(t, validateToken(gormDb, storedToken), "Token should NOT be valid!")
 	})
 	testEnd()
 }
@@ -77,7 +73,7 @@ func TestTokenValidation(t *testing.T) {
 	// Write valid security token response
 	t.Run("Valid token validation", func(t *testing.T) {
 		validReq, _ := http.NewRequest("GET", BACKEND_ADDRESS+ENDPOINT_VALIDATE, nil)
-		res, err := sendSecureRequest(validReq, TEAM_ID)
+		res, err := sendSecureRequest(gormDb, validReq, TEAM_ID)
 		if err != nil {
 			t.Errorf("HTTP request error: %v\n", err)
 		} else if res.StatusCode != http.StatusOK {

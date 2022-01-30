@@ -7,21 +7,23 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
+var gormDb *gorm.DB
+
 type User struct {
-	gorm.Model
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey;->;default:uuid()" json:"userId"`
-	Email        string    `gorm:"uniqueIndex;unique;not null" json:"email"`
-	Password     string    `gorm:"not null" json:"password" validate:"min=8,max=64,validpw"`
-	FirstName    string    `gorm:"index:idx_user,class:FULLTEXT" validate:"nonzero,max=32" json:"firstname"`
-	LastName     string    `gorm:"index:idx_user,class:FULLTEXT" validate:"nonzero,max=32" json:"lastname"`
-	UserType     int       `json:"usertype"`
-	PhoneNumber  string    `gorm:"index:,class:FULLTEXT" json:"phonenumber"`
-	Organization string    `gorm:"index:,class:FULLTEXT" json:"organization"`
+	ID           string `gorm:"not null;primaryKey" json:"userId"`
+	Email        string `gorm:"uniqueIndex;unique;not null" json:"email"`
+	Password     string `gorm:"not null" json:"password" validate:"min=8,max=64,validpw"`
+	FirstName    string `validate:"nonzero,max=32" json:"firstname"`
+	LastName     string `validate:"nonzero,max=32" json:"lastname"`
+	UserType     int    `json:"usertype"`
+	PhoneNumber  string `json:"phonenumber"`
+	Organization string `json:"organization"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -29,38 +31,30 @@ type User struct {
 }
 
 type Server struct {
-	gorm.Model
 	GroupNumber int    `gorm:"not null;primaryKey"`
 	Token       string `gorm:"size:1028;not null"`
 	Url         string `gorm:"not null; size:512"`
 }
 
 type GlobalID struct {
-	gorm.Model
-	GlobalID string `gorm:"not null;primaryKey", json:"globalId"`
-	User     User
-}
+	ID     string `gorm:"not null;primaryKey" json:"globalId"`
+	UserID string
+	User   User
 
-type File struct {
-	gorm.Model
-	FilePath string `gorm:"unique", json:"filePath"`
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt time.Time `gorm:"index"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 type Submission struct {
 	gorm.Model
-	Name       string `gorm:"not null;size:128;index" json:"submissionName"`
-	Files      []File
-	Authors    []User
-	Reviewers  []User
-	Categories []Category
+	Name       string     `gorm:"not null;size:128;index" json:"submissionName"`
+	Authors    []User     `gorm:"many2many:authors_submission"`
+	Reviewers  []User     `gorm:"many2many:reviewers_submission"`
+	Categories []Category `gorm:"many2many:categories_submission"`
+}
 
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt time.Time `gorm:"index"`
+type File struct {
+	gorm.Model
+	FilePath string `gorm:"unique" json:"filePath"`
 }
 
 type Category struct {
@@ -68,17 +62,14 @@ type Category struct {
 	Tag string `gorm:"uniqueIndex;unique" json:"category"`
 }
 
-func (user *User) BeforeCreate(tx *gorm.DB) (err error) {
-	user.ID = uuid.NewV4()
-	return
-}
-
-func gormInit(dbname string) (*gorm.DB, error) {
+func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	// Set MySQL info in DSN format according to Go MySQL Drive -
 	// user:password@protocol(host:port)/dbname?[param1=val...]
 	mysqlInfo := fmt.Sprintf("%s/%s?%s", os.Getenv("DATABASE_URL"), dbname,
 		getDbParams(DB_PARAMS)) // Setting this to allow prepared statements.
-	db, err := gorm.Open(mysql.Open(mysqlInfo), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(mysqlInfo), &gorm.Config{
+		Logger: logger,
+	})
 	if err != nil {
 		goto ERR
 	}
@@ -91,4 +82,32 @@ func gormInit(dbname string) (*gorm.DB, error) {
 ERR:
 	log.Fatalf("SQL initialization error: %v", err)
 	return nil, err
+}
+
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+	if u.ID == "" {
+		u.ID = uuid.NewV4().String()
+	}
+	return
+}
+
+func gormClear(db *gorm.DB) error {
+	tables := []interface{}{&GlobalID{}, &Submission{}, &User{}, &Category{}, &File{}, &Server{}}
+	for _, table := range tables {
+		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
+			Unscoped().Delete(table)
+		if err := res.Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isUnique(db *gorm.DB, table interface{}, varname string, val string) bool {
+	var exists bool
+	if err := db.Model(table).Select("count(*) > 0").Where(varname+" = ?", val).Find(&exists).Error; err != nil {
+		return false
+	} else {
+		return !exists
+	}
 }

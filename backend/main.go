@@ -11,6 +11,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -37,12 +39,17 @@ const (
 	ENDPOINT_VALIDATE        = "/validate"
 )
 
+var prodLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
+	SlowThreshold: time.Second,
+	LogLevel:      logger.Info,
+})
+
 func main() {
 	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
-	dbInit(dbname)
-	setup(os.Getenv("LOG_PATH"))
+	gormInit(dbname, prodLogger)
+	setup(gormDb, os.Getenv("LOG_PATH"))
 
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -88,13 +95,13 @@ func setupCORSsrv() *http.Server {
 	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_SUBMISSION, getSubmission).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
+	// router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
+	// router.HandleFunc(ENDPOINT_SUBMISSION, getSubmission).Methods(http.MethodGet, http.MethodOptions)
+	// router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
+	// router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	// router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/users/{"+getJsonTag(&Credentials{}, "Id")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/users/{"+getJsonTag(&User{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
@@ -104,7 +111,7 @@ func setupCORSsrv() *http.Server {
 }
 
 // Set up the server and it's dependencies.
-func setup(logpath string) error {
+func setup(db *gorm.DB, logpath string) error {
 	// Set log file logging.
 	var err error = nil
 	file, err := os.OpenFile(logpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -115,13 +122,13 @@ func setup(logpath string) error {
 	log.SetOutput(file)
 
 	// Check security token existence before running.
-	err = securityCheck()
+	err = securityCheck(db)
 	if err != nil {
 		goto RETURN
 	}
 
 	// Check for filesystem existence.
-	if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {
+	/* if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {
 		log.Printf("Filesystem not setup up! Setting it up at %s",
 			FILESYSTEM_ROOT)
 		err = os.MkdirAll(FILESYSTEM_ROOT, DIR_PERMISSIONS)
@@ -129,10 +136,10 @@ func setup(logpath string) error {
 			log.Fatalf("Filesystem setup error: %v\n", err)
 			goto RETURN
 		}
-	}
+	} */
 
 	// Set foreign servers.
-	if err = setForeignServers(); err != nil {
+	if err = setForeignServers(db); err != nil {
 		log.Fatalf("FATAL - Foreign server set up error: %v\n", err)
 		goto RETURN
 	}

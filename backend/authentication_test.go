@@ -3,22 +3,26 @@ package main
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/validator.v2"
+	"gorm.io/gorm/logger"
 )
 
 const (
 	TEST_LOG_PATH  = "./test.log"
+	TEST_PORT      = ":59213"
+	LOCALHOST      = "http://localhost"
 	VALID_PW       = "aB12345$"
 	PW_NO_UC       = "a123456$"
 	PW_NO_LC       = "B123456$"
@@ -30,56 +34,102 @@ const (
 	INVALID_ID     = "invalid-always"
 )
 
-var testUsers []*Credentials = []*Credentials{
-	{Email: "test.test@test.test", Pw: "123456aB$", Fname: "test",
-		Lname: "test", PhoneNumber: "0574349206", Usertype: USERTYPE_USER},
-	{Email: "john.doe@test.com", Pw: "dlbjDs2!", Fname: "John",
-		Lname: "Doe", Organization: "TestOrg", Usertype: USERTYPE_USER},
-	{Email: "jane.doe@test.net", Pw: "dlbjDs2!", Fname: "Jane",
-		Lname: "Doe", Usertype: USERTYPE_PUBLISHER},
+var testUsers []User = []User{
+	{Email: "test.test@test.test", Password: "123456aB$", FirstName: "test",
+		LastName: "test", PhoneNumber: "0574349206", UserType: USERTYPE_USER},
+	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
+		LastName: "Doe", Organization: "TestOrg", UserType: USERTYPE_USER},
+	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
+		LastName: "Doe", UserType: USERTYPE_PUBLISHER},
 }
 
-var wrongCredsUsers []*Credentials = []*Credentials{
-	{Email: "test.nospec@test.com", Pw: "badN0Special", Fname: "test", Lname: "nospec"},
-	{Email: "test.nonum@test.com", Pw: "testNoNum!", Fname: "test", Lname: "nonum"},
-	{Email: "test.toosmall@test.com", Pw: "g0.Ku", Fname: "test", Lname: "toosmall"},
-	{Email: "test.wrongchars@test.com", Pw: "Tho/se]chars|ille\"gal", Fname: "test", Lname: "wrongchars"},
-	{Email: "test.nolowercase@test.com", Pw: "ALLCAP5!", Fname: "test", Lname: "nolower"},
-	{Email: "test.nouppercase@test.com", Pw: "nocap5!!", Fname: "test", Lname: "noupper"},
+var wrongCredsUsers []User = []User{
+	{Email: "test.nospec@test.com", Password: "badN0Special", FirstName: "test", LastName: "nospec"},
+	{Email: "test.nonum@test.com", Password: "testNoNum!", FirstName: "test", LastName: "nonum"},
+	{Email: "test.toosmall@test.com", Password: "g0.Ku", FirstName: "test", LastName: "toosmall"},
+	{Email: "test.wrongchars@test.com", Password: "Tho/se]chars|ille\"gal", FirstName: "test", LastName: "wrongchars"},
+	{Email: "test.nolowercase@test.com", Password: "ALLCAP5!", FirstName: "test", LastName: "nolower"},
+	{Email: "test.nouppercase@test.com", Password: "nocap5!!", FirstName: "test", LastName: "noupper"},
 }
+
+var testLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
+	SlowThreshold:             time.Second,
+	LogLevel:                  logger.Silent,
+	IgnoreRecordNotFoundError: true,
+	Colorful:                  true,
+})
 
 // Initialise the database for testing.
 func testInit() {
-	dbInit(TEST_DB)
-	setup(TEST_LOG_PATH)
-	if err := dbClear(); err != nil {
+	gormDb, _ = gormInit(TEST_DB, testLogger)
+	setup(gormDb, TEST_LOG_PATH)
+	if err := gormDb.Transaction(gormClear); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
+	}
+}
+
+// Middleware for the test authentication server.
+func testingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !validateToken(gormDb, r.Header.Get(SECURITY_TOKEN_KEY)) {
+			w.WriteHeader(http.StatusUnauthorized)
+		} else {
+			if r.Header.Get("user") != "" {
+				ctx := context.WithValue(r.Context(), "user", r.Header.Get("user"))
+				next.ServeHTTP(w, r.WithContext(ctx))
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		}
+	})
+}
+
+func testingServerSetup() *http.Server {
+	router := mux.NewRouter()
+	router.Use(testingMiddleware)
+
+	// Call authentication endpoints.
+	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/users/{"+getJsonTag(&User{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
+
+	// Setup testing HTTP server
+	return &http.Server{
+		Addr:    TEST_PORT,
+		Handler: router,
 	}
 }
 
 // Close database at the end of test.
 func testEnd() {
-	if err := dbClear(); err != nil {
+	if err := gormDb.Transaction(gormClear); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
 	}
-	db.Close()
+	getDB, _ := gormDb.DB()
+	getDB.Close()
 }
 
 func sendJsonRequest(endpoint string, method string, data interface{}) (*http.Response, error) {
 	var req *http.Request
 	if data != nil {
 		jsonDat, _ := json.Marshal(data)
-		req, _ = http.NewRequest(method, BACKEND_ADDRESS+endpoint, bytes.NewBuffer(jsonDat))
+		req, _ = http.NewRequest(method, LOCALHOST+TEST_PORT+endpoint, bytes.NewBuffer(jsonDat))
 	} else {
-		req, _ = http.NewRequest(method, BACKEND_ADDRESS+endpoint, nil)
+		req, _ = http.NewRequest(method, LOCALHOST+TEST_PORT+endpoint, nil)
 	}
-	return sendSecureRequest(req, TEAM_ID)
+	return sendSecureRequest(gormDb, req, TEAM_ID)
 }
 
 func testAuth(t *testing.T) {
 	// Set up database.
-	dbInit(TEST_DB)
-	if err := dbClear(); err != nil {
+	var err error
+	gormDb, err = gormInit(TEST_DB, testLogger)
+	if err != nil {
+		fmt.Printf("Error opening database :%v", err)
+	}
+	if err := gormDb.Transaction(gormClear); err != nil {
 		fmt.Printf("Error occured while clearing Db: %v", err)
 	}
 
@@ -121,12 +171,12 @@ func TestPw(t *testing.T) {
 	validator.SetValidationFunc("validpw", validpw)
 	t.Run("Passwords valid", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			assert.Nilf(t, validator.Validate(*testUsers[i]), "%s Should be valid!", testUsers[i].Pw)
+			assert.Nilf(t, validator.Validate(testUsers[i]), "%s Should be valid!", testUsers[i].Password)
 		}
 	})
 	t.Run("Passwords invalid", func(t *testing.T) {
 		for i := 0; i < len(wrongCredsUsers); i++ {
-			assert.NotNilf(t, validator.Validate(*wrongCredsUsers[i]), "%s should be illegal!", wrongCredsUsers[i].Pw)
+			assert.NotNilf(t, validator.Validate(wrongCredsUsers[i]), "%s should be illegal!", wrongCredsUsers[i].Password)
 		}
 	})
 }
@@ -159,30 +209,27 @@ func TestRegisterUser(t *testing.T) {
 }
 
 // Test credential uniqueness with test database.
-func TestCheckUnique(t *testing.T) {
+func TestIsUnique(t *testing.T) {
 	testInit()
 	// Test uniqueness in empty table
 	t.Run("Unique elements", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			assert.Truef(t, checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"),
-				testUsers[i].Email), "Email %s Shouldn't exist in database!", testUsers[i].Email)
+			assert.Truef(t, isUnique(gormDb, &User{}, "email", testUsers[i].Email),
+				"Email %s Shouldn't exist in database!", testUsers[i].Email)
 		}
 	})
 
 	// Add an element to table
-	stmt := fmt.Sprintf(INSERT_CRED,
-		TABLE_USERS,
-		getDbTag(&Credentials{}, "Pw"),
-		getDbTag(&Credentials{}, "Fname"),
-		getDbTag(&Credentials{}, "Lname"),
-		getDbTag(&Credentials{}, "Email"))
+	// Add test users to database
+	if err := gormDb.Create(&testUsers).Error; err != nil {
+		t.Errorf("Batch user creation error: %v", err)
+		return
+	}
 
 	// Test uniquenes if element already exists in table.
 	t.Run("Non-unique elements", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			_, err := db.Query(stmt, testUsers[i].Pw, testUsers[i].Fname, testUsers[i].Lname, testUsers[i].Email)
-			assert.Nilf(t, err, "Database query should work, but error gotten: %v", err)
-			assert.Falsef(t, checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), testUsers[0].Email),
+			assert.Falsef(t, isUnique(gormDb, &User{}, "email", testUsers[i].Email),
 				"Email %s should already be in database!", testUsers[i].Email)
 		}
 	})
@@ -193,33 +240,38 @@ func TestCheckUnique(t *testing.T) {
 func TestSignUp(t *testing.T) {
 	// Set up test
 	testInit()
-	srv := setupCORSsrv()
+	srv := testingServerSetup()
 
 	// Start server.
-	go srv.ListenAndServe()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v\n", err)
+		}
+	}()
 
 	// Test not yet registered users.
 	t.Run("Valid signup requests", func(t *testing.T) {
-		UserStmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email"))
-		IdsStmt := fmt.Sprintf(SELECT_ROW, getDbTag(&IdMappings{}, "GlobalId"), TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"))
 		for i := range testUsers {
 			// Create JSON body for sign up request based on test user.
-			resp, _ := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, testUsers[i])
+			resp, err := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, testUsers[i])
+			if err != nil {
+				t.Errorf("Error sending request: %v", err)
+				return
+			}
 			defer resp.Body.Close()
 
 			// Check if response OK and user registered.
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Expected %d but got %d status code!", http.StatusOK, resp.StatusCode)
 
-			res := db.QueryRow(UserStmt, testUsers[i].Email)
-			storedCreds := &Credentials{}
-			err := res.Scan(&storedCreds.Id)
-			assert.NotEqualf(t, sql.ErrNoRows, err, "User %s %s should be in database!", testUsers[i].Fname, testUsers[i].Lname)
+			assert.NotEqualf(t, false,
+				isUnique(gormDb, &User{}, "email", testUsers[i].Email), "User should be in database!")
 
-			// Check if global ID exists for user.
-			res = db.QueryRow(IdsStmt, storedCreds.Id)
-			storedMapping := &IdMappings{Id: storedCreds.Id}
-			err = res.Scan(storedMapping.GlobalId)
-			assert.NotEqualf(t, sql.ErrNoRows, err, "ID %s should be in database!", storedMapping.GlobalId)
+			var exists bool
+			if err := gormDb.Model(&GlobalID{}).Select("count(*) > 0").
+				Where(&GlobalID{User: testUsers[i]}).Find(&exists).Error; err != nil {
+				t.Errorf("Global ID test query error: %v", err)
+			}
+			assert.NotEqual(t, false, exists, "ID should be in database!")
 		}
 	})
 
@@ -258,30 +310,21 @@ func TestSignUp(t *testing.T) {
 func TestLogIn(t *testing.T) {
 	// Set up test
 	testInit()
-	srv := setupCORSsrv()
+	srv := testingServerSetup()
 
 	// Start server.
 	go srv.ListenAndServe()
 
 	// Populate database with valid users.
-	for i := range testUsers {
-		id, err := registerUser(testUsers[i])
-		if err != nil {
-			t.Errorf("User registration error: %v\n", err)
-			return
-		} else {
-			// Set user ID for ID checking.
-			testUsers[i].Id = id
-		}
-	}
+	gormDb.Create(&testUsers)
 
 	// Test valid logins
 	t.Run("Valid logins", func(t *testing.T) {
 		for i := range testUsers {
 			// Create a request for user login.
 			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[i].Email
-			loginMap[JSON_TAG_PW] = testUsers[i].Pw
+			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
+			loginMap[JSON_TAG_PW] = testUsers[i].Password
 			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response status should be %d", http.StatusOK)
@@ -290,11 +333,11 @@ func TestLogIn(t *testing.T) {
 			respMap := make(map[string]string)
 			err = json.NewDecoder(resp.Body).Decode(&respMap)
 			assert.Nil(t, err, "Body unparsing should succeed")
-			storedId, exists := respMap[getJsonTag(&Credentials{}, "Id")]
+			storedId, exists := respMap[getJsonTag(&User{}, "ID")]
 			assert.True(t, exists, "ID should exist in response.")
 
 			// Check if gotten
-			assert.Equal(t, testUsers[i].Id, storedId, "ID must equal registration's ID.")
+			assert.Equal(t, testUsers[i].ID, storedId, "ID must equal registration's ID.")
 		}
 	})
 
@@ -302,7 +345,7 @@ func TestLogIn(t *testing.T) {
 	t.Run("Invalid password logins", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
 			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[i].Email
+			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
 			loginMap[JSON_TAG_PW] = VALID_PW // Ensure this pw is different from all test users.
 
 			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
@@ -315,8 +358,8 @@ func TestLogIn(t *testing.T) {
 	t.Run("Invalid email logins", func(t *testing.T) {
 		for i := 1; i < len(testUsers); i++ {
 			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[0].Email
-			loginMap[JSON_TAG_PW] = testUsers[i].Pw
+			loginMap[getJsonTag(&User{}, "Email")] = testUsers[0].Email
+			loginMap[JSON_TAG_PW] = testUsers[i].Password
 
 			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
 			assert.Nil(t, err, "Request should not error.")
@@ -334,33 +377,30 @@ func TestLogIn(t *testing.T) {
 // Test user info getter.
 func TestGetUserProfile(t *testing.T) {
 	testInit()
-	srv := setupCORSsrv()
+	srv := testingServerSetup()
 
 	// Start server.
 	go srv.ListenAndServe()
 
 	// Populate database for testing and test valid user.
+	globalUsers := make([]GlobalID, len(testUsers))
 	for i := range testUsers {
-		testUsers[i].Id, _ = registerUser(testUsers[i])
+		globalUsers[i].ID, _ = registerUser(testUsers[i])
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
 		for i := range testUsers {
-			res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+testUsers[i].Id, http.MethodGet, nil)
+			res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+globalUsers[i].ID, http.MethodGet, nil)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
 
-			resCreds := Credentials{}
+			resCreds := User{}
 			err = json.NewDecoder(res.Body).Decode(&resCreds)
 			assert.Nil(t, err, "JSON decoding must not error.")
 
 			// Check equality for all user info.
-			assert.Equal(t, testUsers[i].Email, resCreds.Email, "Email should be equal.")
-			assert.Equal(t, testUsers[i].Fname, resCreds.Fname, "First name should be equal.")
-			assert.Equal(t, testUsers[i].Lname, resCreds.Lname, "Last name should be equal.")
-			assert.Equal(t, testUsers[i].Usertype, resCreds.Usertype, "Usertype should be equal.")
-			assert.Equal(t, testUsers[i].PhoneNumber, resCreds.PhoneNumber, "Phone number should be equal.")
-			assert.Equal(t, testUsers[i].Organization, resCreds.Organization, "Organization should be equal.")
+			equal := reflect.DeepEqual(testUsers[i], resCreds)
+			assert.Equal(t, true, equal, "Users should be equal.")
 		}
 	})
 
@@ -379,6 +419,6 @@ func TestGetUserProfile(t *testing.T) {
 }
 
 // Test user import.
-func TestExport(t *testing.T) {
+func testExport(t *testing.T) {
 
 }
