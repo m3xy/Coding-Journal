@@ -35,7 +35,7 @@ var testSubmissionMetaData = []*SubmissionData{
 	{Abstract: "test abstract, this means nothing", Reviews: nil},
 }
 var testAuthors []*Credentials = []*Credentials{
-	{Email: "test@test.com", Pw: "123456aB$", Fname: "test",
+	{Email: "paul@test.com", Pw: "123456aB$", Fname: "paul",
 		Lname: "test", PhoneNumber: "0574349206", Usertype: USERTYPE_PUBLISHER},
 	{Email: "john.doe@test.com", Pw: "dlbjDs2!", Fname: "John",
 		Lname: "Doe", Organization: "TestOrg", Usertype: USERTYPE_USER},
@@ -713,43 +713,44 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	})
 }
 
-// TODO: fix the below test's bugs
-// // This tests converting from the local submission data format to the supergroup specified format
-// func TestLocalToGlobal(t *testing.T) {
-// 	// tests valid submission struct
-// 	t.Run("Valid Submission", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		// adds the submission and a file to the system
-// 		testSubmission := testSubmissions[0]
-// 		testFile := testFiles[0]
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		_, err = addFileTo(testFile, submissionId)
+// This tests converting from the local submission data format to the supergroup specified format
+func TestLocalToGlobal(t *testing.T) {
+	// tests valid submission struct
+	t.Run("Valid Submission", func(t *testing.T) {
+		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 
-// 		// gets the supergroup compliant submission
-// 		localSubmission, err := getSubmission(submissionId) // uses this to make sure id and file paths are set properly
-// 		globalSubmission, err := localToGlobal(localSubmission)
-// 		assert.NoErrorf(t, err, "Error occurred while converting submission format: %v", err)
+		// adds the submission and a file to the system
+		testSubmission := testSubmissions[0]
+		testFile := testFiles[0]
+		testAuthor := testAuthors[0]
+		testSubmission.Authors = registerUsers(t, []*Credentials{testAuthor})
+		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
+		submissionId, err := addSubmission(testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding submission: %v", err)
+		_, err = addFileTo(testFile, submissionId)
+		assert.NoErrorf(t, err, "Error occurred while adding file to submission: %v", err)
 
-// 		// compares submission fields
-// 		assert.Equal(t, localSubmission.Name, globalSubmission.Name, "Names do not match")
-// 		assert.Equal(t, localSubmission.CreationDate, globalSubmission.MetaData.CreationDate,
-// 			"Creation Dates do not match")
-// 		assert.Equal(t, localSubmission.License, globalSubmission.MetaData.License, 
-// 			"Licenses do not match")
-// 		assert.Equal(t, localSubmission.Categories, globalSubmission.MetaData.Categories, 
-// 			"Tags do not match")
-// 		assert.Equal(t, localSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
-// 			"Abstracts do not match")
-		
-// 		// compares files
-// 		// TODO: implement comparison of submission files
+		// gets the supergroup compliant submission
+		globalSubmission, err := localToGlobal(submissionId)
+		assert.NoErrorf(t, err, "Error occurred while converting submission format: %v", err)
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+		// compares submission fields
+		assert.Equal(t, testSubmission.Name, globalSubmission.Name, "Names do not match")
+		assert.Equal(t, testSubmission.License, globalSubmission.MetaData.License, 
+			"Licenses do not match")
+		assert.Equal(t, testAuthor.Fname+" "+testAuthor.Lname, globalSubmission.MetaData.AuthorNames[0],
+			"Authors do not match")
+		assert.Equal(t, testSubmission.Categories, globalSubmission.MetaData.Categories, 
+			"Tags do not match")
+		assert.Equal(t, testSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
+			"Abstracts do not match")
+		// compares files
+		assert.Equal(t, testFile.Name, globalSubmission.Files[0].Name, "File names do not match")
+		assert.Equal(t, testFile.Base64Value, globalSubmission.Files[0].Base64Value, "File content does not match")
 
-// 	})
-// }
+		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	})
+}
 
 // Tests the ability of the getAllSubmissions() function to get all submission ids and names from the db
 // at once

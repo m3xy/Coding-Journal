@@ -287,10 +287,10 @@ func dbClear() error {
 		TABLE_AUTHORS,
 		TABLE_REVIEWERS,
 		TABLE_IDMAPPINGS,
-		TABLE_USERS,
 		TABLE_CATEGORIES,
 		TABLE_FILES,
 		TABLE_SUBMISSIONS,
+		TABLE_USERS,
 	}
 	// formats and executes a delete command for each table
 	for _, table := range tablesToClear {

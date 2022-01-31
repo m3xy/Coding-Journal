@@ -628,12 +628,17 @@ func getSubmissionMetaData(submissionId int) (*SubmissionData, error) {
 // it into the supergroup compliant format
 //
 // Parameters:
-// 	localSubmission (*Submission) : a valid submission struct with all relevant fields
-// 		populated. The structs data must already be in the filesystem and database
+// 	submissionId (int) : the id of the submission to be converted to a supergroup-compliant
+// 		format
 // Returns:
 // 	(*SupergroupSubmission) : a supergroup compliant submission struct
 // 	(error) : an error if one occurs	
-func localToGlobal(localSubmission *Submission) (*SupergroupSubmission, error) {
+func localToGlobal(submissionId int) (*SupergroupSubmission, error) {
+	// gets the submission struct which submissionId refers to
+	localSubmission, err := getSubmission(submissionId)
+	if err != nil {
+		return nil, err
+	}
 	// creates the Supergroup metadata struct
 	supergroupData := &SupergroupSubmissionData{
 		CreationDate: localSubmission.CreationDate,
@@ -641,21 +646,27 @@ func localToGlobal(localSubmission *Submission) (*SupergroupSubmission, error) {
 		Abstract: localSubmission.MetaData.Abstract,
 		License: localSubmission.License,
 	}
-	// builds the list of author names and adds it to the metadata
-	authorIds, err := getSubmissionAuthors(localSubmission.Id)
+
+	// builds a list of author names from the users table's first and last name fields
+	queryAuthorNames := fmt.Sprintf(
+		SELECT_ROW_INNER_JOIN,
+		getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
+		VIEW_USER_INFO,
+		TABLE_AUTHORS,
+		VIEW_USER_INFO+"."+getDbTag(&IdMappings{}, "GlobalId"),
+		TABLE_AUTHORS+"."+getDbTag(&AuthorsReviewers{}, "Id"),
+		TABLE_AUTHORS+"."+getDbTag(&AuthorsReviewers{}, "SubmissionId"),
+	)
+	rows, err := db.Query(queryAuthorNames, submissionId)
+	if err != nil {
+		return nil, err
+	}
+	// iterates over each row to get the author names
 	var fname string
 	var lname string
 	authorNames := []string{}
-	for _, id := range authorIds {
-		// queries the author name from the credentials table
-		query := fmt.Sprintf(
-			SELECT_ROW,
-			getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
-			TABLE_USERS,
-			getDbTag(&Credentials{}, "Id"),
-		)
-		row := db.QueryRow(query, id)
-		if err = row.Scan(&fname, &lname); err != nil {
+	for rows.Next() {
+		if err = rows.Scan(&fname, &lname); err != nil {
 			return nil, err
 		}
 		authorNames = append(authorNames, fname+" "+lname)

@@ -90,7 +90,10 @@ func clearTestEnvironment() error {
 	if err := os.RemoveAll(TEST_FILES_DIR); err != nil {
 		return err
 	}
-	dbClear()
+	err := dbClear()
+	if err != nil {
+		return err
+	}
 	db.Close()
 	return nil
 }
