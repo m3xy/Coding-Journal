@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"reflect"
@@ -61,28 +60,27 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get credentials at given email, and assign it.
-	var storedCreds map[string]string
-	res := gormDb.Select("id", "password").Where(user).First(storedCreds)
+	var globalUser GlobalID
+	res := gormDb.Joins("User").Where("User.Email = ?", user.Email).Find(&globalUser)
 	if res.RowsAffected == 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 		log.Printf("[INFO] Incorrect email: %s", user.Email)
 		return
-	} else if err := res.Error; res != nil {
-		fmt.Println(err)
+	} else if err := res.Error; err != nil {
 		log.Printf("[ERROR] SQL query failure on login: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	// Compare password to hash in database, and conclude status.
-	if !comparePw(user.Password, storedCreds["password"]) {
+	if !comparePw(user.Password, globalUser.User.Password) {
 		log.Printf("[INFO] Given password and password registered on %s do not match.", user.Email)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	// Marshal JSON and insert it into the response.
-	jsonResp, _ := json.Marshal(map[string]string{getJsonTag(&User{}, "Id"): storedCreds["id"]})
+	jsonResp, _ := json.Marshal(map[string]string{getJsonTag(&User{}, "ID"): globalUser.ID})
 	w.Write(jsonResp)
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
 }
@@ -98,17 +96,21 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from parameters.
 	vars := mux.Vars(r)
-	if checkUnique(TABLE_IDMAPPINGS,
+	/* if checkUnique(TABLE_IDMAPPINGS,
 		getDbTag(&User{}, "GlobalId"), vars[getJsonTag(&User{}, "ID")]) {
+		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&User{}, "ID")])
+		w.WriteHeader(http.StatusNotFound)
+		return
+	} */
+	if isUnique(gormDb, &GlobalID{}, "ID", vars[getJsonTag(&User{}, "ID")]) {
 		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&User{}, "ID")])
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	// Get user details from user ID.
-	var info User
-	if res := gormDb.Omit("UpdatedAt", "CreatedAt", "DeletedAt", "Password").Limit(1).
-		Find(&info, vars[getJsonTag(&User{}, "ID")]); res.Error != nil {
+	var info GlobalID
+	if res := gormDb.Joins("User").Where("global_ids.id = ?", vars[getJsonTag(&User{}, "ID")]).Find(&info); res.Error != nil {
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -124,7 +126,8 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} */
-	err := json.NewEncoder(w).Encode(info)
+	info.User.Password = "" // Remove password - ensure it isn't passed around.
+	err := json.NewEncoder(w).Encode(info.User)
 	if err != nil {
 		log.Printf("[ERROR] User data JSON encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)

@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -68,10 +67,24 @@ func testInit() {
 	}
 }
 
+func (u *User) getCopy() User {
+	return User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
+		LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+}
+
+func getCopies(uc []User) []User {
+	res := make([]User, len(uc))
+	for i, u := range uc {
+		res[i] = u.getCopy()
+	}
+	return res
+}
+
 // Middleware for the test authentication server.
 func testingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !validateToken(gormDb, r.Header.Get(SECURITY_TOKEN_KEY)) {
+			fmt.Println("[WARN] Invalid security token!!")
 			w.WriteHeader(http.StatusUnauthorized)
 		} else {
 			if r.Header.Get("user") != "" {
@@ -187,7 +200,8 @@ func TestRegisterUser(t *testing.T) {
 	// Test registering new users with default credentials.
 	t.Run("Valid registrations", func(t *testing.T) {
 		for i := range testUsers {
-			_, err := registerUser(testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			_, err := registerUser(trialUser)
 			if err != nil {
 				t.Errorf("User registration error: %v\n", err.Error())
 				return
@@ -198,7 +212,8 @@ func TestRegisterUser(t *testing.T) {
 	// Test reregistering those users
 	t.Run("Repeat registrations", func(t *testing.T) {
 		for i := range testUsers {
-			_, err := registerUser(testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			_, err := registerUser(trialUser)
 			if err == nil {
 				t.Error("Already registered account cannot be reregistered.")
 				return
@@ -221,7 +236,8 @@ func TestIsUnique(t *testing.T) {
 
 	// Add an element to table
 	// Add test users to database
-	if err := gormDb.Create(&testUsers).Error; err != nil {
+	trialUsers := getCopies(testUsers)
+	if err := gormDb.Create(&trialUsers).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)
 		return
 	}
@@ -253,7 +269,8 @@ func TestSignUp(t *testing.T) {
 	t.Run("Valid signup requests", func(t *testing.T) {
 		for i := range testUsers {
 			// Create JSON body for sign up request based on test user.
-			resp, err := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			resp, err := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, trialUser)
 			if err != nil {
 				t.Errorf("Error sending request: %v", err)
 				return
@@ -263,7 +280,7 @@ func TestSignUp(t *testing.T) {
 			// Check if response OK and user registered.
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Expected %d but got %d status code!", http.StatusOK, resp.StatusCode)
 
-			assert.NotEqualf(t, false,
+			assert.NotEqualf(t, true,
 				isUnique(gormDb, &User{}, "email", testUsers[i].Email), "User should be in database!")
 
 			var exists bool
@@ -313,10 +330,17 @@ func TestLogIn(t *testing.T) {
 	srv := testingServerSetup()
 
 	// Start server.
-	go srv.ListenAndServe()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v\n", err)
+		}
+	}()
 
 	// Populate database with valid users.
-	gormDb.Create(&testUsers)
+	trialUsers := getCopies(testUsers)
+	for i := range trialUsers {
+		trialUsers[i].ID, _ = registerUser(trialUsers[i])
+	}
 
 	// Test valid logins
 	t.Run("Valid logins", func(t *testing.T) {
@@ -337,7 +361,7 @@ func TestLogIn(t *testing.T) {
 			assert.True(t, exists, "ID should exist in response.")
 
 			// Check if gotten
-			assert.Equal(t, testUsers[i].ID, storedId, "ID must equal registration's ID.")
+			assert.Equal(t, trialUsers[i].ID, storedId, "ID must equal registration's ID.")
 		}
 	})
 
@@ -389,8 +413,8 @@ func TestGetUserProfile(t *testing.T) {
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
-		for i := range testUsers {
-			res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+globalUsers[i].ID, http.MethodGet, nil)
+		for i, u := range globalUsers {
+			res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+u.ID, http.MethodGet, nil)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
 
@@ -399,7 +423,12 @@ func TestGetUserProfile(t *testing.T) {
 			assert.Nil(t, err, "JSON decoding must not error.")
 
 			// Check equality for all user info.
-			equal := reflect.DeepEqual(testUsers[i], resCreds)
+			equal := (testUsers[i].Email == resCreds.Email) &&
+				(testUsers[i].FirstName == resCreds.FirstName) &&
+				(testUsers[i].LastName == resCreds.LastName) &&
+				(testUsers[i].PhoneNumber == resCreds.PhoneNumber) &&
+				(testUsers[i].Organization == resCreds.Organization)
+
 			assert.Equal(t, true, equal, "Users should be equal.")
 		}
 	})

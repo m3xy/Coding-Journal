@@ -58,6 +58,7 @@ const (
 
 var DB_PARAMS map[string]string = map[string]string{
 	"interpolateParams": "true",
+	"parseTime":         "true",
 }
 
 // structure to hold supergroup compliant submission metadata

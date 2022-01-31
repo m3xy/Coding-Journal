@@ -50,7 +50,7 @@ func TestValidateToken(t *testing.T) {
 	// Test valid security token.
 	t.Run("Valid security token", func(t *testing.T) {
 		var storedToken string
-		err := gormDb.Model(&Server{}).Select("token").Find(&storedToken, TEAM_ID)
+		err := gormDb.Model(&Server{}).Select("token").Find(&storedToken, TEAM_ID).Error
 		assert.Nil(t, err, "Database query should not error!")
 		assert.True(t, validateToken(gormDb, storedToken), "Token should be valid!")
 	})

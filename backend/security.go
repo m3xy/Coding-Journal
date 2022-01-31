@@ -132,7 +132,7 @@ func sendSecureRequest(db *gorm.DB, req *http.Request, groupNb int) (*http.Respo
 func validateToken(db *gorm.DB, token string) bool {
 	// Query token from servers table.
 	var exists bool
-	if err := db.Model(&Server{}).Select("count(*) > 0").Where("token = ?", token).Limit(1).Find(&exists); err != nil {
+	if err := db.Model(&Server{}).Select("count(*) > 0").Where("token = ?", token).Limit(1).Find(&exists).Error; err != nil {
 		return false
 	} else {
 		return exists
