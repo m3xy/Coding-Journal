@@ -4,33 +4,14 @@
  * 
  * User's profile page
  */
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {Tabs, Tab, ListGroup} from "react-bootstrap";
-import { Redirect } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axiosInstance from "../Web/axiosInstance";
 
 const profileEndpoint = '/users';
 
-class Profile extends React.Component {
-
-	constructor(props) {
-        super(props);
-
-        this.state = {
-			userId: this.getUserID(),
-			firstname: "",
-			lastname: "",
-			email: "",
-			usertype: 0,
-			phonenumber: "",
-			organization: "",
-			submissions: {}
-        };
-
-		this.logout= this.logout.bind(this);
-    }
-
-	getUserID() {
+function getUserID() {
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
         for(let i = 0; i < cookies.length; i++){    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
@@ -39,88 +20,80 @@ class Profile extends React.Component {
             }
         }
         return null;
+}
+
+function Profile() {
+    const navigate = useNavigate()
+	const [firstname, setFirstname] = useState('')
+	const [lastname, setLastname] = useState('')
+	const [usertype, setUsertype] = useState(0)
+	const [email, setEmail] = useState('')
+	const [phonenumber, setPhoneNumber] = useState('000000')
+	const [organization, setOrganization] = useState('None')
+	const [userSubmissions, setSubmissions] = useState('')
+
+
+    function openSubmission(submissionsID) {
+        navigate("/code/" + submissionsID)
     }
 
-	logout() {
-        var cookies = document.cookie.split(';'); 
-    
-        // The "expire" attribute of every cookie is set to "Thu, 01 Jan 1970 00:00:00 GMT".
-        for (var i = 0; i < cookies.length; i++) {
-            document.cookie = cookies[i] + "=;expires=" + new Date(0).toUTCString();  //Setting all cookies expiry date to be a past date.
-        }
-
-        this.setState({
-            userId : null
-        })
-    }
-
-	openSubmission(submissionID) {
-		var codePage = window.open("/code");
-		codePage.submissionID = submissionID;
+	if(getUserID() === null) {
+		navigate("/login")
 	}
 
-	componentDidMount() {
-        axiosInstance.get(profileEndpoint + "/" + this.state.userId)
-		             .then((response) => {
-			console.log(response.data);
-			this.setState({
-				firstname: response.data.firstname,
-				lastname: response.data.lastname,
-				usertype: response.data.usertype,
-				email: response.data.email,
-				phonenumber: response.data.phonenumber,
-				organization: response.data.organization,
-				submissions: response.data.submissions
-			});
-		})
-	}
+    useEffect(() => {
+		axiosInstance.get(profileEndpoint + "/" + getUserID())
+					.then((response) => {
+						console.log(response.data);
+						setFirstname(response.data.firstname)
+						setLastname(response.data.lastname)
+						setUsertype(response.data.usertype)
+						setEmail(response.data.email)
+						setPhoneNumber(response.data.phonenumber)
+						setOrganization(response.data.organization)
+						setSubmissions(response.data.submissions)
+					})
+					.catch(() => {
+						return(<div></div>)
+					})
+    }, [])
 
-	render() {
-		//Get user comments
-		const comments = []
-
-		const userTypes = ["None", "Publisher", "Reviewer", "Reviewer-Publisher", "User"]
-
-		const submissions = Object.entries(this.state.submissions).map(([id, name]) => {
-			return (
-                <ListGroup.Item as="li" key={id} action onClick={() => {this.openSubmission(id)}}>
-                    <label>{name}</label>
-                </ListGroup.Item>
-            );
-		})
-
-		if(this.getUserID() === null) {
-            return (<Redirect to ='/login' />);
-        }
-
+	//Get user comments
+	const comments = []
+	const userTypes = ["None", "Publisher", "Reviewer", "Reviewer-Publisher", "User"]
+	const submissions = Object.entries(userSubmissions).map(([id, name]) => {
 		return (
-			<div className="col-md-6 offset-md-3" style={{textAlign:"center"}}>
-				<br/>
-				<h2>{this.state.firstname + " " + this.state.lastname}</h2>
-				 <label>({userTypes[this.state.usertype]})</label>
-				<br/><br/>
-				<Tabs justify defaultActiveKey="profile" id="profileTabs" className="mb-3">
-					<Tab eventKey="posts" title="Posts">
-						{submissions.length > 0 ? (
-							<ListGroup>{submissions}</ListGroup>
-						) : (
-							<div className="text-center" style={{color:"grey"}}><i>No posts</i></div>
-						)	
-						}
-					</Tab>
-					<Tab eventKey="comments" title="Comments">
-						{comments}
-					</Tab>
-					<Tab eventKey="contact" title="Contact">
-						Email: {this.state.email} <br/>
-						Phone Number: {this.state.phonenumber}  <br/>
-						Organization: {this.state.organization} <br/>
-					</Tab>
-				</Tabs>
-			</div>
+			<ListGroup.Item as="li" key={id} action onClick={() => {openSubmission(id)}}>
+				<label>{name}</label>
+			</ListGroup.Item>
 		);
-
-	}
+	})
+	return (
+		<div className="col-md-6 offset-md-3" style={{textAlign:"center"}}>
+			<br/>
+			<h2>{firstname + " " + lastname}</h2>
+			<label>({userTypes[usertype]})</label>
+			<br/><br/>
+			<Tabs justify defaultActiveKey="profile" id="profileTabs" className="mb-3">
+				<Tab eventKey="posts" title="Posts">
+					{submissions.length > 0 ? (
+						<ListGroup>{submissions}</ListGroup>
+					) : (
+						<div className="text-center" style={{color:"grey"}}><i>No posts</i></div>
+					)
+					}
+				</Tab>
+				<Tab eventKey="comments" title="Comments">
+					{comments}
+				</Tab>
+				<Tab eventKey="contact" title="Contact">
+					Email: {email} <br/>
+					Phone Number: {phonenumber}  <br/>
+					Organization: {organization} <br/>
+				</Tab>
+			</Tabs>
+		</div>
+	)
 }
 
 export default Profile;

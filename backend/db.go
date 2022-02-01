@@ -4,33 +4,35 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	_ "github.com/go-sql-driver/mysql"
+	"os"
 	"reflect"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var db *sql.DB
 
 const (
-	TEAM_ID         = "11"
+	TEAM_ID = "11"
 
 	// Constant for table operations.
-	VIEW_PERMISSIONS = "globalPermissions"
-	TABLE_SERVERS	 = "servers"
-	VIEW_LOGIN		 = "globalLogins"
-	TABLE_USERS     = "users"
-	TABLE_SUBMISSIONS  = "submissions"
-	TABLE_FILES     = "files"
-	TABLE_AUTHORS   = "authors"
-	TABLE_REVIEWERS = "reviewers"
-	TABLE_CATEGORIES = "categories"
-	TABLE_IDMAPPINGS = "idMappings"
-	VIEW_USER_INFO	= "globalUserInfo"
+	VIEW_PERMISSIONS    = "globalPermissions"
+	TABLE_SERVERS       = "servers"
+	VIEW_LOGIN          = "globalLogins"
+	TABLE_USERS         = "users"
+	TABLE_SUBMISSIONS   = "submissions"
+	TABLE_FILES         = "files"
+	TABLE_AUTHORS       = "authors"
+	TABLE_REVIEWERS     = "reviewers"
+	TABLE_CATEGORIES    = "categories"
+	TABLE_IDMAPPINGS    = "idMappings"
+	VIEW_USER_INFO      = "globalUserInfo"
 	VIEW_SUBMISSIONLIST = "submissionList"
 
 	// TEMP: reconcile these
-	INNER_JOIN       = "%s INNER JOIN %s"
-	INSERT_DOUBLE    = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
+	INNER_JOIN    = "%s INNER JOIN %s"
+	INSERT_DOUBLE = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
 
 	SELECT_ROW               = "SELECT %s FROM %s WHERE %s = ?"
 	SELECT_EXISTS            = "SELECT EXISTS (SELECT %s FROM %s WHERE %s = ?)"
@@ -176,7 +178,7 @@ type FileData struct {
 type Comment struct {
 	// author of the comment as an id
 	AuthorId string `json:"author"`
-	// time that the comment was recorded as a string 
+	// time that the comment was recorded as a string
 	Time string `json:"time"`
 	// content of the comment as a string
 	Base64Value string `json:"base64Value"`
@@ -186,8 +188,8 @@ type Comment struct {
 
 // Structure for authors and reviewers
 type AuthorsReviewers struct {
-	SubmissionId int `json:"submissionId" db:"submissionId"`
-	Id string `json:"id" db:"userId"`
+	SubmissionId int    `json:"submissionId" db:"submissionId"`
+	Id           string `json:"id" db:"userId"`
 }
 
 // structure for categories
@@ -196,12 +198,11 @@ type Categories struct {
 	Tag string `db:"tag"`
 }
 
-
 // Structure for servers.
 type Servers struct {
-	GroupNb	int `json:"groupNumber" db:"groupNumber"`
-	Token	string `json:"token" db:"token"`
-	Url		string `json:"url" db:"url"`
+	GroupNb int    `json:"groupNumber" db:"groupNumber"`
+	Token   string `json:"token" db:"token"`
+	Url     string `json:"url" db:"url"`
 }
 
 // Get the tag in a struct.
@@ -259,12 +260,12 @@ func getDbParams(paramMap map[string]string) string {
 }
 
 // Initialise connection to the database.
-func dbInit(user string, pw string, protocol string, h string, port int, dbname string) error {
+func dbInit(dbname string) error {
 	var err error
 
 	// Set MySQL info in DSN format according to Go MySQL Drive -
 	// user:password@protocol(host:port)/dbname?[param1=val...]
-	mysqlInfo := fmt.Sprintf("%s:%s@%s(%s:%d)/%s?%s", user, pw, protocol, h, port, dbname,
+	mysqlInfo := fmt.Sprintf("%s/%s?%s", os.Getenv("DATABASE_URL"), dbname,
 		getDbParams(DB_PARAMS)) // Setting this to allow prepared statements.
 	db, err = sql.Open("mysql", mysqlInfo)
 	if err != nil {
@@ -280,7 +281,7 @@ func dbInit(user string, pw string, protocol string, h string, port int, dbname 
 
 // Close a database connection.
 // WARNING: this function clears all data from the database, setting it
-// back to the state it'd be in 
+// back to the state it'd be in
 func dbClear() error {
 	// db tables to clear ORDER MATTERS HERE DUE TO KEY CONSTRAINTS
 	tablesToClear := []string{

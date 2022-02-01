@@ -75,14 +75,6 @@ const (
 //				base64Value: string
 //				replies: object (same as comments)
 func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		log.Print("invalid security token\n")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("uploadSingleFile request received from %v", r.RemoteAddr)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -162,14 +154,6 @@ func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
 //				base64Value: string
 //				replies: object (same as comments)
 func getFile(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		log.Print("invalid security token\n")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
@@ -245,13 +229,6 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 // 	500 : if something else goes wrong in the backend
 // Response Body: empty
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 

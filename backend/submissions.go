@@ -52,13 +52,6 @@ import (
 // Response Body:
 //	A JSON object of form: {...<submission id>:<submission name>...}
 func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
-	if !validateToken(r.Header.Get(SECURITY_TOKEN_KEY)) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
 	log.Printf("[INFO] GetAllSubmissions request received from %v", r.RemoteAddr)
 	// gets the userId from the URL
 	var userId string

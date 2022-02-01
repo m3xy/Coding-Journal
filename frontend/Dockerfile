@@ -6,9 +6,11 @@
 # ----
 # Node docker image
 # ----
-FROM node:16 AS cs3099node
+FROM node:17-alpine
 WORKDIR /usr/src/app
-COPY . ./
+COPY package*.json ./
 RUN npm i
-EXPOSE 23409
-CMD ["npm", "run", "start"]
+
+COPY . ./
+EXPOSE 3000
+CMD ["npm", "run", "start:dev"]

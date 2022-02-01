@@ -8,14 +8,15 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const (
 	BASE64_CHARS       = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/"
-	SECURITY_TOKEN_KEY = "X-FOREIGNJOURNAL-SECURITY-TOKEN"
 	SECURITY_TOKEN_ENV = "BACKEND_TOKEN"
 	SECURITY_KEY_SIZE  = 128
-	LOG_FILE_PATH      = "../cs3099-backend.log"
+	LOG_FILE_PATH      = "./cs3099-backend.log"
 )
 
 // CORS headers
@@ -86,20 +87,24 @@ func getDbSecurityKey() (string, error) {
 // Check security key existence, and set it if it doesn't exist.
 func securityCheck() error {
 	// Check security token existence before running.
-	token, err := getDbSecurityKey()
+	_, err := getDbSecurityKey()
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Println("Server token not set! Setting up...")
-			securityToken := getNewSecurityKey()
-			_, err := db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
+			myEnv, err := godotenv.Read("secrets.env")
+			if err != nil {
+				log.Fatal("No token has been set!")
+				return err
+			}
+
+			securityToken := myEnv["BACKEND_TOKEN"]
+			_, err = db.Exec(fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?);", TABLE_SERVERS),
 				TEAM_ID, securityToken, BACKEND_ADDRESS)
 			if err != nil {
 				log.Fatalf("Critical token failure! %v\n", err)
 				return err
 			} else {
 				log.Println("Security token successfully stored in database.")
-				log.Printf("Store this security token: %s\n", securityToken)
-				token = securityToken
 			}
 
 		} else {
@@ -107,9 +112,6 @@ func securityCheck() error {
 			return err
 		}
 	}
-
-	// Write environment variable for security token.
-	dotenvMap[SECURITY_TOKEN_ENV] = token
 	return nil
 }
 
@@ -175,15 +177,7 @@ func validateToken(token string) bool {
 //  200: Success - security token valid.
 //  401: Failure - security token invalid.
 func tokenValidation(w http.ResponseWriter, r *http.Request) {
-	if useCORSresponse(&w, r); r.Method == http.MethodOptions {
-		return
-	}
 	log.Printf("[INFO] Token validation request from %v.", r.RemoteAddr)
-	token := r.Header.Get(SECURITY_TOKEN_KEY)
-	if !validateToken(token) {
-		w.WriteHeader(http.StatusUnauthorized)
-		log.Print("[WARN] Received token is invalid.")
-	}
 	log.Printf("[INFO] Token validation from %v successful.", r.RemoteAddr)
 }
 

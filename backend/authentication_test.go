@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	TEST_LOG_PATH  = "test.log"
+	TEST_LOG_PATH  = "./test.log"
 	VALID_PW       = "aB12345$"
 	PW_NO_UC       = "a123456$"
 	PW_NO_LC       = "B123456$"
@@ -50,8 +50,8 @@ var wrongCredsUsers []*Credentials = []*Credentials{
 
 // Initialise the database for testing.
 func testInit() {
-	dbInit(user, password, protocol, host, port, TEST_DB)
-	setup()
+	dbInit(TEST_DB)
+	setup(TEST_LOG_PATH)
 	if err := dbClear(); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
 	}
@@ -78,14 +78,13 @@ func sendJsonRequest(endpoint string, method string, data interface{}) (*http.Re
 
 func testAuth(t *testing.T) {
 	// Set up database.
-	dbInit(user, password, protocol, host, port, TEST_DB)
-	setup()
+	dbInit(TEST_DB)
 	if err := dbClear(); err != nil {
 		fmt.Printf("Error occured while clearing Db: %v", err)
 	}
 
 	// Set up logging to a local testing file.
-	file, err := os.OpenFile(TEST_LOG_PATH, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(TEST_LOG_PATH, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
 		fmt.Printf("Log file creation failure: %v! Exiting...", err)
 	}
