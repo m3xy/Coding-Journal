@@ -1,9 +1,15 @@
 volumes:
   db_data:
 
+networks:
+  backend:
+    driver: bridge
+
 services:
   db:
     build: ./db
+    networks:
+      - backend
     ports:
       - "3307:3306"
     volumes:
@@ -13,13 +19,17 @@ services:
     build: ./backend
     depends_on:
       - db
+    links:
+      - db
+    networks:
+      - backend
     ports:
       - "3333:3333"
     volumes:
       - ./logs:/var/tmp/cs3099-log
     environment:
       LOG_PATH: "/var/tmp/cs3099-log/cs3099-backend.log"
-      DATABASE_URL: "myuser:mypass@tcp(db:3306)"
+      DATABASE_URL: "myuser:mypass@tcp(localhost:3307)"
 
   frontend:
     build: ./frontend
