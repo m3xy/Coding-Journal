@@ -6,7 +6,7 @@
 // test file for files.go
 // Note that the tests are written dependency wise from top to bottom.
 // Hence if a test breaks, fix the top one first and then re-run.
-// 
+//
 // This file depends heavily on submissions_test.go
 // ===================================================================
 
@@ -67,9 +67,9 @@ var testFileData []*CodeFileData = []*CodeFileData{
 // TODO: move these to some common place as they are used here and in submissions_test
 // Initialise and clear filesystem and database.
 func initTestEnvironment() error {
-	dbInit(user, password, protocol, host, port, TEST_DB)
+	dbInit(TEST_DB)
 	dbClear()
-	err := setup()
+	err := setup(TEST_LOG_PATH)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func TestAddFile(t *testing.T) {
 	})
 }
 
-// tests the ability of the backend to add comments to a given file. 
+// tests the ability of the backend to add comments to a given file.
 // Test Depends On:
 // 	- TestAddSubmission (in submissions_test.go)
 // 	- TestAddFile
@@ -205,7 +205,7 @@ func TestAddComment(t *testing.T) {
 		// extracts the last comment (most recently added) from the comments and checks for equality with
 		// the passed in comment
 		addedComment := codeData.Comments[len(codeData.Comments)-1]
-		assert.Equalf(t, comment.AuthorId, addedComment.AuthorId, 
+		assert.Equalf(t, comment.AuthorId, addedComment.AuthorId,
 			"Comment author ID mismatch: %s vs %s", comment.AuthorId, addedComment.AuthorId)
 		assert.Equal(t, comment.Content, addedComment.Content, "Comment content does not match")
 	}
@@ -242,9 +242,9 @@ func TestAddComment(t *testing.T) {
 
 // Tests the basic ability of the files.go code to load the data from a
 // valid file path passed to it via HTTP request
-// 
+//
 // TODO : test whether having / in file path query param breaks the function
-// 
+//
 // Test Depends On:
 // 	- TestAddSubmission (in submissions_test.go)
 // 	- TestAddFile
@@ -270,8 +270,8 @@ func TestGetFile(t *testing.T) {
 		assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Name, err)
 
 		// builds the request url inserting query parameters
-		urlString := fmt.Sprintf("%s:%s%s?%s=%d&%s=%s", TEST_URL, TEST_SERVER_PORT, 
-			ENDPOINT_FILE, getJsonTag(&File{}, "SubmissionId"), testFile.SubmissionId, 
+		urlString := fmt.Sprintf("%s:%s%s?%s=%d&%s=%s", TEST_URL, TEST_SERVER_PORT,
+			ENDPOINT_FILE, getJsonTag(&File{}, "SubmissionId"), testFile.SubmissionId,
 			getJsonTag(&File{}, "Path"), testFile.Path)
 		req, err := http.NewRequest("GET", urlString, nil)
 
@@ -287,7 +287,7 @@ func TestGetFile(t *testing.T) {
 
 		// tests that the file was retrieved with the correct information
 		assert.Equalf(t, testFile.Path, file.Path, "Incorrect file path %d != %d", file.Id, testFile.Id)
-		assert.Equalf(t, testFile.SubmissionId, file.SubmissionId, 
+		assert.Equalf(t, testFile.SubmissionId, file.SubmissionId,
 			"Incorrect file submission Id %d != %d", file.SubmissionId, testFile.SubmissionId)
 		assert.Equal(t, testFile.Content, file.Content, "File Content does not match")
 
@@ -296,7 +296,6 @@ func TestGetFile(t *testing.T) {
 		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
 	})
 }
-
 
 // Tests the ability of the files.go code to upload files to the backend
 //
@@ -329,7 +328,7 @@ func TestUploadFile(t *testing.T) {
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", 
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s",
 			TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWFILE), bytes.NewBuffer(reqBody))
 		assert.NoErrorf(t, err, "Error creating request: %v", err)
 		resp, err := sendSecureRequest(req, TEAM_ID)
@@ -379,7 +378,7 @@ func TestUploadUserComment(t *testing.T) {
 		testAuthor.Id, err = registerUser(testAuthor)
 		assert.NoErrorf(t, err, "error occurred while adding testAuthor: %v", err)
 		testComment.AuthorId = testAuthor.Id // sets test comment author
-	
+
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(map[string]interface{}{
 			getJsonTag(&File{}, "SubmissionId"): submissionId,
@@ -388,7 +387,7 @@ func TestUploadUserComment(t *testing.T) {
 			getJsonTag(&Comment{}, "Content"):   testComment.Content,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
-	
+
 		// formats and executes the request
 		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWCOMMENT), bytes.NewBuffer(reqBody))
 		assert.NoErrorf(t, err, "Error creating request: %v", err)
@@ -397,10 +396,10 @@ func TestUploadUserComment(t *testing.T) {
 		resp, err := sendSecureRequest(req, TEAM_ID)
 		assert.NoErrorf(t, err, "Error executing request: %v", err)
 		defer resp.Body.Close()
-	
+
 		// tests that the result is as desired
 		assert.Equalf(t, resp.StatusCode, http.StatusOK, "HTTP request error: %d", resp.StatusCode)
-	
+
 		// tests that the comment was added properly
 		fileDataPath := filepath.Join(
 			TEST_FILES_DIR,
@@ -415,11 +414,11 @@ func TestUploadUserComment(t *testing.T) {
 		// decodes the json from the file's metadata
 		codeData := &CodeFileData{}
 		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to decode file metadata")
-	
+
 		// extracts the last comment (most recently added) from the comments and checks for equality with
 		// the passed in comment
 		addedComment := codeData.Comments[len(codeData.Comments)-1]
-		assert.Equalf(t, testComment.AuthorId, addedComment.AuthorId, 
+		assert.Equalf(t, testComment.AuthorId, addedComment.AuthorId,
 			"Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
 		assert.Equalf(t, testComment.Content, addedComment.Content,
 			"Comment content mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)

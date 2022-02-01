@@ -1,47 +1,47 @@
-var HtmlWebpackPlugin = require('html-webpack-plugin');
-const Dotenv = require('dotenv-webpack')
+var HtmlWebpackPlugin = require("html-webpack-plugin");
+const Dotenv = require("dotenv-webpack");
 
 module.exports = {
-    mode: 'production',
+    mode: "production",
     resolve: {
-        extensions: ['.js', '.jsx']
+        extensions: [".js", ".jsx"],
     },
     module: {
         rules: [
             {
                 test: /\.jsx?$/,
-                loader: 'babel-loader'
+                use: "babel-loader",
             },
             {
                 test: /\.css/,
-                loader: 'style-loader!css-loader'
+                use: ["style-loader", "css-loader"],
             },
             {
                 test: /\.log$/i,
-                use: 'raw-loader',
+                use: "raw-loader",
             },
-        ]
+        ],
     },
     optimization: {
+        runtimeChunk: true,
         splitChunks: {
-	    chunks: 'all',
+            chunks: "all",
         },
     },
     plugins: [
         new HtmlWebpackPlugin({
-            template: './src/index.html'
+            template: "./src/index.html",
         }),
-        new Dotenv({path: './.env'})
     ],
     devServer: {
         historyApiFallback: true,
+        host: "0.0.0.0",
         port: 23409,
-        injectClient: false,
     },
     externals: {
         // global app config object
         config: JSON.stringify({
-            apiUrl: 'http://localhost:4000'
-        })
+            apiUrl: "http://localhost:4000",
+        }),
     },
-}
+};
