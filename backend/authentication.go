@@ -61,7 +61,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 	// Get credentials at given email, and assign it.
 	var globalUser GlobalID
-	res := gormDb.Joins("User").Where("User.Email = ?", user.Email).Find(&globalUser)
+	res := gormDb.Joins("User").Where("User.Email = ?", user.Email).Limit(1).Find(&globalUser)
 	if res.RowsAffected == 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 		log.Printf("[INFO] Incorrect email: %s", user.Email)
@@ -156,7 +156,7 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 
 	// Query path from team ID.
 	var retServer Server
-	res := gormDb.Find(&retServer, propsMap[getJsonTag(&Server{}, "GroupNumber")])
+	res := gormDb.Limit(1).Find(&retServer, propsMap[getJsonTag(&Server{}, "GroupNumber")])
 	if res.RowsAffected == 0 {
 		log.Printf("[WARN] Group number %s doesn't exist in database.", propsMap[getJsonTag(&Server{}, "GroupNumber")])
 		w.WriteHeader(http.StatusUnauthorized)

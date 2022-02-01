@@ -63,6 +63,7 @@ type Submission struct {
 	Categories []Category `gorm:"many2many:categories_submission"`
 }
 
+
 type File struct {
 	gorm.Model
 	SubmissionID uint
