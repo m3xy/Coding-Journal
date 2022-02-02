@@ -47,13 +47,15 @@ class Upload extends React.Component {
      */
     uploadFiles(userId, submissionName, files) {
 
-        if(userId === null) {
-            console.log("not logged in!");
-            return;
-        }
+        // if(userId === null) {
+        //     console.log("not logged in!");
+        //     return;
+        // }
 
-        const authorID = JSON.parse(userId).userId;  //Extract author's userId
+        console.log(userId);
+        // const authorID = JSON.parse(userId).userId;  //Extract author's userId
 
+        
         const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -95,17 +97,19 @@ class Upload extends React.Component {
         Promise.all(filePromises)
                .then(() => {
                    let data = {
-                       author: authorID,
+                       author: userId,
                        name: submissionName,
-                       content: files[i]
+                       content: files[0]
                    }
                    console.log(data)
                    axiosInstance.post(uploadEndpoint, data)
                                 .then((response) => {
-                                    console.log("Submission ID: " + response.data["projId"]);
+                                    console.log(response);
+                                    console.log("Submission ID: " + response.data["id"]);
                                     var codePage = window.open("/code");
-                                    codePage.submission = submission;
-                                    codePage.submissionName = this.state.submissionName;
+                                    codePage.submissionId = response.data["id"];
+                                    codePage.submissionName = response.data["name"];
+                                    codePage.submission = files[0];
                                 })
                                 .catch((error) => {
                                     console.log(error);
@@ -147,6 +151,7 @@ class Upload extends React.Component {
         // }, (error) => {
         //    console.log(error);
         // });
+        
         this.uploadFiles(userId, this.state.submissionName, this.state.files);
 
         document.getElementById("formFile").files = new DataTransfer().files;
@@ -174,14 +179,14 @@ class Upload extends React.Component {
         let formFileList = new DataTransfer();
         let fileList = this.state.files;
 
-        for(var i = 0; i < files.length; i++){
+        for(let i = 0; i < files.length; i++){
             if(!files[i] 
             || !(files[i].name.endsWith(".css") || files[i].name.endsWith(".java") || files[i].name.endsWith(".js"))){
                 console.log("Invalid file");
                 return;
             } 
 
-            for(var j = 0; j < fileList.length; j++){
+            for(let j = 0; j < fileList.length; j++){
                 if(files[i].name === fileList[j].name){
                     console.log("Duplicate file");
                     return;
@@ -203,7 +208,7 @@ class Upload extends React.Component {
         let formFileList = new DataTransfer();
         let fileList = this.state.files;
 
-        for(var i = 0; i < this.state.files.length; i++){
+        for(let i = 0; i < this.state.files.length; i++){
             formFileList.items.add(this.state.files[i]);
         }
         formFileList.items.remove(key);

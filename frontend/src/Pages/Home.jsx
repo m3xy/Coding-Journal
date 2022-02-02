@@ -1,6 +1,6 @@
 /**
  * Home.jsx
- * author: 190010714
+ * author: 190010714, 190019931
  * 
  * Home page for the whole website
  */
