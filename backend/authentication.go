@@ -13,16 +13,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
-	"reflect"
-	"regexp"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
-	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/validator.v2"
 	"gorm.io/gorm"
 )
@@ -30,60 +26,11 @@ import (
 const (
 	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//://_//-//+//-//=//\"//'"
 	A_NUMS        = "a-zA-Z0-9"
-	HASH_COST     = 8
 )
 
 // ----
 // User log in
 // ----
-
-/*
- Log in to website, check credentials correctness.
- Content type: application/json
- Success: 200, Credentials are correct
- Failure: 401, Unauthorized
- Returns: userId
-*/
-func logIn(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received log in request from %v", r.RemoteAddr)
-
-	// Set up writer response.
-	w.Header().Set("Content-Type", "application/json")
-
-	// Get credentials from log in request.
-	user := &User{}
-	err := json.NewDecoder(r.Body).Decode(user)
-	if err != nil {
-		log.Printf("[ERROR] JSON decoder failed on log in.")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// Get credentials at given email, and assign it.
-	var globalUser GlobalID
-	res := gormDb.Joins("User").Where("User.Email = ?", user.Email).Limit(1).Find(&globalUser)
-	if res.RowsAffected == 0 {
-		w.WriteHeader(http.StatusUnauthorized)
-		log.Printf("[INFO] Incorrect email: %s", user.Email)
-		return
-	} else if err := res.Error; err != nil {
-		log.Printf("[ERROR] SQL query failure on login: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// Compare password to hash in database, and conclude status.
-	if !comparePw(user.Password, globalUser.User.Password) {
-		log.Printf("[INFO] Given password and password registered on %s do not match.", user.Email)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Marshal JSON and insert it into the response.
-	jsonResp, _ := json.Marshal(map[string]string{getJsonTag(&User{}, "ID"): globalUser.ID})
-	w.Write(jsonResp)
-	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
-}
 
 /*
 	Get user profile info for a user.
@@ -263,42 +210,4 @@ func registerUser(user User) (string, error) {
 
 	// Return user's primary key (the UUID)
 	return strconv.Itoa(TEAM_ID) + user.ID, nil
-}
-
-// ----
-// Password control
-// ----
-
-// Checks if a password contains upper case, lower case, numbers, and special characters.
-func validpw(v interface{}, param string) error {
-	st := reflect.ValueOf(v)
-	if st.Kind() != reflect.String {
-		return errors.New("Value must be string!")
-	} else {
-		// Set password and character number.
-		pw := st.String()
-		restrictions := []string{"[a-z]", // Must contain lowercase.
-			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
-			"[A-Z]",                               // Must contain uppercase.
-			"[0-9]",                               // Must contain numerics.
-			"[" + SPECIAL_CHARS + "]"}             // Must contain special characters.
-		for _, restriction := range restrictions {
-			matcher := regexp.MustCompile(restriction)
-			if !matcher.MatchString(pw) {
-				return errors.New("Restriction not matched!")
-			}
-		}
-		return nil
-	}
-}
-
-// Hash a password
-func hashPw(pw string) []byte {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
-	return hash
-}
-
-// Compare password and hash for validity.
-func comparePw(pw string, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }
