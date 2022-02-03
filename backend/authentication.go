@@ -13,13 +13,14 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/validator.v2"
+	"gorm.io/gorm"
 )
 
 const (
@@ -30,58 +31,6 @@ const (
 // ----
 // User log in
 // ----
-
-/*
-	Get user profile info for a user.
-	Content type: application/json
-	Success: 200, Credentials can be passed down.
-	Failure: 404, User not found.
-*/
-func getUserProfile(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received user credential request from %s", r.RemoteAddr)
-
-	// Get user from parameters.
-	vars := mux.Vars(r)
-	/* if checkUnique(TABLE_IDMAPPINGS,
-		getDbTag(&User{}, "GlobalId"), vars[getJsonTag(&User{}, "ID")]) {
-		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&User{}, "ID")])
-		w.WriteHeader(http.StatusNotFound)
-		return
-	} */
-	if isUnique(gormDb, &GlobalUser{}, "ID", vars[getJsonTag(&User{}, "ID")]) {
-		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&User{}, "ID")])
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	// Get user details from user ID.
-	var info GlobalUser
-	if res := gormDb.Joins("User").Where("global_ids.id = ?", vars[getJsonTag(&User{}, "ID")]).Find(&info); res.Error != nil {
-		log.Printf("[ERROR] SQL query error: %v", res.Error)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	} else if res.RowsAffected == 0 {
-		log.Printf("[WARN] No user found with that ID.")
-		return
-	}
-
-	// Get map of submission IDs to submission names.
-	/* submissionsMap, err := getUserSubmissions(vars[getJsonTag(&Credentials{}, "Id")])
-	if err != nil {
-		log.Printf("[ERROR] Failed to retrieve user (%s)'s projects: %v'", vars[getJsonTag(&Credentials{}, "Id")], err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	} */
-	info.User.Password = "" // Remove password - ensure it isn't passed around.
-	err := json.NewEncoder(w).Encode(info.User)
-	if err != nil {
-		log.Printf("[ERROR] User data JSON encoding failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	log.Printf("[INFO] User credential request from %s successful.", r.RemoteAddr)
-}
-
 /*
 	Log in to website with any server's database.
 	Content type: application/json
@@ -158,7 +107,9 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 
 /*
   Router function to sign up to website.
-  Content type: application/json Success: 200, OK Failure: 400, bad request
+  Content type: application/json
+  Success: 200, OK
+  Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] Received sign up request from %s.", r.RemoteAddr)
@@ -194,11 +145,22 @@ func registerUser(user User) (string, error) {
 	// Hash password and store new credentials to database.
 	user.Password = string(hashPw(user.Password))
 
-	// Make credentials insert transaction.
-	user.ID = uuid.NewV4().String()
-	if err := gormDb.Create(&GlobalUser{ID: (strconv.Itoa(TEAM_ID) + user.ID), User: user}).Error; err != nil {
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// Check constraints on user
+		if !isUnique(tx, User{}, "Email", user.Email) {
+			return errors.New("Email already taken!")
+		}
+
+		// Make credentials insert transaction.
+		user.ID = uuid.NewV4().String()
+		if err := gormDb.Create(&GlobalUser{ID: (strconv.Itoa(TEAM_ID) + user.ID), User: user}).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", err
 	}
+
 	// Return user's primary key (the UUID)
 	return strconv.Itoa(TEAM_ID) + user.ID, nil
 }

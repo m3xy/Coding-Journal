@@ -9,7 +9,11 @@
 FROM golang:latest
 RUN mkdir -p /backend
 WORKDIR /backend
-COPY . /backend
+COPY go.* ./
+RUN go mod download
+
+COPY . .
 RUN go build -o main .
+
 CMD ["./main"]
 EXPOSE 3333

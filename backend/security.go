@@ -61,13 +61,13 @@ func randStringBase64(seed int, n int) string {
 // Get security key from database.
 func getDbSecurityKey(db *gorm.DB) (string, error) {
 	// Get security key from database
-	var token string
-	if res := db.Model(&Server{}).Select("token").Limit(1).Find(&token, TEAM_ID); res.Error != nil {
+	var server Server
+	if res := db.Select("Token").Limit(1).Find(&server, TEAM_ID); res.Error != nil {
 		return "", res.Error
 	} else if res.RowsAffected == 0 {
 		return "", nil
 	} else {
-		return token, nil
+		return server.Token, nil
 	}
 }
 

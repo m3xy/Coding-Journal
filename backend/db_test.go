@@ -37,6 +37,10 @@ var testUsers []User = []User{
 		LastName: "Doe", UserType: USERTYPE_PUBLISHER},
 }
 
+var testObjects []GlobalUser = []GlobalUser{
+	{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"},
+}
+
 var wrongCredsUsers []User = []User{
 	{Email: "test.nospec@test.com", Password: "badN0Special", FirstName: "test", LastName: "nospec"},
 	{Email: "test.nonum@test.com", Password: "testNoNum!", FirstName: "test", LastName: "nonum"},
@@ -71,14 +75,25 @@ func (u *User) getCopy() User {
 	return User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
 		LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
 }
+func (u *GlobalUser) getCopy() GlobalUser {
+	return GlobalUser{ID: u.ID, FullName: u.FullName}
+}
 
 // Get a copy of a user array.
-func getCopies(uc []User) []User {
+func getUserCopies(uc []User) []User {
 	res := make([]User, len(uc))
 	for i, u := range uc {
 		res[i] = u.getCopy()
 	}
 	return res
+}
+func getGlobalCopies(gc []GlobalUser) []GlobalUser {
+	res := make([]GlobalUser, len(gc))
+	for i, u := range gc {
+		res[i] = u.getCopy()
+	}
+	return res
+
 }
 
 // Middleware for the test authentication server.
@@ -172,27 +187,28 @@ func TestDbInit(t *testing.T) {
 // Test credential uniqueness with test database.
 func TestIsUnique(t *testing.T) {
 	testInit()
+
 	// Test uniqueness in empty table
 	t.Run("Unique elements", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			assert.Truef(t, isUnique(gormDb, &User{}, "email", testUsers[i].Email),
-				"Email %s Shouldn't exist in database!", testUsers[i].Email)
+		for i := 0; i < len(testObjects); i++ {
+			assert.Truef(t, isUnique(gormDb, &GlobalUser{}, "ID", testObjects[i].ID),
+				"ID %s Shouldn't exist in database!", testObjects[i].ID)
 		}
 	})
 
 	// Add an element to table
 	// Add test users to database
-	trialUsers := getCopies(testUsers)
-	if err := gormDb.Create(&trialUsers).Error; err != nil {
+	trialObjects := getGlobalCopies(testObjects)
+	if err := gormDb.Create(&trialObjects).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)
 		return
 	}
 
 	// Test uniquenes if element already exists in table.
 	t.Run("Non-unique elements", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			assert.Falsef(t, isUnique(gormDb, &User{}, "email", testUsers[i].Email),
-				"Email %s should already be in database!", testUsers[i].Email)
+		for i := 0; i < len(testObjects); i++ {
+			assert.Falsef(t, isUnique(gormDb, &GlobalUser{}, "ID", testObjects[i].ID),
+				"Email %s should already be in database!", testObjects[i].ID)
 		}
 	})
 	testEnd()

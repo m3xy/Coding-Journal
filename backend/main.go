@@ -41,20 +41,23 @@ const (
 
 var prodLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
 	SlowThreshold: time.Second,
-	LogLevel:      logger.Info,
+	LogLevel:      logger.Error,
 })
 
 func main() {
-	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
-	gormInit(dbname, prodLogger)
+	var err error
+	if gormDb, err = gormInit(dbname, prodLogger); err != nil {
+		return
+	}
 	setup(gormDb, os.Getenv("LOG_PATH"))
 
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	// Run server in goroutine to avoid blocking call.
+	srv := setupCORSsrv()
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v\n", err)

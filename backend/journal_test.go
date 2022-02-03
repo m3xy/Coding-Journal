@@ -24,7 +24,7 @@ func TestLogIn(t *testing.T) {
 	}()
 
 	// Populate database with valid users.
-	trialUsers := getCopies(testUsers)
+	trialUsers := getUserCopies(testUsers)
 	for i := range trialUsers {
 		trialUsers[i].ID, _ = registerUser(trialUsers[i])
 	}

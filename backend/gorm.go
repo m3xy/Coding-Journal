@@ -17,9 +17,9 @@ var gormDb *gorm.DB
 
 type User struct {
 	ID           string `gorm:"type:varchar(191);not null;primaryKey" json:"userId"`
-	GlobalUserID string
+	GlobalUserID string `json:",omitempty"`
 	Email        string `gorm:"uniqueIndex;unique;not null" json:"email"`
-	Password     string `gorm:"not null" json:"password" validate:"min=8,max=64,validpw"`
+	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,validpw"`
 	FirstName    string `validate:"nonzero,max=32" json:"firstname"`
 	LastName     string `validate:"nonzero,max=32" json:"lastname"`
 	UserType     int    `json:"usertype"`
