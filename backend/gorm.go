@@ -54,25 +54,110 @@ type QueryUser struct {
 	Password string
 }
 
+// Structure for code Submissions
 type Submission struct {
 	gorm.Model
-	Name       string     `gorm:"not null;size:128;index" json:"submissionName"`
-	Files      []File     `gorm:"foreignKey:SubmissionID;references:ID"`
+	// name of the submission
+	Name string `gorm:"not null;size:128;index" json:"submissionName"`
+	// license which the code is published under
+	License string `gorm:"size:64" json:"license"`
+	// an array of the submission's files
+	// File      []File     `gorm:"foreignKey:SubmissionID;references:ID"`
+	// an array of the submission's file paths
+	FilePaths []string `json:"filePaths"`
+	// an array of the submissions's authors
+	AuthorIDs   []string `gorm:"-" json:"AuthorIDs"`
 	Authors    []User     `gorm:"many2many:authors_submission"`
+	// an array of the submission's reviewers
+	ReviewerIDs   []string `gorm:"-" json:"ReviewerIDs"`
 	Reviewers  []User     `gorm:"many2many:reviewers_submission"`
-	Categories []Category `gorm:"many2many:categories_submission"`
+	// tags for organizing/grouping code submissions
+	Categories []Category `gorm:"foreignKey:SubmissionID; references:ID" json:"categories"`
+	// metadata about the submission
+	MetaData *SubmissionData `gorm:"-" json:"metadata"`
 }
 
+// Supergroup compliant code submissions (never stored in db)
+type SupergroupSubmission struct {
+	// name of the submission
+	Name string `json:"name"`
+	// metadata about the submission
+	MetaData *SupergroupSubmissionData `json:"metadata"`
+	// file objects which are members of the submission
+	Files []*SupergroupFile `json:"files"`
+}
 
+// structure for meta-data of the submission. matches the structure of the submission's
+// JSON data file. This struct is never stored in the db
+type SubmissionData struct {
+	// abstract for the submission, to be displayed upon opening of any given submission
+	Abstract string `json:"abstract"`
+	// reviewer comments on the overall submission
+	Reviews []*Comment `json:"reviews"`
+}
+
+// supergroup compliant structure for meta-data of the submission
+type SupergroupSubmissionData struct {
+	// date the code submission was created
+	CreationDate string `json:"creationDate"`
+	// names of the authors listed on the submission
+	AuthorNames []string `json:"authorNames"`
+	// tags for organizing/grouping code submissions (does not access db, so doesnt use Category type)
+	Categories []string `json:"categories"`
+	// abstract for the submission, to be displayed upon opening of any given submission
+	Abstract string `json:"abstract"`
+	// license which the code is published under
+	License string `json:"license"`
+}
+
+// Structure for code files
 type File struct {
 	gorm.Model
-	SubmissionID uint
-	FilePath     string `gorm:"unique" json:"filePath"`
+	// id of the submission this file is a part of
+	SubmissionID int `json:"submissionId"`
+	// name of the submission this file is a part of
+	SubmissionName string `json:"submissionName"` // TODO: remove if obselete
+	// relative path to the file from the root of the submission's file structure
+	Path string `json:"filePath" db:"filePath"`
+	// base name of the file with extension
+	Name string `json:"filename"`
+	// content of the file encoded as a Base64 string (non-db field)
+	Base64Value string `gorm:"-" json:"base64Value"`
+	// structure to hold the data from the file's metadata file
+	MetaData *FileData `gorm:"-" json:"metadata"`
 }
 
+// Supergroup compliant file structure (never stored in db)
+type SupergroupFile struct {
+	// name of the file as a string
+	Name string `json:"filename"`
+	// file content as a base64 encoded string
+	Base64Value string `json: "base64Value"`
+}
+
+// structure to hold json data from data files (never stored in db)
+type FileData struct {
+	// stores comments for the given code file
+	Comments []*Comment `json:"comments"`
+}
+
+// Structure for user comments on code (not written to db)
+type Comment struct {
+	// author of the comment as an id
+	AuthorId string `json:"author"`
+	// time that the comment was recorded as a string
+	Time string `json:"time"`
+	// content of the comment as a string
+	Base64Value string `json:"base64Value"`
+	// replies TEMP: maybe don't allow nested replies?
+	Replies []*Comment `json:"replies"`
+}
+
+// stores submission tags (i.e. networking, java, python, etc.)
 type Category struct {
 	gorm.Model
-	Tag string `gorm:"uniqueIndex;unique" json:"category"`
+	Tag string `gorm:"uniqueIndex;unique" json:"category"` // actual tag
+	SubmissionID int
 }
 
 func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
@@ -86,7 +171,7 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&User{}, &Server{}, &GlobalID{}, &Category{}, &Submission{}, &File{})
+	err = db.AutoMigrate(&User{}, &Server{}, &GlobalID{})
 	if err != nil {
 		goto ERR
 	}
@@ -105,7 +190,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func gormClear(db *gorm.DB) error {
-	tables := []interface{}{&File{}, &Category{}, &Submission{}, &GlobalID{}, &User{}}
+	tables := []interface{}{&GlobalID{}, &User{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
 			Unscoped().Delete(table)
