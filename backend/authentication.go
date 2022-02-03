@@ -20,7 +20,6 @@ import (
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"gopkg.in/validator.v2"
-	"gorm.io/gorm"
 )
 
 const (
@@ -49,14 +48,14 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	} */
-	if isUnique(gormDb, &GlobalID{}, "ID", vars[getJsonTag(&User{}, "ID")]) {
+	if isUnique(gormDb, &GlobalUser{}, "ID", vars[getJsonTag(&User{}, "ID")]) {
 		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&User{}, "ID")])
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	// Get user details from user ID.
-	var info GlobalID
+	var info GlobalUser
 	if res := gormDb.Joins("User").Where("global_ids.id = ?", vars[getJsonTag(&User{}, "ID")]).Find(&info); res.Error != nil {
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -196,18 +195,10 @@ func registerUser(user User) (string, error) {
 	user.Password = string(hashPw(user.Password))
 
 	// Make credentials insert transaction.
-	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		user.ID = uuid.NewV4().String()
-		if err := tx.Create(&user).Error; err != nil {
-			return err
-		} else if err := tx.Create(&GlobalID{ID: (strconv.Itoa(TEAM_ID) + user.ID), UserID: user.ID}).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
+	user.ID = uuid.NewV4().String()
+	if err := gormDb.Create(&GlobalUser{ID: (strconv.Itoa(TEAM_ID) + user.ID), User: user}).Error; err != nil {
 		return "", err
 	}
-
 	// Return user's primary key (the UUID)
 	return strconv.Itoa(TEAM_ID) + user.ID, nil
 }

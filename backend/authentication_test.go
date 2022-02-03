@@ -125,8 +125,8 @@ func TestSignUp(t *testing.T) {
 				isUnique(gormDb, &User{}, "email", testUsers[i].Email), "User should be in database!")
 
 			var exists bool
-			if err := gormDb.Model(&GlobalID{}).Select("count(*) > 0").
-				Where(&GlobalID{User: testUsers[i]}).Find(&exists).Error; err != nil {
+			if err := gormDb.Model(&GlobalUser{}).Select("count(*) > 0").
+				Where(&GlobalUser{User: testUsers[i]}).Find(&exists).Error; err != nil {
 				t.Errorf("Global ID test query error: %v", err)
 			}
 			assert.NotEqual(t, false, exists, "ID should be in database!")
@@ -173,7 +173,7 @@ func TestGetUserProfile(t *testing.T) {
 	go srv.ListenAndServe()
 
 	// Populate database for testing and test valid user.
-	globalUsers := make([]GlobalID, len(testUsers))
+	globalUsers := make([]GlobalUser, len(testUsers))
 	for i := range testUsers {
 		globalUsers[i].ID, _ = registerUser(testUsers[i])
 	}
