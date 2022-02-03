@@ -75,8 +75,8 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 
 	// Get response from login request.
 	client := &http.Client{}
-	r.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
-	foreignRes, err := client.Do(r)
+	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
+	foreignRes, err := client.Do(globalReq)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("[ERROR] HTTP Request error: %v", err)
