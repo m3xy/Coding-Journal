@@ -2,10 +2,13 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"golang.org/x/crypto/bcrypt"
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -55,6 +58,9 @@ const (
 	USERTYPE_REVIEWER           = 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
 	USERTYPE_USER               = 4
+
+	// Password related
+	HASH_COST = 8
 )
 
 var DB_PARAMS map[string]string = map[string]string{
@@ -314,4 +320,42 @@ func getCols(v interface{}) []interface{} {
 		cols[i] = s.Field(i).Addr().Interface()
 	}
 	return cols
+}
+
+// -----
+// Password Control
+// -----
+
+// Checks if a password contains upper case, lower case, numbers, and special characters.
+func validpw(v interface{}, param string) error {
+	st := reflect.ValueOf(v)
+	if st.Kind() != reflect.String {
+		return errors.New("Value must be string!")
+	} else {
+		// Set password and character number.
+		pw := st.String()
+		restrictions := []string{"[a-z]", // Must contain lowercase.
+			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
+			"[A-Z]",                               // Must contain uppercase.
+			"[0-9]",                               // Must contain numerics.
+			"[" + SPECIAL_CHARS + "]"}             // Must contain special characters.
+		for _, restriction := range restrictions {
+			matcher := regexp.MustCompile(restriction)
+			if !matcher.MatchString(pw) {
+				return errors.New("Restriction not matched!")
+			}
+		}
+		return nil
+	}
+}
+
+// Hash a password
+func hashPw(pw string) []byte {
+	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
+	return hash
+}
+
+// Compare password and hash for validity.
+func comparePw(pw string, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }
