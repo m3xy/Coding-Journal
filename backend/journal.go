@@ -32,7 +32,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get credentials at given email, and assign it.
-	var globalUser GlobalID
+	var globalUser GlobalUser
 	res := gormDb.Joins("User").Where("User.Email = ?", user.Email).Limit(1).Find(&globalUser)
 	if res.RowsAffected == 0 {
 		w.WriteHeader(http.StatusUnauthorized)

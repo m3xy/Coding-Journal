@@ -17,6 +17,7 @@ var gormDb *gorm.DB
 
 type User struct {
 	ID           string `gorm:"type:varchar(191);not null;primaryKey" json:"userId"`
+	GlobalUserID string
 	Email        string `gorm:"uniqueIndex;unique;not null" json:"email"`
 	Password     string `gorm:"not null" json:"password" validate:"min=8,max=64,validpw"`
 	FirstName    string `validate:"nonzero,max=32" json:"firstname"`
@@ -38,31 +39,24 @@ type Server struct {
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
-type GlobalID struct {
-	ID     string `gorm:"not null;primaryKey" json:"globalId"`
-	UserID string `json:"userId"`
-	User   User
+type GlobalUser struct {
+	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"globalId"`
+	FullName string
+	User     User
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
-type QueryUser struct {
-	ID       string
-	Email    string
-	Password string
-}
-
 type Submission struct {
 	gorm.Model
-	Name       string     `gorm:"not null;size:128;index" json:"submissionName"`
-	Files      []File     `gorm:"foreignKey:SubmissionID;references:ID"`
-	Authors    []User     `gorm:"many2many:authors_submission"`
-	Reviewers  []User     `gorm:"many2many:reviewers_submission"`
-	Categories []Category `gorm:"many2many:categories_submission"`
+	Name       string       `gorm:"not null;size:128;index" json:"submissionName"`
+	Files      []File       `gorm:"foreignKey:SubmissionID;references:ID"`
+	Authors    []GlobalUser `gorm:"many2many:authors_submission"`
+	Reviewers  []GlobalUser `gorm:"many2many:reviewers_submission"`
+	Categories []Category   `gorm:"many2many:categories_submission"`
 }
-
 
 type File struct {
 	gorm.Model
@@ -86,7 +80,7 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&User{}, &Server{}, &GlobalID{}, &Category{}, &Submission{}, &File{})
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Category{}, &Submission{}, &File{})
 	if err != nil {
 		goto ERR
 	}
@@ -105,7 +99,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func gormClear(db *gorm.DB) error {
-	tables := []interface{}{&File{}, &Category{}, &Submission{}, &GlobalID{}, &User{}}
+	tables := []interface{}{&File{}, &Category{}, &Submission{}, &User{}, &GlobalUser{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
 			Unscoped().Delete(table)
