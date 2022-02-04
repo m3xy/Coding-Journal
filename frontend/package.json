@@ -2,9 +2,8 @@
   "license": "MIT",
   "scripts": {
     "build": "webpack build --mode production --color --config webpack.production.js",
-    "start": "npm run start:nodocker",
-    "start:dev": "webpack serve --hot --color --open --config webpack.dev.js",
-    "start:nodocker": "webpack serve --hot --color --open --config webpack.nodocker.js"
+    "start": "npm run start:dev",
+    "start:dev": "webpack serve --hot --color --open --config webpack.dev.js"
   },
   "dependencies": {
     "axios": "^0.25.0",
@@ -28,7 +27,8 @@
     "redux-logger": "^3.0.6",
     "redux-thunk": "^2.4.1",
     "regenerator-runtime": "^0.13.9",
-    "webpack-merge": "^5.8.0"
+    "webpack-merge": "^5.8.0",
+    "react-folder-tree": "5.0.3"
   },
   "devDependencies": {
     "@babel/core": "^7.16.7",

@@ -15,7 +15,7 @@ import React from 'react';
 import './App.css';
 import { BrowserRouter as Router, Route, Routes} from 'react-router-dom';
 import {Container} from "react-bootstrap"
-import { Navigation, Home, Login, Register, About, Contact, Footer, Code, Upload, Profile, Comment } from '../Pages';
+import { Navigation, Home, Login, Register, About, Contact, Footer, Code, Upload, Profile, Comment, Submissions } from '../Pages';
  
 function App() {
 
@@ -35,6 +35,7 @@ function App() {
                     <Route path="/contact" element = {<Contact />} />
                     <Route path="/upload" element = {<Upload />} />
                     <Route path="/profile" element = {<Profile />} />
+                    <Route path="/submissions" element = {<Submissions />} />
                 </Routes>
                 <Footer />
             </Router>

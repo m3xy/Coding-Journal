@@ -73,6 +73,9 @@ function Navigation() {
 					<LinkContainer to="/profile">
 						<Nav.Link>Profile</Nav.Link>
 					</ LinkContainer>
+					<LinkContainer to="/submissions">
+						<Nav.Link>Submissions</Nav.Link>
+					</ LinkContainer>
 				</Nav>
 			</Container>
 		</Navbar>

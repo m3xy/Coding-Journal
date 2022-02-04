@@ -9,3 +9,4 @@ export {default as Code} from "./Code";
 export {default as Upload} from "./Upload";
 export {default as Profile} from "./Profile"
 export {default as Comment} from "./Comment";
+export {default as Submissions} from "./Submissions";
