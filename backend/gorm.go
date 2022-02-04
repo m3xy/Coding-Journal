@@ -10,6 +10,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -63,17 +64,13 @@ type Submission struct {
 	// license which the code is published under
 	License string `gorm:"size:64" json:"license"`
 	// an array of the submission's files
-	// File      []File     `gorm:"foreignKey:SubmissionID;references:ID"`
-	// an array of the submission's file paths
-	FilePaths []string `json:"filePaths"`
+	Files []File `gorm:"foreignKey:SubmissionID; references:ID"`
 	// an array of the submissions's authors
-	AuthorIDs   []string `gorm:"-" json:"AuthorIDs"`
-	Authors    []User     `gorm:"many2many:authors_submission"`
+	Authors []GlobalUser `gorm:"many2many:authors_submission"`
 	// an array of the submission's reviewers
-	ReviewerIDs   []string `gorm:"-" json:"ReviewerIDs"`
-	Reviewers  []User     `gorm:"many2many:reviewers_submission"`
+	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission"`
 	// tags for organizing/grouping code submissions
-	Categories []Category `gorm:"foreignKey:SubmissionID; references:ID" json:"categories"`
+	Categories []string `gorm:"-" json:"categories"`
 	// metadata about the submission
 	MetaData *SubmissionData `gorm:"-" json:"metadata"`
 }
@@ -111,16 +108,7 @@ type SupergroupSubmissionData struct {
 	License string `json:"license"`
 }
 
-// // Structure for code files
-// type Submission struct {
-// 	gorm.Model
-// 	Name       string       `gorm:"not null;size:128;index" json:"submissionName"`
-// 	Files      []File       `gorm:"foreignKey:SubmissionID;references:ID"`
-// 	Authors    []GlobalUser `gorm:"many2many:authors_submission"`
-// 	Reviewers  []GlobalUser `gorm:"many2many:reviewers_submission"`
-// 	Categories []Category   `gorm:"many2many:categories_submission"`
-// }
-
+// struct for code files
 type File struct {
 	gorm.Model
 	// id of the submission this file is a part of
@@ -165,9 +153,8 @@ type Comment struct {
 
 // stores submission tags (i.e. networking, java, python, etc.)
 type Category struct {
-	gorm.Model
-	Tag string `gorm:"uniqueIndex;unique" json:"category"` // actual tag
-	SubmissionID int
+	Tag          string `gorm:"uniqueIndex;unique" json:"category"` // actual tag
+	SubmissionID uint   `gorm:"foreignKey:SubmissionID; references:Submissions.ID"`
 }
 
 func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
@@ -181,7 +168,7 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Category{}, &Submission{}, &File{})
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{})
 	if err != nil {
 		goto ERR
 	}
@@ -200,7 +187,16 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func gormClear(db *gorm.DB) error {
-	tables := []interface{}{&File{}, &Category{}, &Submission{}, &User{}, &GlobalUser{}}
+	// deletes submissions w/ Authors/Reviewers Associations
+	var submissions []Submission
+	if err := db.Find(&submissions).Error; err != nil {
+		return err
+	}
+	for _, submission := range submissions {
+		db.Select(clause.Associations).Delete(&submission)
+	}
+	// Deletes main table
+	tables := []interface{}{&File{}, &Category{}, &User{}, &GlobalUser{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
 			Unscoped().Delete(table)

@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gorm.io/gorm/logger"
 	"log"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"gorm.io/gorm/logger"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -52,7 +53,7 @@ var wrongCredsUsers []User = []User{
 
 var testLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
 	SlowThreshold:             time.Second,
-	LogLevel:                  logger.Silent,
+	LogLevel:                  logger.Error,
 	IgnoreRecordNotFoundError: true,
 	Colorful:                  true,
 })

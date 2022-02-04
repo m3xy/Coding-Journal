@@ -26,20 +26,13 @@
 package main
 
 import (
-// // 	"database/sql"
-// // 	"encoding/json"
-// 	"errors"
-// 	"fmt"
-// // 	"io/ioutil"
-// // 	"log"
-// // 	"net/http"
-// 	"os"
-// 	"path/filepath"
-// // 	"strconv"
+	// 	"database/sql"
 
-// 	"gorm.io/driver/mysql"
-// 	"gorm.io/gorm"
-// 	"gorm.io/gorm/logger"
+	"errors"
+	"fmt"
+	// 	"io/ioutil"
+	// 	"net/http"
+	// 	"strconv"
 )
 
 // ------
@@ -153,112 +146,111 @@ import (
 // Helper Functions
 // ------
 
-// // Add submission to filesystem and database.
-// // Note: the Files, Authors, and Reviewers fields should be empty here
-// //
-// // Params:
-// //	submission (*Submission) : the submission to be added to the db 
-// // 		(all fields but Id MUST be set)
-// // Returns:
-// //	(int) : the id of the added submission
-// //	(error) : if the operation fails
-// func addSubmission(submission *Submission) (int, error) {
-// 	// error cases
-// 	if submission == nil {
-// 		return 0, errors.New("Submission cannot be nil")
-// 	} else if submission.Name == "" {
-// 		return 0, errors.New("Submission.Name must be set to a valid string")
-// 	} else if submission.AuthorIDs == nil || len(submission.AuthorIDs) == 0 {
-// 		return 0, errors.New("AuthorIDs array cannot be nil or length 0")
-// 	// TODO: potentially make it so there must be at least 1 reviewer per submission
-// 	} else if submission.ReviewerIDs == nil {
-// 		return 0, errors.New("ReviewerIDs array cannot be nil")
-// 	}
+// Add submission to filesystem and database.
+// Note: the Files, Authors, and Reviewers fields should be empty here
+//
+// Params:
+//	submission (*Submission) : the submission to be added to the db
+// 		(all fields but Id MUST be set)
+// Returns:
+//	(int) : the id of the added submission
+//	(error) : if the operation fails
+func addSubmission(submission *Submission) (uint, error) {
+	// error cases
+	if submission == nil {
+		return 0, errors.New("Submission cannot be nil")
+	} else if submission.Name == "" {
+		return 0, errors.New("Submission.Name must be set to a valid string")
+	} else if submission.Authors == nil || len(submission.Authors) == 0 {
+		return 0, errors.New("Authors array cannot be nil or length 0")
+		// TODO: potentially make it so there must be at least 1 reviewer per submission
+	} else if submission.Reviewers == nil {
+		return 0, errors.New("Reviewers array cannot be nil")
+	}
 
-// 	// adds the submission to the db
-// 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-// 		// adds the submission to the db, automatically setting submission.ID
-// 		if err := tx.Create(submission).Error; err != nil {
-// 			return err
-// 		} 
+	// adds the submission to the db, automatically setting submission.ID
+	if err := gormDb.Create(submission).Error; err != nil {
+		return 0, err
+	}
+	// // adds the tags to the Categories table
+	// if err := addTags(submission.Categories, submission.ID); err != nil {
+	// 	return 0, err
+	// }
 
-// 		// adds the author associations
-// 		tx.Model(submission).Association("Authors").Append(submission.AuthorIDs)
-// 	}); err != nil {
-// 		return -1, err
-// 	}
+	// // creates the directories to hold the submission in the filesystem
+	// submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name)
+	// submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME, submission.Name)
+	// if err := os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
+	// 	return 0, err
+	// }
+	// if err := os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
+	// 	return 0, err
+	// }
 
+	// // writes the submission metadata to it's corresponding file
+	// dataFile, err := os.OpenFile(submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// // Write submission metadata to the created file
+	// jsonString, err := json.Marshal(submission.MetaData)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+	// 	return 0, err
+	// }
+	// dataFile.Close()
 
-// 	// declares return values
-// 	var submissionId int
-// 	var err error
+	// // Adds each member file to the filesystem
+	// for _, file := range submission.File {
+	// 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), file.SubmissionName, file.Path)
+	// 	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME,
+	// 		file.SubmissionName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
 
-// 	// formats query to insert the submission into the db
-// 	insertSubmission := fmt.Sprintf(
-// 		INSERT_SUBMISSION,
-// 		TABLE_SUBMISSIONS,
-// 		getDbTag(&Submission{}, "Name"),
-// 		getDbTag(&Submission{}, "License"),
-// 	)
+	// 	// file paths without the file name (to create dirs if they don't exist yet)
+	// 	fileDirPath := filepath.Dir(filePath)
+	// 	fileDataDirPath := filepath.Dir(fileDataPath)
 
-// 	// executes the query and gets the submission id
-// 	row := db.QueryRow(insertSubmission, submission.Name, submission.License)
-// 	// gets the id from the inserted submission
-// 	if err = row.Scan(&submissionId); err != nil {
-// 		return 0, err
-// 	}
+	// 	// mkdir files's dir in case they don't yet exist
+	// 	if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+	// 		return 0, err
+	// 	} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
+	// 		return 0, err
+	// 	}
 
-// 	// adds the authors and reviewers to their respective tables
-// 	// (here we work with the assumption that author and reviewer arrays are very small)
-// 	for _, authorId := range submission.AuthorIDs {
-// 		if err = addAuthor(authorId, submissionId); err != nil {
-// 			return 0, err
-// 		}
-// 	}
-// 	for _, reviewerId := range submission.Reviewers {
-// 		if err = addReviewer(reviewerId, submissionId); err != nil {
-// 			return 0, err
-// 		}
-// 	}
-// 	// adds the submission tags to the categories table
-// 	for _, tag := range submission.Categories {
-// 		if err = addTag(tag, submissionId); err != nil {
-// 			return 0, err
-// 		}
-// 	}
-// 	// builds an array of category structs to add to the db
-	
+	// 	// Create and open file and it's corresponding data file
+	// 	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	// 	if err != nil {
+	// 		return 0, err
+	// 	}
+	// 	dataFile, err := os.OpenFile(
+	// 		fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	// 	if err != nil {
+	// 		return 0, err
+	// 	}
 
-// 	// creates the directories to hold the submission in the filesystem
-// 	submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), submission.Name)
-// 	submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submission.Name)
-// 	if err = os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
-// 		return 0, err
-// 	}
-// 	if err = os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
-// 		return 0, err
-// 	}
+	// 	// writes the file content
+	// 	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
+	// 		return 0, err
+	// 	}
+	// 	// Writes given file's metadata
+	// 	jsonString, err := json.Marshal(file.MetaData)
+	// 	if err != nil {
+	// 		return 0, err
+	// 	}
+	// 	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+	// 		return 0, err
+	// 	}
 
-// 	// writes the submission metadata to it's corresponding file
-// 	dataFile, err := os.OpenFile(
-// 		submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	// Write submission metadata to the created file
-// 	jsonString, err := json.Marshal(submission.MetaData)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-// 		return 0, err
-// 	}
-// 	dataFile.Close()
+	// 	// closes files
+	// 	codeFile.Close()
+	// 	dataFile.Close()
+	// }
 
-// 	// if the action was successful, the submission id of the submission struct is set and returned
-// 	submission.Id = submissionId
-// 	return submissionId, nil
-// }
+	// if the action was successful, the submission ID is returned
+	return submission.ID, nil
+}
 
 // // Add an author to the given submission provided the id given corresponds to a valid
 // // user with publisher or publisher-reviewer permissions
@@ -331,88 +323,42 @@ import (
 // 	return errors.New("User must be authorized as a Reviewer")
 // }
 
-// // function to add tags for a given submission
-// //
-// // Parameters:
-// // 	tags ([]string) : the tag to add to the submission
-// // 	submissionId (int) : the unique Id of the submission to add tags to
-// // Returns:
-// // 	(error) : an error if one occurs, nil otherwise
-// func addTags(tag string, submissionId int) (error) {
-// 	if tag == "" {
-// 		return fmt.Errorf("Tag cannot be empty") // TODO: figure out if this should err or just log
-// 	}
+// function to add tags for a given submission
+//
+// Parameters:
+// 	tags ([]string) : the tags to add to the submission
+// 	submissionId (int) : the unique Id of the submission to add tags to
+// Returns:
+// 	(error) : an error if one occurs, nil otherwise
+func addTags(tags []string, submissionID uint) error {
+	for _, tag := range tags {
+		if tag == "" {
+			return fmt.Errorf("tag cannot be empty") // TODO: figure out if this should err or just log
+		}
+		// creates a catagory struct and adds it to the db
+		if err := gormDb.Create(&Category{Tag: tag, SubmissionID: submissionID}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-// 	// makes sure the given tag does not already exist for the given project
-// 	queryTag := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Categories{}, "Tag"),
-// 		TABLE_CATEGORIES,
-// 		getDbTag(&Categories{}, "SubmissionId"),
-// 	)
-// 	// queries the db for the given submissions tags, and checks if they match the new tag
-// 	rows, err := db.Query(queryTag, submissionId)
-// 	var currTag string
-// 	for rows.Next() {
-// 		err = rows.Scan(&currTag)
-// 		if err != nil {
-// 			log.Printf("[ERROR] %v", err)
-// 			return err
-// 		}
-// 		if currTag == tag {
-// 			log.Print("[WARN] Tag already exists as specified")
-// 			return errors.New("Tag already exists as specified")
-// 		}
-// 	}
-
-// 	// adds the tag
-// 	rows, err = db.Query(fmt.Sprintf(INSERT_CATEGORIES, TABLE_CATEGORIES), submissionId, tag)
-// 	if rows != nil {
-// 		rows.Close()
-// 	}
-
-// 	return err
-// }
-
-// // gets all authors which are written by a given user and returns them
-// //
-// // Params:
-// // 	authorId (string) : the global id of the author as stored in the db
-// // Return:
-// // 	(map[int]string) : map of submission Ids to submission names
-// // 	(error) : an error if something goes wrong, nil otherwise
-// func getUserSubmissions(authorId string) (map[int]string, error) {
-// 	// queries the database for the submission ID and name pairs
-// 	stmt := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&AuthorsReviewers{}, "SubmissionId")+", "+
-// 		getDbTag(&Submission{}, "Name"),
-// 		VIEW_SUBMISSIONLIST, 
-// 		"userId",
-// 	)
-// 	rows, err := db.Query(stmt, authorId)
-// 	if err != nil {
-// 		log.Printf("[WARN] User does exist: %s", authorId)
-// 		return nil, err
-// 	}
-
-	// parses query result into { id : submission name } mappings
-// 	var id int
-// 	var submissionName string
-// 	submissions := make(map[int]string)
-// 	for rows.Next() {
-// 		if err := rows.Scan(&id, &submissionName); err != nil {
-// 			if err == sql.ErrNoRows {
-// 				log.Printf("[WARN] Submission does not exist: %d", id)
-// 				return nil, nil
-// 			}
-// 			log.Printf("[ERROR] SQL Error on submission retrieval.")
-// 			return nil, err
-// 		}
-// 		submissions[id] = submissionName
-// 	}
-// 	return submissions, nil
-// }
+// gets all authors which are written by a given user and returns them
+//
+// Params:
+// 	authorId (string) : the global id of the author as stored in the db
+// Return:
+// 	(map[int]string) : map of submission Ids to submission names
+// 	(error) : an error if something goes wrong, nil otherwise
+func getUserSubmissions(authorId string) (map[int]string, error) {
+	// gets the submission IDs mapped to submission Names
+	submissions := make(map[int]string)
+	if err := gormDb.Select("Submissions.ID", "Submissions.Name").Joins("GlobalUsers").Joins("Submissions").Where(
+		"global_ids.id = ?", authorId).Find(&submissions).Error; err != nil {
+		return nil, err
+	}
+	return submissions, nil
+}
 
 // // Get the submission struct corresponding to the id by querying the db and reading
 // // the submissions meta-data file
@@ -546,7 +492,7 @@ import (
 // // 	([]string) : an array of the tags associated with the given submission
 // // 	(error) : an error if one occurs while retrieving the tags
 // func getSubmissionCategories(submissionId int) ([]string, error) {
-// 	// gets categories of the submission 
+// 	// gets categories of the submission
 // 	var currTag string
 // 	categories := []string{}
 // 	queryCategories := fmt.Sprintf(
@@ -647,7 +593,7 @@ import (
 // // 		format
 // // Returns:
 // // 	(*SupergroupSubmission) : a supergroup compliant submission struct
-// // 	(error) : an error if one occurs	
+// // 	(error) : an error if one occurs
 // func localToGlobal(submissionId int) (*SupergroupSubmission, error) {
 // 	// gets the submission struct which submissionId refers to
 // 	localSubmission, err := getSubmission(submissionId)
@@ -704,7 +650,7 @@ import (
 // 		}
 // 		supergroupFiles = append(supergroupFiles, supergroupFile)
 // 	}
-	
+
 // 	// creates the supergroup submission to return
 // 	return &SupergroupSubmission{
 // 		Name: localSubmission.Name,

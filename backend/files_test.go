@@ -12,7 +12,6 @@
 
 package main
 
-import (
 // 	"bytes"
 // 	"context"
 // 	"encoding/json"
@@ -24,14 +23,9 @@ import (
 // 	"strings"
 // 	"testing"
 // 	"time"
-
 // 	"github.com/stretchr/testify/assert"
-)
 
 // const (
-// 	// constants for filesystem
-// 	// TEST_DB = "testdb" // TEMP: declared in authentication_test.go
-
 // 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
 // 	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
 
@@ -40,24 +34,24 @@ import (
 // )
 
 // var testFiles []*File = []*File{
-// 	{Id: -1, SubmissionId: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
+// 	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
 // 		Name: "testFile1.txt", Base64Value: "hello world", MetaData: nil},
-// 	{Id: -1, SubmissionId: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
+// 	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
 // 		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
 // }
 
 // var testComments []*Comment = []*Comment{
 // 	{
-// 		AuthorId: "",
-// 		Time:     fmt.Sprint(time.Now()),
-// 		Base64Value:  "Hello World",
-// 		Replies:  []*Comment{},
+// 		AuthorId:    "",
+// 		Time:        fmt.Sprint(time.Now()),
+// 		Base64Value: "Hello World",
+// 		Replies:     []*Comment{},
 // 	},
 // 	{
-// 		AuthorId: "",
-// 		Time:     fmt.Sprint(time.Now()),
-// 		Base64Value:  "Goodbye World",
-// 		Replies:  []*Comment{},
+// 		AuthorId:    "",
+// 		Time:        fmt.Sprint(time.Now()),
+// 		Base64Value: "Goodbye World",
+// 		Replies:     []*Comment{},
 // 	},
 // }
 // var testFileData []*FileData = []*FileData{

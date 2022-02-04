@@ -36,16 +36,16 @@ package main
 // 	"time"
 // )
 
-// // file constants, includes
-// const (
-// 	// TEMP: hard coded for testing
-// 	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories TEMP: maybe set with an env variable?
-// 	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
+// file constants, includes
+const (
+	// TEMP: hard coded for testing
+	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories TEMP: maybe set with an env variable?
+	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
-// 	// File Mode Constants
-// 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
-// 	FILE_PERMISSIONS = 0644 // permissions for submission files
-// )
+	// File Mode Constants
+	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
+	FILE_PERMISSIONS = 0644 // permissions for submission files
+)
 
 // // -----
 // // Router functions
@@ -443,7 +443,7 @@ package main
 // }
 
 // // helper function to return a file object given its ID
-// // 
+// //
 // // TODO : write tests for this function
 // //
 // // Params:
@@ -502,13 +502,13 @@ package main
 // 	return file, nil
 // }
 
-// // // Gets a supergroup compliant file struct given the file id 
+// // // Gets a supergroup compliant file struct given the file id
 // // //
 // // // Params:
 // // // 	fileId (int) : the unique of the given file
 // // // Returns:
 // // // 	(*SupergroupFile) : a supergroupp compliant file object
-// // // 	(error) : an error if one occurs 
+// // // 	(error) : an error if one occurs
 // // func getSuperGroupFile(fileId int) (*SupergroupFile, error) {
 // // 	// builds a query to get the file's name from the database
 // // 	var fileName string
@@ -562,7 +562,7 @@ package main
 // // Params:
 // //	dataPath (string) : a path to the data file containing a given file's meta-data
 // //Returns:
-// //  (*FileData) : the file's metadata 
+// //  (*FileData) : the file's metadata
 // //	(error) : if something goes wrong, nil otherwise
 // func getFileMetaData(dataPath string) (*FileData, error) {
 // 	// reads the file contents into a json string

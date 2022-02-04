@@ -4,12 +4,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
 	"log"
 	"os"
 	"reflect"
 	"regexp"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -44,11 +45,11 @@ const (
 	SELECT_ROW_INNER_JOIN    = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"
 	SELECT_ROW_ORDER_BY      = "SELECT %s FROM %s ORDER BY ? WHERE %s = ?"
 	INSERT_CRED              = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_SUBMISSION		 = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
+	INSERT_SUBMISSION        = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
 	INSERT_FILE              = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
 	INSERT_AUTHOR            = "INSERT INTO %s VALUES (?, ?)"
 	INSERT_REVIEWER          = "INSERT INTO %s VALUES (?, ?)"
-	INSERT_CATEGORIES		 = "INSERT INTO %s VALUES (?, ?)"
+	INSERT_CATEGORIES        = "INSERT INTO %s VALUES (?, ?)"
 	INSERT_FULL              = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
 	UPDATE_ROWS              = "UPDATE %s SET %s = ? WHERE %s = ?"
 	DELETE_ALL_ROWS          = "DELETE FROM %s"
@@ -65,7 +66,7 @@ const (
 
 var DB_PARAMS map[string]string = map[string]string{
 	"interpolateParams": "true",
-	"parseTime": "true",
+	"parseTime":         "true",
 }
 
 // // Structure for user table.
@@ -108,7 +109,7 @@ var DB_PARAMS map[string]string = map[string]string{
 // 	Reviewers []string `json:"reviewers"`
 // 	// the ids of the submission's authors
 // 	Authors []string `json:"authors"`
-// 	// relative paths of the files from the root of the submission 
+// 	// relative paths of the files from the root of the submission
 // 	FilePaths []string `json:"files" db:"filePath"`
 // 	// tags for organizing/grouping code submissions
 // 	Categories []string `json:"categories" db:"tag"`

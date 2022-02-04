@@ -9,6 +9,12 @@
 
 package main
 
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
 // import (
 // 	"context"
 // 	"encoding/json"
@@ -23,13 +29,13 @@ package main
 
 // // data to use in the tests
 // var testSubmissions []*Submission = []*Submission{
-// 	{Id: -1, Name: "testSubmission1", CreationDate:"", License:"MIT", 
-// 		Reviewers: []string{}, Authors: []string{}, FilePaths: []string{"testFile1.txt"}, 
-// 		Categories: []string{"networking"}, MetaData: testSubmissionMetaData[0]},
-// 	{Id: -1, Name: "testSubmission2", CreationDate:"", License:"MIT", 
-// 		Reviewers: []string{}, Authors: []string{}, FilePaths: []string{"testFile2.txt"}, 
-// 		Categories: []string{"cloud computing"}, MetaData: testSubmissionMetaData[0]},
+// 	{Name: "testSubmission1", License: "MIT",
+// 		Reviewers: []GlobalUser{}, Authors: []GlobalUser{},
+// 		Categories: []Category{"networking"}, MetaData: testSubmissionMetaData[0]},
+// 	{Name: "testSubmission2", License: "MIT", Reviewers: []GlobalUser{}, Authors: []GlobalUser{},
+// 		Categories: []Category{"cloud computing"}, MetaData: testSubmissionMetaData[0]},
 // }
+
 // // TODO: add comments here
 // var testSubmissionMetaData = []*SubmissionData{
 // 	{Abstract: "test abstract, this means nothing", Reviews: nil},
@@ -44,7 +50,7 @@ package main
 // 	{Email: "adam.doe@test.net", Pw: "dlbjDs2!", Fname: "Adam",
 // 		Lname: "Doe", Usertype: USERTYPE_REVIEWER_PUBLISHER},
 // }
-// var testReviewers []*Credentials = []*Credentials{
+// var testReviewers []*GlobalUser = []*GlobalUser{
 // 	{Email: "dave@test.com", Pw: "123456aB$", Fname: "dave",
 // 		Lname: "smith", PhoneNumber: "0574349206", Usertype: USERTYPE_REVIEWER},
 // 	{Email: "Geoff@test.com", Pw: "dlbjDs2!", Fname: "Geoff",
@@ -69,122 +75,147 @@ package main
 // 	return userIds
 // }
 
-// // test the addSubmission() function in submissions.go
-// func TestAddSubmission(t *testing.T) {
-// 	// Utility function to be re-used for testing adding submissions to the db
-// 	testAddSubmission := func(testSubmission *Submission) {
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "%v", err)
-// 		assert.Greaterf(t, submissionId, 0, "Invalid Submission ID returned: %d", submissionId)
+// test the addSubmission() function in submissions.go
+func TestAddSubmission(t *testing.T) {
+	// // Utility function to be re-used for testing adding submissions to the db
+	// testAddSubmission := func(testSubmission *Submission) {
+	// 	submissionId, err := addSubmission(testSubmission)
+	// 	assert.NoErrorf(t, err, "%v", err)
+	// 	assert.Greaterf(t, submissionId, 0, "Invalid Submission ID returned: %d", submissionId)
 
-// 		// checks manually that the submission was added correctly
-// 		var submissionName string
-// 		var submissionLicense string
-// 		authors := []string{}
-// 		reviewers := []string{}
+	// 	// checks manually that the submission was added correctly
+	// 	var submissionName string
+	// 	var submissionLicense string
+	// 	authors := []string{}
+	// 	reviewers := []string{}
 
-// 		// builds SQL Queries for retrieving the added values
-// 		querySubmission := fmt.Sprintf(SELECT_ROW, getDbTag(&Submission{}, "Name")+", "+
-// 			getDbTag(&Submission{}, "License"), TABLE_SUBMISSIONS, getDbTag(&Submission{}, "Id"))
-// 		queryAuthors := fmt.Sprintf(SELECT_ROW, getDbTag(&AuthorsReviewers{}, "Id"),
-// 			TABLE_AUTHORS, getDbTag(&AuthorsReviewers{}, "SubmissionId"))
-// 		queryReviewers := fmt.Sprintf(SELECT_ROW, getDbTag(&AuthorsReviewers{}, "Id"),
-// 			TABLE_REVIEWERS, getDbTag(&AuthorsReviewers{}, "SubmissionId"))
+	// 	// builds SQL Queries for retrieving the added values
+	// 	querySubmission := fmt.Sprintf(SELECT_ROW, getDbTag(&Submission{}, "Name")+", "+
+	// 		getDbTag(&Submission{}, "License"), TABLE_SUBMISSIONS, getDbTag(&Submission{}, "Id"))
+	// 	queryAuthors := fmt.Sprintf(SELECT_ROW, getDbTag(&AuthorsReviewers{}, "Id"),
+	// 		TABLE_AUTHORS, getDbTag(&AuthorsReviewers{}, "SubmissionId"))
+	// 	queryReviewers := fmt.Sprintf(SELECT_ROW, getDbTag(&AuthorsReviewers{}, "Id"),
+	// 		TABLE_REVIEWERS, getDbTag(&AuthorsReviewers{}, "SubmissionId"))
 
-// 		// tests that the submission name was added correctly by querying the sql database
-// 		row := db.QueryRow(querySubmission, submissionId)
-// 		assert.NoErrorf(t, row.Scan(&submissionName, &submissionLicense), "Error querying submission: %v", row.Err())
-// 		assert.Equalf(t, testSubmission.Name, submissionName, "Submission name mismatch. %s vs %s", 
-// 			testSubmission.Name, submissionName)
-// 		assert.Equalf(t, testSubmission.License, submissionLicense, "Submission name mismatch. %s vs %s", 
-// 			testSubmission.License, submissionLicense)
+	// 	// tests that the submission name was added correctly by querying the sql database
+	// 	row := db.QueryRow(querySubmission, submissionId)
+	// 	assert.NoErrorf(t, row.Scan(&submissionName, &submissionLicense), "Error querying submission: %v", row.Err())
+	// 	assert.Equalf(t, testSubmission.Name, submissionName, "Submission name mismatch. %s vs %s",
+	// 		testSubmission.Name, submissionName)
+	// 	assert.Equalf(t, testSubmission.License, submissionLicense, "Submission name mismatch. %s vs %s",
+	// 		testSubmission.License, submissionLicense)
 
-// 		// tests that the authors were added correctly by querying the sql db and comparing to the known values
-// 		var author string
-// 		rows, err := db.Query(queryAuthors, submissionId)
-// 		assert.NoErrorf(t, err, "Error querying submission Authors: %v", err)
-// 		for rows.Next() {
-// 			rows.Scan(&author)
-// 			authors = append(authors, author)
-// 		}
-// 		assert.ElementsMatch(t, testSubmission.Authors, authors, "authors arrays do not match")
+	// 	// tests that the authors were added correctly by querying the sql db and comparing to the known values
+	// 	var author string
+	// 	rows, err := db.Query(queryAuthors, submissionId)
+	// 	assert.NoErrorf(t, err, "Error querying submission Authors: %v", err)
+	// 	for rows.Next() {
+	// 		rows.Scan(&author)
+	// 		authors = append(authors, author)
+	// 	}
+	// 	assert.ElementsMatch(t, testSubmission.Authors, authors, "authors arrays do not match")
 
-// 		// tests that the reviewers were added correctly by querying the sql db and comparing to the known values
-// 		var reviewer string
-// 		rows, err = db.Query(queryReviewers, submissionId)
-// 		assert.NoErrorf(t, err, "Error querying submission Reviewers: %v", err)
-// 		for rows.Next() {
-// 			rows.Scan(&reviewer)
-// 			reviewers = append(reviewers, reviewer)
-// 		}
-// 		assert.ElementsMatch(t, testSubmission.Reviewers, reviewers, "reviewer arrays do not match")
+	// 	// tests that the reviewers were added correctly by querying the sql db and comparing to the known values
+	// 	var reviewer string
+	// 	rows, err = db.Query(queryReviewers, submissionId)
+	// 	assert.NoErrorf(t, err, "Error querying submission Reviewers: %v", err)
+	// 	for rows.Next() {
+	// 		rows.Scan(&reviewer)
+	// 		reviewers = append(reviewers, reviewer)
+	// 	}
+	// 	assert.ElementsMatch(t, testSubmission.Reviewers, reviewers, "reviewer arrays do not match")
 
-// 		// checks that the filesystem has a proper corresponding entry and metadata file
-// 		submissionData := &SubmissionData{}
-// 		submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId))
-// 		fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, submissionName+".json")
-// 		dataString, err := ioutil.ReadFile(fileDataPath)
-// 		assert.NoError(t, err, "error reading submission data")
-// 		assert.NoError(t, json.Unmarshal(dataString, submissionData), "error unmarshalling submission data")
+	// 	// checks that the filesystem has a proper corresponding entry and metadata file
+	// 	submissionData := &SubmissionData{}
+	// 	submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId))
+	// 	fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, submissionName+".json")
+	// 	dataString, err := ioutil.ReadFile(fileDataPath)
+	// 	assert.NoError(t, err, "error reading submission data")
+	// 	assert.NoError(t, json.Unmarshal(dataString, submissionData), "error unmarshalling submission data")
 
-// 		// tests that the metadata is properly formatted
-// 		assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
-// 			"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
-// 			submissionData.Abstract, testSubmission.MetaData.Abstract)
-// 		assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
-// 	}
+	// 	// tests that the metadata is properly formatted
+	// 	assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
+	// 		"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
+	// 		submissionData.Abstract, testSubmission.MetaData.Abstract)
+	// 	assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
+	// }
 
-// 	// tests that a single valid submission can be added to the db and filesystem properly
-// 	t.Run("Add One Submission", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		submission := testSubmissions[0]
-// 		submission.Authors = registerUsers(t, testAuthors[:1])
-// 		submission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		testAddSubmission(submission)
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+	// // tests that a single valid submission can be added to the db and filesystem properly
+	// t.Run("Add One Submission", func(t *testing.T) {
+	// 	assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+	// 	submission := testSubmissions[0]
+	// 	submission.Authors = registerUsers(t, testAuthors[:1])
+	// 	submission.Reviewers = registerUsers(t, testReviewers[:1])
+	// 	testAddSubmission(submission)
+	// 	assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	// })
 
-// 	// tests that multiple submissions can be added in a row properly
-// 	t.Run("Add Multiple Submissions", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		submissions := testSubmissions[0:2] // list of submissions to add to the db
-// 		authors := registerUsers(t, testAuthors[:1])
-// 		reviewers := registerUsers(t, testReviewers[:1])
-// 		for _, submission := range submissions {
-// 			submission.Authors = authors
-// 			submission.Reviewers = reviewers
-// 			testAddSubmission(submission)
-// 		}
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+	// // tests that multiple submissions can be added in a row properly
+	// t.Run("Add Multiple Submissions", func(t *testing.T) {
+	// 	assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+	// 	submissions := testSubmissions[0:2] // list of submissions to add to the db
+	// 	authors := registerUsers(t, testAuthors[:1])
+	// 	reviewers := registerUsers(t, testReviewers[:1])
+	// 	for _, submission := range submissions {
+	// 		submission.Authors = authors
+	// 		submission.Reviewers = reviewers
+	// 		testAddSubmission(submission)
+	// 	}
+	// 	assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	// })
 
-// 	// tests that trying to add a nil submission to the db and filesystem will result in an error
-// 	t.Run("Add Nil Submission", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		_, err := addSubmission(nil)
-// 		assert.Error(t, err, "No error occurred while uploading nil submission")
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+	// // tests that trying to add a nil submission to the db and filesystem will result in an error
+	// t.Run("Add Nil Submission", func(t *testing.T) {
+	// 	assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+	// 	_, err := addSubmission(nil)
+	// 	assert.Error(t, err, "No error occurred while uploading nil submission")
+	// 	assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	// })
 
-// 	// tests that a submission with some fields as nil will not be added
-// 	t.Run("Add Submission No Authors", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission := testSubmissions[0]
+	// // tests that a submission with some fields as nil will not be added
+	// t.Run("Add Submission No Authors", func(t *testing.T) {
+	// 	assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+	// 	testSubmission := testSubmissions[0]
 
-// 		// nil author array
-// 		testSubmission.Authors = nil 
-// 		_, err := addSubmission(testSubmission)
-// 		assert.Error(t, err, "No error occurred while uploading nil Author array")
+	// 	// nil author array
+	// 	testSubmission.Authors = nil
+	// 	_, err := addSubmission(testSubmission)
+	// 	assert.Error(t, err, "No error occurred while uploading nil Author array")
 
-// 		// empty author array
-// 		testSubmission.Authors = []string{}
-// 		_, err = addSubmission(testSubmission)
-// 		assert.Error(t, err, "No error occurred while uploading empty Author array")
+	// 	// empty author array
+	// 	testSubmission.Authors = []string{}
+	// 	_, err = addSubmission(testSubmission)
+	// 	assert.Error(t, err, "No error occurred while uploading empty Author array")
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+	// 	assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
+	// })
 
-// }
+	// TEMP: temporary test
+	t.Run("TEMPORARY", func(t *testing.T) {
+		testInit()
+		authorID, err := registerUser(testUsers[0])
+		assert.NoErrorf(t, err, "Error: %v", err)
+		testAuthor := GlobalUser{
+			ID:   authorID,
+			User: testUsers[0],
+		}
+		testSub := &Submission{
+			Name:       "TestSubmission",
+			License:    "MIT",
+			Authors:    []GlobalUser{testAuthor},
+			Reviewers:  []GlobalUser{},
+			Files:      []File{},
+			Categories: []string{"testtag"},
+			MetaData: &SubmissionData{
+				Abstract: "test abstract",
+				Reviews:  []*Comment{},
+			},
+		}
+		addSubmission(testSub)
+
+		testEnd()
+	})
+}
 
 // // tests the ability of the submissions.go module to add authors to projects
 // // Test Depends on:
@@ -217,7 +248,7 @@ package main
 // 		// queries the authors table in the database for author IDs which match that returned from registerUser()
 // 		var queriedAuthors []string
 // 		var queriedSubmissionId int
-// 		var queriedAuthorId string 
+// 		var queriedAuthorId string
 // 		queryAuthor := fmt.Sprintf(SELECT_ROW, "*", TABLE_AUTHORS, "userId")
 // 		assert.NoErrorf(t, err, "Error querying submission Authors: %v", err)
 // 		rows, err:= db.Query(queryAuthor, authorId)
@@ -228,7 +259,7 @@ package main
 // 		}
 
 // 		// checks submission Id and author Id for equality with those which were queried
-// 		assert.Equalf(t, submissionId, queriedSubmissionId, 
+// 		assert.Equalf(t, submissionId, queriedSubmissionId,
 // 			"Author added to the wrong submission: Wanted: %d Got: %d", submissionId, queriedSubmissionId)
 // 		assert.Contains(t, queriedAuthors, authorId,
 // 			"Author not added to the submission properly")
@@ -306,7 +337,7 @@ package main
 // 		// queries the authors table in the database for author IDs which match that returned from registerUser()
 // 		var queriedReviewers []string
 // 		var queriedSubmissionId int
-// 		var queriedReviewerId string 
+// 		var queriedReviewerId string
 // 		queryReviewer := fmt.Sprintf(SELECT_ROW, "*", TABLE_REVIEWERS, "userId")
 // 		rows, err:= db.Query(queryReviewer, reviewerId)
 // 		assert.NoErrorf(t, err, "Error querying submission Reviewers: %v", err)
@@ -316,7 +347,7 @@ package main
 // 		}
 
 // 		// checks submission Id and reviewer Id for equality with those which were queried
-// 		assert.Equalf(t, submissionId, queriedSubmissionId, 
+// 		assert.Equalf(t, submissionId, queriedSubmissionId,
 // 			"Reviewer added to the wrong submission: Wanted: %d Got: %d", submissionId, queriedSubmissionId)
 // 		assert.Contains(t, queriedReviewers, reviewerId,
 // 			"Reviewer not added to the submission properly")
@@ -358,7 +389,7 @@ package main
 // 		reviewerId := "u881jafjka" // non-user fake id
 // 		submissionId := testAddSubmission(testSubmission)
 // 		assert.Error(t, addReviewer(reviewerId, submissionId), "Non-user added as reviewer")
-		
+
 // 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 // 	})
 // }
@@ -382,7 +413,7 @@ package main
 
 // 		// adds a tag to the submission
 // 		addTag(testTag, submissionId)
-	
+
 // 		// queries the db to make sure the tag was added properly
 // 		queryTagExists := fmt.Sprintf(
 // 			SELECT_ROW_TWO_CONDITION,
@@ -513,23 +544,23 @@ package main
 // 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 // 		testSubmission1.Reviewers = []string{reviewerId}
 // 		testSubmission2.Reviewers = []string{reviewerId}
-	
+
 // 		// adds two test submissions to the db
 // 		testSubmission1.Id, err = addSubmission(testSubmission1)
 // 		assert.NoErrorf(t, err, "Error occurred while adding submission1: %v", err)
 // 		testSubmission2.Id, err = addSubmission(testSubmission2)
 // 		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
-	
+
 // 		// queries all of testAuthor's submissions
 // 		submissions, err := getUserSubmissions(authorId)
 // 		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
-	
+
 // 		// tests for equality of submission Id and that testSubmission2.Id is not in the map
 // 		_, ok := submissions[testSubmission2.Id]
 // 		assert.False(t, ok, "Returned submission where the test author is not an author")
 // 		assert.Equalf(t, submissions[testSubmission1.Id], testSubmission1.Name,
 // 			"Returned incorrect submission name: %s", submissions[testSubmission1.Id])
-		
+
 // 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
 // 	})
 // }
@@ -544,7 +575,7 @@ package main
 // 	t.Run("Single Valid Submission", func(t *testing.T) {
 // 		testSubmission := testSubmissions[0]
 // 		testFile := testFiles[0]
-		
+
 // 		// sets up test environment, and adds a submission with one file to the db and filesystem
 // 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
 // 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
@@ -696,7 +727,7 @@ package main
 // 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
 // 		submissionData, err := getSubmissionMetaData(submissionId)
 // 		assert.NoErrorf(t, err, "Error getting submission metadata: %v", err)
-// 		assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract, 
+// 		assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
 // 			"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
 // 			submissionData.Abstract, testSubmission.MetaData.Abstract)
 // 		assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
@@ -736,11 +767,11 @@ package main
 
 // 		// compares submission fields
 // 		assert.Equal(t, testSubmission.Name, globalSubmission.Name, "Names do not match")
-// 		assert.Equal(t, testSubmission.License, globalSubmission.MetaData.License, 
+// 		assert.Equal(t, testSubmission.License, globalSubmission.MetaData.License,
 // 			"Licenses do not match")
 // 		assert.Equal(t, testAuthor.Fname+" "+testAuthor.Lname, globalSubmission.MetaData.AuthorNames[0],
 // 			"Authors do not match")
-// 		assert.Equal(t, testSubmission.Categories, globalSubmission.MetaData.Categories, 
+// 		assert.Equal(t, testSubmission.Categories, globalSubmission.MetaData.Categories,
 // 			"Tags do not match")
 // 		assert.Equal(t, testSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
 // 			"Abstracts do not match")
@@ -790,7 +821,7 @@ package main
 // 		returnedSubmissions := make(map[int]string)
 // 		json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
 // 		for k, v := range returnedSubmissions {
-// 			assert.Equalf(t, v,  sentSubmissions[k], 
+// 			assert.Equalf(t, v,  sentSubmissions[k],
 // 				"Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
 // 		}
 
@@ -813,7 +844,7 @@ package main
 // 		testFile := testFiles[0]             // defines the file to use for the test here so that it can be easily changed
 // 		testSubmission := testSubmissions[0] // defines the submission to use for the test here so that it can be easily changed
 // 		testAuthor := testAuthors[0]         // defines the author of the submission
-// 		testReviewer := testReviewers[0]     // defines the reviewer of the submission	
+// 		testReviewer := testReviewers[0]     // defines the reviewer of the submission
 
 // 		// Set up server and test environment
 // 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
@@ -835,7 +866,7 @@ package main
 // 		assert.NoErrorf(t, err, "Error adding file to the submission %v", err)
 
 // 		// creates a request to send to the test server
-// 		urlString := fmt.Sprintf("%s:%s%s?%s=%d", TEST_URL, TEST_SERVER_PORT, 
+// 		urlString := fmt.Sprintf("%s:%s%s?%s=%d", TEST_URL, TEST_SERVER_PORT,
 // 			ENDPOINT_SUBMISSION, getJsonTag(&Submission{}, "Id"), submissionId)
 // 		req, _ := http.NewRequest("GET", urlString, nil)
 // 		resp, err := sendSecureRequest(req, TEAM_ID)
@@ -848,7 +879,7 @@ package main
 // 		assert.NoErrorf(t, json.NewDecoder(resp.Body).Decode(submission), "Error while decoding server response: %v", err)
 
 // 		// tests that the returned submission matches the passed in data
-// 		assert.Equalf(t, testSubmission.Id, submission.Id, 
+// 		assert.Equalf(t, testSubmission.Id, submission.Id,
 // 			"Submission IDs do not match. Given: %d != Returned: %d", testSubmission.Id, submission.Id)
 // 		assert.Equalf(t, testSubmission.Name, submission.Name,
 // 			"Submission Names do not match. Given: %s != Returned: %s", testSubmission.Name, submission.Name)
