@@ -15,6 +15,14 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+const (
+	USERTYPE_NIL                = 0
+	USERTYPE_PUBLISHER          = 1
+	USERTYPE_REVIEWER           = 2
+	USERTYPE_REVIEWER_PUBLISHER = 3
+	USERTYPE_USER               = 4
+)
+
 var gormDb *gorm.DB
 
 type User struct {
@@ -24,7 +32,7 @@ type User struct {
 	Password     string `gorm:"not null" json:"Password,omitempty" validate:"min=8,max=64,validpw"`
 	FirstName    string `validate:"nonzero,max=32" json:"FirstName"`
 	LastName     string `validate:"nonzero,max=32" json:"LastName"`
-	UserType     int    `json:"UserType"`
+	UserType     int    `gorm:"default:4" json:"UserType"`
 	PhoneNumber  string `json:"PhoneNumber"`
 	Organization string `json:"Organization"`
 

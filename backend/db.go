@@ -54,11 +54,11 @@ const (
 	UPDATE_ROWS              = "UPDATE %s SET %s = ? WHERE %s = ?"
 	DELETE_ALL_ROWS          = "DELETE FROM %s"
 
-	USERTYPE_NIL                = 0
-	USERTYPE_PUBLISHER          = 1
-	USERTYPE_REVIEWER           = 2
-	USERTYPE_REVIEWER_PUBLISHER = 3
-	USERTYPE_USER               = 4
+	// USERTYPE_NIL                = 0
+	// USERTYPE_PUBLISHER          = 1
+	// USERTYPE_REVIEWER           = 2
+	// USERTYPE_REVIEWER_PUBLISHER = 3
+	// USERTYPE_USER               = 4
 
 	// Password related
 	HASH_COST = 8

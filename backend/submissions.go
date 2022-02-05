@@ -34,6 +34,8 @@ import (
 	"path/filepath"
 	"encoding/json"
 	"strings"
+	"gorm.io/gorm"
+
 	// 	"io/ioutil"
 	// 	"net/http"
 	// 	"strconv"
@@ -173,7 +175,14 @@ func addSubmission(submission *Submission) (uint, error) {
 	}
 
 	// adds the submission to the db, automatically setting submission.ID
-	if err := gormDb.Create(submission).Error; err != nil {
+	if err := gormDb.Omit("Submissions.Authors Submissions.Reviewers").Create(submission).Error; err != nil {
+		return 0, err
+	}
+	// adds authors and reviewers (done explicitly to allow for checking permissions)
+	if err := addAuthors(submission.Authors, submission.ID); err != nil {
+		return 0, err
+	}
+	if err := addReviewers(submission.Reviewers, submission.ID); err != nil {
 		return 0, err
 	}
 	// adds the tags to the Categories table
@@ -256,76 +265,71 @@ func addSubmission(submission *Submission) (uint, error) {
 	return submission.ID, nil
 }
 
-// // Add an author to the given submission provided the id given corresponds to a valid
-// // user with publisher or publisher-reviewer permissions
-// //
-// // Params:
-// //	authorId ([]string) : the global ids of the authors to add to the submission
-// //	submissionId (int) : the id of the submission to be added to
-// // Returns:
-// //	(error) : an error if one occurs, nil otherwise
-// func addAuthors(authorId []string, submissionId int) error {
-// 	if submissionId < 0 {
-// 		return errors.New(
-// 			fmt.Sprintf("Submission IDs must be integers 0 or greater, not: %d", submissionId))
-// 	}
+// Add an array of authors to the given submission provided the id given corresponds to a valid
+// user with publisher or publisher-reviewer permissions
+//
+// Params:
+//	authors ([]GlobalUser) : the global user structs of the authors to add to the submission
+//	submissionId (int) : the id of the submission to be added to
+// Returns:
+//	(error) : an error if one occurs, nil otherwise
+func addAuthors(authors []GlobalUser, submissionID uint) error {
+	var user User
+	for _, author := range authors {
+		if err := gormDb.Transaction(func(tx *gorm.DB) error {
+			// checks the user's permissions
+			if err := tx.Model(&User{}).Select("users.user_type").Where(
+				"users.global_user_id = ?", author.ID).Find(&user).Error; err != nil {
+				return err
+			}
+			if user.UserType != USERTYPE_PUBLISHER && user.UserType != USERTYPE_REVIEWER_PUBLISHER {
+				return fmt.Errorf("User must have publisher permissions, not: %d", user.UserType)
+			}
 
-// 	// checks that the author is a valid user with publisher or publisher-reviewer permissions
-// 	var permissions int
-// 	queryUserType := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Credentials{}, "Usertype"),
-// 		VIEW_PERMISSIONS,
-// 		getDbTag(&IdMappings{}, "GlobalId"),
-// 	)
-// 	// executes the query, getting the user's permissions
-// 	row := db.QueryRow(queryUserType, authorId)
-// 	if err := row.Scan(&permissions); err != nil {
-// 		return err
-// 	}
+			// generates the association between the two submission and author
+			if err := tx.Model(&Submission{}).Where(submissionID).Association("Authors").Append(author.ID); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil 
+}
 
-// 	// checks permissions, and if they are correct, the author is added
-// 	if permissions == USERTYPE_PUBLISHER || permissions == USERTYPE_REVIEWER_PUBLISHER {
-// 		_, err := db.Query(fmt.Sprintf(INSERT_AUTHOR, TABLE_AUTHORS), submissionId, authorId)
-// 		return err
-// 	}
-// 	return errors.New("User must be authorized as an author")
-// }
+// Add an array of reviewers to the given submission provided the id given corresponds to a valid
+// user with reviewer or publisher-reviewer permissions
+//
+// Params:
+//	reviewers ([]GlobalUser) : the global user structs of the reviewers to add to the submission
+//	submissionID (uint) : the id of the submission to be added to
+// Returns:
+//	(error) : an error if one occurs, nil otherwise
+func addReviewers(reviewers []GlobalUser, submissionID uint) error {
+	var user User
+	for _, reviewer := range reviewers {
+		if err := gormDb.Transaction(func(tx *gorm.DB) error {
+			// checks the user's permissions
+			if err := tx.Model(&User{}).Select("users.user_type").Where(
+				"users.global_user_id = ?", reviewer.ID).Find(&user).Error; err != nil {
+				return err
+			}
+			if user.UserType != USERTYPE_REVIEWER && user.UserType != USERTYPE_REVIEWER_PUBLISHER {
+				return fmt.Errorf("User must have reviewer permissions, not: %d", user.UserType)
+			}
 
-// // Add a user to a submission as a reviewer
-// //
-// // Params:
-// //	reviewerId (int) : the id of the reviewer to add to the submission
-// //	submissionId (int) : the id of the submission to be added to
-// // Returns:
-// //	(error) : an error if one occurs, nil otherwise
-// func addReviewer(reviewerId string, submissionId int) error {
-// 	var err error
-// 	if submissionId < 0 {
-// 		return errors.New(fmt.Sprintf("Submission IDs must be integers 0 or greater, not: %d", submissionId))
-// 	}
-
-// 	// checks that the reviewer is a valid user with reviewer or publisher-reviewer permissions
-// 	var permissions int
-// 	queryUserType := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Credentials{}, "Usertype"),
-// 		VIEW_PERMISSIONS,
-// 		getDbTag(&IdMappings{}, "GlobalId"),
-// 	)
-// 	// gets the user's permissions
-// 	row := db.QueryRow(queryUserType, reviewerId)
-// 	if err := row.Scan(&permissions); err != nil {
-// 		return err
-// 	}
-
-// 	// checks permissions, and if they are correct, the reviewer is added
-// 	if permissions == USERTYPE_REVIEWER || permissions == USERTYPE_REVIEWER_PUBLISHER {
-// 		_, err = db.Query(fmt.Sprintf(INSERT_REVIEWER, TABLE_REVIEWERS), submissionId, reviewerId)
-// 		return err
-// 	}
-// 	return errors.New("User must be authorized as a Reviewer")
-// }
+			// generates the association between the two submission and author
+			if err := tx.Model(&Submission{}).Where(submissionID).Association("Reviewers").Append(reviewer.ID); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // function to add tags for a given submission
 //
@@ -357,7 +361,7 @@ func addTags(tags []string, submissionID uint) error {
 func getUserSubmissions(authorId string) (map[int]string, error) {
 	// gets the submission IDs mapped to submission Names
 	submissions := make(map[int]string)
-	if err := gormDb.Select("Submissions.ID", "Submissions.Name").Joins("GlobalUsers").Joins("Submissions").Where(
+	if err := gormDb.Select("submissions.ID", "submissions.Name").Joins("GlobalUsers").Joins("submissions").Where(
 		"global_ids.id = ?", authorId).Find(&submissions).Error; err != nil {
 		return nil, err
 	}
