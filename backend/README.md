@@ -1,19 +1,16 @@
-
 # Table of Contents
 
-1.  [Response Format](#org53d091f)
-2.  [API](#orgb09e5ff)
-    1.  [Journal](#org6978210)
-        1.  [Login](#org6a5f21c)
-    2.  [Authentication](#orgc9014e9)
-        1.  [Login](#orgc990c37)
-        2.  [Register](#orgb295fc3)
-    3.  [User](#org7ea7e4b)
-        1.  [Profile Query](#org1b33072)
+1.  [Response Format](#response_format)
+2.  [API](#api)
+    1.  [Journal](#journal)
+        1.  [Login](#journal_login)
+    2.  [Authentication](#authentication)
+        1.  [Login](#authentication_login)
+        2.  [Register](#authentication_register)
+    3.  [User](#user)
+        1.  [Profile Query](#user_query)
 
-
-
-<a id="org53d091f"></a>
+<a id="response_format"></a>
 
 # Response Format
 
@@ -25,25 +22,22 @@ Response bodies are always given in this below format (with the exception of jou
     	content: any    // The response's body.
     }
 
-
-<a id="orgb09e5ff"></a>
+<a id="api"></a>
 
 # API
 
 This section describes main enpoints. There are 4 main entrypoints in the api,
 starting with `cs3099user11.host.cs.st-andrews.ac.uk/api/<version>`:
 
--   `/journal/`: Supergroup compliant endpoints,
--   `/auth/`: Authentication requests - client login, signup.
--   `/user/`: User retrieval requests.
+- `/journal/`: Supergroup compliant endpoints,
+- `/auth/`: Authentication requests - client login, signup.
+- `/user/`: User retrieval requests.
 
-
-<a id="org6978210"></a>
+<a id="journal"></a>
 
 ## Journal
 
-
-<a id="org6a5f21c"></a>
+<a id="journal_login"></a>
 
 ### Login
 
@@ -56,37 +50,39 @@ Supergroup compliant journal login.
 2.  Request
 
     1.  Headers
-    
-        -   X-FOREIGNJOURNAL-SECURITY-TOKEN: Journal&rsquo;s secret key. Needed for all journal queries. **MUST NOT BE SHARED WITH ANY CLIENT.**
-    
+
+        - X-FOREIGNJOURNAL-SECURITY-TOKEN: Journal&rsquo;s secret key. Needed for all journal queries. **MUST NOT BE SHARED WITH ANY CLIENT.**
+
     2.  Body
-    
-            {
-            	"email": "string",
-            	"password": "string"
-            }
+
+```json
+{
+  "email": "string",
+  "password": "string"
+}
+```
 
 3.  Response
 
     1.  Status
-    
-        -   200 - User logged in, response OK.
-        -   404 - User was not found.
-        -   401 - Access Unauthorized. See Headers.
-    
+
+        - 200 - User logged in, response OK.
+        - 404 - User was not found.
+        - 401 - Access Unauthorized. See Headers.
+
     2.  Content
-    
-            interface Content {
-            	userId: string   // ID of the logged in user. Empty if errored
-            }
 
+```typescript
+interface Content {
+  userId: string; // ID of the logged in user. Empty if errored
+}
+```
 
-<a id="orgc9014e9"></a>
+<a id="authentication"></a>
 
 ## Authentication
 
-
-<a id="orgc990c37"></a>
+<a id="authentication_login"></a>
 
 ### Login
 
@@ -99,34 +95,37 @@ Client-only login endpoint.
 2.  Request
 
     1.  Headers
-    
+
         No headers required.
-    
+
     2.  Body
-    
-            interface Body {
-            	client_id: string 		// ID used to find client - here, it is an email.
-            	client_secret: string   // Client's secret for authentication - here, password.
-            }
+
+```typescript
+interface Body {
+  client_id: string; // ID used to find client - here, it is an email.
+  client_secret: string; // Client's secret for authentication - here, password.
+}
+```
 
 3.  Response
 
     1.  Status
-    
-        -   200 - User logged in, response OK.
-        -   404 - User was not found.
-        -   401 - Access Unauthorized. See Headers.
-    
+
+        - 200 - User logged in, response OK.
+        - 404 - User was not found.
+        - 401 - Access Unauthorized. See Headers.
+
     2.  Content
-    
-            interface Content {
-            	token: string   			// Token used for restriced user access later on.
-            	refresh_token: string		// Refresh token - used to make a new token after expiry.
-            	redirect_uri: string 		// Address to token refresh request.
-            }
 
+```typescript
+interface Content {
+  token: string; // Token used for restriced user access later on.
+  refresh_token: string; // Refresh token - used to make a new token after expiry.
+  redirect_uri: string; // Address to token refresh request.
+}
+```
 
-<a id="orgb295fc3"></a>
+<a id="authentication_register"></a>
 
 ### Register
 
@@ -139,41 +138,41 @@ Client registration endpoint.
 2.  Request
 
     1.  Headers
-    
+
         No required headers.
-    
+
     2.  Body
-    
-            interface Content {
-            	// Required
-            	Email: string  	// Client ID
-            	Password: string    // Client Secret
-            	FirstName: string
-            	LastName: string
-            
-            	// Optional
-            	PhoneNumber?: string
-            	Organization?: string
-            }
+
+```typescript
+interface Content {
+  // Required
+  Email: string; // Client ID
+  Password: string; // Client Secret
+  FirstName: string;
+  LastName: string;
+
+  // Optional
+  PhoneNumber?: string;
+  Organization?: string;
+}
+```
 
 3.  Response
 
     1.  Status
-    
-        -   200 - User successfully registered, response OK.
-        -   405 - Bad request, form given is invalid.
-    
+
+        - 200 - User successfully registered, response OK.
+        - 405 - Bad request, form given is invalid.
+
     2.  Body
-    
+
         This function has no response content.
 
-
-<a id="org7ea7e4b"></a>
+<a id="user"></a>
 
 ## User
 
-
-<a id="org1b33072"></a>
+<a id="user_query"></a>
 
 ### Profile Query
 
@@ -186,32 +185,33 @@ User profile information query.
 2.  Request
 
     1.  Headers
-    
+
         No header or authentication is required for this query.
 
 3.  Response
 
     1.  Status
-    
-        -   200 - Query successful, requested information contained in content.
-        -   404 - User not found, content empty.
-    
-    2.  Body
-    
-        The \`Content\` value in the response is of type below
-        
-            interface Content {
-            	UserID: string
-            	FullName: string
-            	Profile: Profile
-            }
-            
-            interface Profile {
-            	Email: string
-            	FirstName: string
-            	LastName: string
-            	PhoneNumber: string
-            	Organization: string
-            	CreatedAt: DateTime // Format -
-            }
 
+        - 200 - Query successful, requested information contained in content.
+        - 404 - User not found, content empty.
+
+    2.  Body
+
+        The \`Content\` value in the response is of type below
+
+```typescript
+interface Content {
+  UserID: string;
+  FullName: string;
+  Profile: Profile;
+}
+
+interface Profile {
+  Email: string;
+  FirstName: string;
+  LastName: string;
+  PhoneNumber: string;
+  Organization: string;
+  CreatedAt: DateTime; // Format -
+}
+```
