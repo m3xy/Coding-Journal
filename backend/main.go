@@ -104,12 +104,14 @@ func setupCORSsrv() *http.Server {
 	// router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/users/{"+getJsonTag(&User{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/users/{"+getJsonTag(&GlobalUser{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
-		Addr:    PORT,
-		Handler: c.Handler(router),
+		Addr:         PORT,
+		Handler:      c.Handler(router),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
 	}
 }
 

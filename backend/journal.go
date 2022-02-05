@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"gorm.io/gorm"
 )
 
 // Set of all supergroup-appliant controllers and routes
@@ -33,7 +35,9 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 	// Get credentials at given email, and assign it.
 	var globalUser GlobalUser
-	res := gormDb.Joins("User").Where("User.Email = ?", user.Email).Limit(1).Find(&globalUser)
+	res := gormDb.Joins("User", func(tx *gorm.DB) *gorm.DB {
+		return tx.Select("Password", "Email")
+	}).Limit(1).Find(&globalUser, "Email = ?", user.Email)
 	if res.RowsAffected == 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 		log.Printf("[INFO] Incorrect email: %s", user.Email)

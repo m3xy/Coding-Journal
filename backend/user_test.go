@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Test user info getter.
@@ -29,17 +30,16 @@ func TestGetUserProfile(t *testing.T) {
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
 
-			resCreds := User{}
+			resCreds := GlobalUser{}
 			err = json.NewDecoder(res.Body).Decode(&resCreds)
 			assert.Nil(t, err, "JSON decoding must not error.")
 
 			// Check equality for all user info.
-			equal := (testUsers[i].Email == resCreds.Email) &&
-				(testUsers[i].FirstName == resCreds.FirstName) &&
-				(testUsers[i].LastName == resCreds.LastName) &&
-				(testUsers[i].PhoneNumber == resCreds.PhoneNumber) &&
-				(testUsers[i].Organization == resCreds.Organization)
-
+			equal := (testUsers[i].Email == resCreds.User.Email) &&
+				(testUsers[i].FirstName == resCreds.User.FirstName) &&
+				(testUsers[i].LastName == resCreds.User.LastName) &&
+				(testUsers[i].PhoneNumber == resCreds.User.PhoneNumber) &&
+				(testUsers[i].Organization == resCreds.User.Organization)
 			assert.Equal(t, true, equal, "Users should be equal.")
 		}
 	})

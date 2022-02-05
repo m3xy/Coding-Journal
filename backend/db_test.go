@@ -88,13 +88,20 @@ func getUserCopies(uc []User) []User {
 	}
 	return res
 }
-func getGlobalCopies(gc []GlobalUser) []GlobalUser {
+func getGlobalCopies(gc []User) []GlobalUser {
+	res := make([]GlobalUser, len(gc))
+	for i, u := range gc {
+		res[i] = GlobalUser{User: u.getCopy()}
+	}
+	return res
+
+}
+func getObjectCopies(gc []GlobalUser) []GlobalUser {
 	res := make([]GlobalUser, len(gc))
 	for i, u := range gc {
 		res[i] = u.getCopy()
 	}
 	return res
-
 }
 
 // Middleware for the test authentication server.
@@ -123,7 +130,7 @@ func testingServerSetup() *http.Server {
 	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/users/{"+getJsonTag(&User{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/users/{"+getJsonTag(&GlobalUser{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
 
 	// Setup testing HTTP server
 	return &http.Server{
@@ -199,7 +206,7 @@ func TestIsUnique(t *testing.T) {
 
 	// Add an element to table
 	// Add test users to database
-	trialObjects := getGlobalCopies(testObjects)
+	trialObjects := getObjectCopies(testObjects)
 	if err := gormDb.Create(&trialObjects).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)
 		return

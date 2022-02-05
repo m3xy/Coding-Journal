@@ -14,13 +14,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"log"
-	"net/http"
-	"strconv"
-
-	uuid "github.com/satori/go.uuid"
 	"gopkg.in/validator.v2"
 	"gorm.io/gorm"
+	"log"
+	"net/http"
 )
 
 const (
@@ -117,27 +114,26 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 
 	// Get credentials from JSON request and validate them.
 	user := &User{}
-	err := json.NewDecoder(r.Body).Decode(user)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		goto ERROR
 	}
-	validator.SetValidationFunc("validpw", validpw)
-	if validator.Validate(*user) != nil {
+	if validator.SetValidationFunc("validpw", validpw); validator.Validate(*user) != nil {
 		log.Printf("[WARN] Invalid password format received.")
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		goto ERROR
 	}
 
-	_, err = registerUser(*user)
-	if err != nil {
+	if _, err := registerUser(*user); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		goto ERROR
 	}
 	log.Printf("[INFO] User signup from %s successful.", r.RemoteAddr)
 	w.WriteHeader(http.StatusOK)
+	return
+
+ERROR:
+	w.WriteHeader(http.StatusBadRequest)
+	return
 }
 
 // Register a user to the database. Returns user global ID.
@@ -145,6 +141,7 @@ func registerUser(user User) (string, error) {
 	// Hash password and store new credentials to database.
 	user.Password = string(hashPw(user.Password))
 
+	registeredUser := GlobalUser{User: user}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user
 		if !isUnique(tx, User{}, "Email", user.Email) {
@@ -152,8 +149,7 @@ func registerUser(user User) (string, error) {
 		}
 
 		// Make credentials insert transaction.
-		user.ID = uuid.NewV4().String()
-		if err := gormDb.Create(&GlobalUser{ID: (strconv.Itoa(TEAM_ID) + user.ID), User: user}).Error; err != nil {
+		if err := gormDb.Create(&registeredUser).Error; err != nil {
 			return err
 		}
 		return nil
@@ -162,5 +158,5 @@ func registerUser(user User) (string, error) {
 	}
 
 	// Return user's primary key (the UUID)
-	return strconv.Itoa(TEAM_ID) + user.ID, nil
+	return registeredUser.ID, nil
 }

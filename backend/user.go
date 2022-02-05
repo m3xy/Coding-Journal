@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"reflect"
 
 	"github.com/gorilla/mux"
+	"gorm.io/gorm"
 )
+
+func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
+	return tx.Select("GlobalUserID", "Email", "FirstName", "LastName", "UserType", "PhoneNumber", "Organization", "CreatedAt")
+}
 
 /*
 	Get user profile info for a user.
@@ -20,13 +24,13 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Get user details from user ID.
 	vars := mux.Vars(r)
-	var user User
-	if err := gormDb.Model(&GlobalUser{ID: vars[getJsonTag(&User{}, "ID")]}).Association("User").Find(&user); err != nil {
-		log.Printf("[ERROR] SQL query error: %v", err)
+	user := &GlobalUser{ID: vars[getJsonTag(&GlobalUser{}, "ID")]}
+	if res := gormDb.Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else if reflect.DeepEqual(user, User{}) {
-		log.Printf("[WARN] No user linked to %s", vars[getJsonTag(&User{}, "ID")])
+	} else if res.RowsAffected == 0 {
+		log.Printf("[WARN] No user linked to %s", vars[getJsonTag(&GlobalUser{}, "ID")])
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -38,10 +42,7 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	} */
 
-	// Remove private data and encode user.
-	user.Password = ""
-	user.ID = vars[getJsonTag(&User{}, "ID")]
-	user.GlobalUserID = ""
+	// Encode user and send.
 	err := json.NewEncoder(w).Encode(user)
 	if err != nil {
 		log.Printf("[ERROR] User data JSON encoding failed: %v", err)

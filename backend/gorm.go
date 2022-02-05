@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"time"
 
 	"fmt"
@@ -17,19 +18,19 @@ import (
 var gormDb *gorm.DB
 
 type User struct {
-	ID           string `gorm:"type:varchar(191);not null;primaryKey" json:"userId"`
-	GlobalUserID string `json:",omitempty"`
-	Email        string `gorm:"uniqueIndex;unique;not null" json:"email"`
-	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,validpw"`
-	FirstName    string `validate:"nonzero,max=32" json:"firstname"`
-	LastName     string `validate:"nonzero,max=32" json:"lastname"`
-	UserType     int    `json:"usertype"`
-	PhoneNumber  string `json:"phonenumber"`
-	Organization string `json:"organization"`
+	ID           uint   `gorm:"primaryKey" json:"-"`
+	GlobalUserID string `json:"-"`
+	Email        string `gorm:"uniqueIndex;unique;not null" json:"Email"`
+	Password     string `gorm:"not null" json:"Password,omitempty" validate:"min=8,max=64,validpw"`
+	FirstName    string `validate:"nonzero,max=32" json:"FirstName"`
+	LastName     string `validate:"nonzero,max=32" json:"LastName"`
+	UserType     int    `json:"UserType"`
+	PhoneNumber  string `json:"PhoneNumber"`
+	Organization string `json:"Organization"`
 
 	CreatedAt time.Time      `json:",omitempty"`
-	UpdatedAt time.Time      `json:",omitempty"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:",omitempty"`
+	UpdatedAt time.Time      `json:"-"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Server struct {
@@ -37,23 +38,18 @@ type Server struct {
 	Token       string `gorm:"size:1028;not null"`
 	Url         string `gorm:"not null; size:512"`
 
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type GlobalUser struct {
-	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"globalId"`
-	FullName string
-	User     User
+	ID          string       `gorm:"not null;primaryKey;type:varchar(191)" json:"UserID"`
+	FullName    string       `json:"FullName"`
+	User        User         `json:"Profile"`
+	Submissions []Submission `gorm:"many2many:authors_submission"`
 
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
-}
-
-type QueryUser struct {
-	ID       string
-	Email    string
-	Password string
+	CreatedAt time.Time      `json:"CreatedAt"`
+	UpdatedAt time.Time      `json:"-"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Structure for code Submissions
@@ -130,7 +126,7 @@ type SupergroupFile struct {
 	// name of the file as a string
 	Name string `json:"filename"`
 	// file content as a base64 encoded string
-	Base64Value string `json: "base64Value"`
+	Base64Value string `json:"base64Value"`
 }
 
 // structure to hold json data from data files (never stored in db)
@@ -179,9 +175,9 @@ ERR:
 	return nil, err
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 	if u.ID == "" {
-		u.ID = uuid.NewV4().String()
+		u.ID = strconv.Itoa(TEAM_ID) + uuid.NewV4().String()
 	}
 	return
 }
