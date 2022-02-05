@@ -85,7 +85,7 @@ func securityCheck(db *gorm.DB) error {
 			log.Fatal("No token has been set!")
 			return err
 		}
-		securityToken := myEnv["BACKEND_TOKEN"]
+		securityToken := myEnv[SECURITY_TOKEN_ENV]
 		if err := db.Create(&Server{GroupNumber: TEAM_ID, Token: securityToken, Url: BACKEND_ADDRESS}).Error; err != nil {
 			log.Fatalf("Critical token failure! %v\n", err)
 			return err
