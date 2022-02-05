@@ -28,8 +28,12 @@ package main
 import (
 	// 	"database/sql"
 
+	"os"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"encoding/json"
+	"strings"
 	// 	"io/ioutil"
 	// 	"net/http"
 	// 	"strconv"
@@ -172,81 +176,81 @@ func addSubmission(submission *Submission) (uint, error) {
 	if err := gormDb.Create(submission).Error; err != nil {
 		return 0, err
 	}
-	// // adds the tags to the Categories table
-	// if err := addTags(submission.Categories, submission.ID); err != nil {
-	// 	return 0, err
-	// }
+	// adds the tags to the Categories table
+	if err := addTags(submission.Categories, submission.ID); err != nil {
+		return 0, err
+	}
 
-	// // creates the directories to hold the submission in the filesystem
-	// submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name)
-	// submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME, submission.Name)
-	// if err := os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
-	// 	return 0, err
-	// }
-	// if err := os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
-	// 	return 0, err
-	// }
+	// creates the directories to hold the submission in the filesystem
+	submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name)
+	submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME, submission.Name)
+	if err := os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	}
+	if err := os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	}
 
-	// // writes the submission metadata to it's corresponding file
-	// dataFile, err := os.OpenFile(submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// // Write submission metadata to the created file
-	// jsonString, err := json.Marshal(submission.MetaData)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-	// 	return 0, err
-	// }
-	// dataFile.Close()
+	// writes the submission metadata to it's corresponding file
+	dataFile, err := os.OpenFile(submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	if err != nil {
+		return 0, err
+	}
+	// Write submission metadata to the created file
+	jsonString, err := json.Marshal(submission.MetaData)
+	if err != nil {
+		return 0, err
+	}
+	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+		return 0, err
+	}
+	dataFile.Close()
 
-	// // Adds each member file to the filesystem
-	// for _, file := range submission.File {
-	// 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), file.SubmissionName, file.Path)
-	// 	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME,
-	// 		file.SubmissionName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
+	// Adds each member file to the filesystem
+	for _, file := range submission.Files {
+		filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name, file.Path)
+		fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME,
+			submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
 
-	// 	// file paths without the file name (to create dirs if they don't exist yet)
-	// 	fileDirPath := filepath.Dir(filePath)
-	// 	fileDataDirPath := filepath.Dir(fileDataPath)
+		// file paths without the file name (to create dirs if they don't exist yet)
+		fileDirPath := filepath.Dir(filePath)
+		fileDataDirPath := filepath.Dir(fileDataPath)
 
-	// 	// mkdir files's dir in case they don't yet exist
-	// 	if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
-	// 		return 0, err
-	// 	} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
-	// 		return 0, err
-	// 	}
+		// mkdir files's dir in case they don't yet exist
+		if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+			return 0, err
+		} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
+			return 0, err
+		}
 
-	// 	// Create and open file and it's corresponding data file
-	// 	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// 	dataFile, err := os.OpenFile(
-	// 		fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
+		// Create and open file and it's corresponding data file
+		codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+		if err != nil {
+			return 0, err
+		}
+		dataFile, err := os.OpenFile(
+			fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+		if err != nil {
+			return 0, err
+		}
 
-	// 	// writes the file content
-	// 	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-	// 		return 0, err
-	// 	}
-	// 	// Writes given file's metadata
-	// 	jsonString, err := json.Marshal(file.MetaData)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// 	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-	// 		return 0, err
-	// 	}
+		// writes the file content
+		if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
+			return 0, err
+		}
+		// Writes given file's metadata
+		jsonString, err := json.Marshal(file.MetaData)
+		if err != nil {
+			return 0, err
+		}
+		if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+			return 0, err
+		}
 
-	// 	// closes files
-	// 	codeFile.Close()
-	// 	dataFile.Close()
-	// }
+		// closes files
+		codeFile.Close()
+		dataFile.Close()
+	}
 
 	// if the action was successful, the submission ID is returned
 	return submission.ID, nil

@@ -25,20 +25,20 @@ package main
 // 	"time"
 // 	"github.com/stretchr/testify/assert"
 
-// const (
+const (
 // 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
-// 	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
+	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
 
 // 	TEST_URL         = "http://localhost"
 // 	TEST_SERVER_PORT = "3333"
-// )
+)
 
-// var testFiles []*File = []*File{
-// 	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
-// 		Name: "testFile1.txt", Base64Value: "hello world", MetaData: nil},
-// 	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
-// 		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
-// }
+var testFiles []*File = []*File{
+	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
+		Name: "testFile1.txt", Base64Value: "hello world", MetaData: nil},
+	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
+		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
+}
 
 // var testComments []*Comment = []*Comment{
 // 	{

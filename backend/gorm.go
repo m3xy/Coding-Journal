@@ -72,7 +72,7 @@ type Submission struct {
 	// tags for organizing/grouping code submissions
 	Categories []string `gorm:"-" json:"categories"`
 	// metadata about the submission
-	MetaData *SubmissionData `gorm:"-" json:"metadata"`
+	MetaData *SubmissionData `gorm:"-" json:"metadata,omitempty"`
 }
 
 // Supergroup compliant code submissions (never stored in db)
@@ -153,7 +153,7 @@ type Comment struct {
 
 // stores submission tags (i.e. networking, java, python, etc.)
 type Category struct {
-	Tag          string `gorm:"uniqueIndex;unique" json:"category"` // actual tag
+	Tag          string `gorm:"column" json:"category"` // actual content of the tag
 	SubmissionID uint   `gorm:"foreignKey:SubmissionID; references:Submissions.ID"`
 }
 
@@ -195,7 +195,7 @@ func gormClear(db *gorm.DB) error {
 	for _, submission := range submissions {
 		db.Select(clause.Associations).Delete(&submission)
 	}
-	// Deletes main table
+	// Deletes main tables
 	tables := []interface{}{&File{}, &Category{}, &User{}, &GlobalUser{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
