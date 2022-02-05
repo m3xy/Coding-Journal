@@ -1,16 +1,19 @@
 
 # Table of Contents
 
-1.  [Response Format](#org22af552)
-2.  [API](#orgf6ba78d)
-    1.  [Journal](#org427c0d4)
-        1.  [Login](#org1f3d312)
-    2.  [Authentication](#orgcbad998)
-        1.  [Login](#org2ae3186)
+1.  [Response Format](#org53d091f)
+2.  [API](#orgb09e5ff)
+    1.  [Journal](#org6978210)
+        1.  [Login](#org6a5f21c)
+    2.  [Authentication](#orgc9014e9)
+        1.  [Login](#orgc990c37)
+        2.  [Register](#orgb295fc3)
+    3.  [User](#org7ea7e4b)
+        1.  [Profile Query](#org1b33072)
 
 
 
-<a id="org22af552"></a>
+<a id="org53d091f"></a>
 
 # Response Format
 
@@ -23,7 +26,7 @@ Response bodies are always given in this below format (with the exception of jou
     }
 
 
-<a id="orgf6ba78d"></a>
+<a id="orgb09e5ff"></a>
 
 # API
 
@@ -35,12 +38,12 @@ starting with `cs3099user11.host.cs.st-andrews.ac.uk/api/<version>`:
 -   `/user/`: User retrieval requests.
 
 
-<a id="org427c0d4"></a>
+<a id="org6978210"></a>
 
 ## Journal
 
 
-<a id="org1f3d312"></a>
+<a id="org6a5f21c"></a>
 
 ### Login
 
@@ -78,12 +81,12 @@ Supergroup compliant journal login.
             }
 
 
-<a id="orgcbad998"></a>
+<a id="orgc9014e9"></a>
 
 ## Authentication
 
 
-<a id="org2ae3186"></a>
+<a id="orgc990c37"></a>
 
 ### Login
 
@@ -101,7 +104,7 @@ Client-only login endpoint.
     
     2.  Body
     
-            interface Request {
+            interface Body {
             	client_id: string 		// ID used to find client - here, it is an email.
             	client_secret: string   // Client's secret for authentication - here, password.
             }
@@ -120,5 +123,95 @@ Client-only login endpoint.
             	token: string   			// Token used for restriced user access later on.
             	refresh_token: string		// Refresh token - used to make a new token after expiry.
             	redirect_uri: string 		// Address to token refresh request.
+            }
+
+
+<a id="orgb295fc3"></a>
+
+### Register
+
+Client registration endpoint.
+
+1.  Endpoint
+
+    The endpoint is accessible as **GET** `/auth/register`
+
+2.  Request
+
+    1.  Headers
+    
+        No required headers.
+    
+    2.  Body
+    
+            interface Content {
+            	// Required
+            	Email: string  	// Client ID
+            	Password: string    // Client Secret
+            	FirstName: string
+            	LastName: string
+            
+            	// Optional
+            	PhoneNumber?: string
+            	Organization?: string
+            }
+
+3.  Response
+
+    1.  Status
+    
+        -   200 - User successfully registered, response OK.
+        -   405 - Bad request, form given is invalid.
+    
+    2.  Body
+    
+        This function has no response content.
+
+
+<a id="org7ea7e4b"></a>
+
+## User
+
+
+<a id="org1b33072"></a>
+
+### Profile Query
+
+User profile information query.
+
+1.  Endpoint
+
+    The endpoint for the query is `/user/{ID}`, where ID stands for the user&rsquo;s UUID in the server.
+
+2.  Request
+
+    1.  Headers
+    
+        No header or authentication is required for this query.
+
+3.  Response
+
+    1.  Status
+    
+        -   200 - Query successful, requested information contained in content.
+        -   404 - User not found, content empty.
+    
+    2.  Body
+    
+        The \`Content\` value in the response is of type below
+        
+            interface Content {
+            	UserID: string
+            	FullName: string
+            	Profile: Profile
+            }
+            
+            interface Profile {
+            	Email: string
+            	FirstName: string
+            	LastName: string
+            	PhoneNumber: string
+            	Organization: string
+            	CreatedAt: DateTime // Format -
             }
 
