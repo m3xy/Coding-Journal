@@ -36,7 +36,7 @@ import (
 	"strings"
 	"gorm.io/gorm"
 
-	// 	"io/ioutil"
+	"io/ioutil"
 	// 	"net/http"
 	// 	"strconv"
 )
@@ -175,7 +175,7 @@ func addSubmission(submission *Submission) (uint, error) {
 	}
 
 	// adds the submission to the db, automatically setting submission.ID
-	if err := gormDb.Omit("Submissions.Authors Submissions.Reviewers").Create(submission).Error; err != nil {
+	if err := gormDb.Omit("submissions.authors", "submissions.reviewers", "submissions.files").Create(submission).Error; err != nil {
 		return 0, err
 	}
 	// adds authors and reviewers (done explicitly to allow for checking permissions)
@@ -217,6 +217,7 @@ func addSubmission(submission *Submission) (uint, error) {
 
 	// Adds each member file to the filesystem
 	for _, file := range submission.Files {
+		// constructs the file paths for the content file and data file
 		filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name, file.Path)
 		fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME,
 			submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
@@ -260,8 +261,6 @@ func addSubmission(submission *Submission) (uint, error) {
 		codeFile.Close()
 		dataFile.Close()
 	}
-
-	// if the action was successful, the submission ID is returned
 	return submission.ID, nil
 }
 
@@ -282,12 +281,15 @@ func addAuthors(authors []GlobalUser, submissionID uint) error {
 				"users.global_user_id = ?", author.ID).Find(&user).Error; err != nil {
 				return err
 			}
+			// throws an error if the author is not registered as an author
 			if user.UserType != USERTYPE_PUBLISHER && user.UserType != USERTYPE_REVIEWER_PUBLISHER {
 				return fmt.Errorf("User must have publisher permissions, not: %d", user.UserType)
 			}
 
 			// generates the association between the two submission and author
-			if err := tx.Model(&Submission{}).Where(submissionID).Association("Authors").Append(author.ID); err != nil {
+			submission := &Submission{}
+			submission.ID = submissionID
+			if err := tx.Model(submission).Association("Authors").Append(author.ID); err != nil {
 				return err
 			}
 			return nil
@@ -315,12 +317,15 @@ func addReviewers(reviewers []GlobalUser, submissionID uint) error {
 				"users.global_user_id = ?", reviewer.ID).Find(&user).Error; err != nil {
 				return err
 			}
+			// throws an error if the author is not registered as an author
 			if user.UserType != USERTYPE_REVIEWER && user.UserType != USERTYPE_REVIEWER_PUBLISHER {
 				return fmt.Errorf("User must have reviewer permissions, not: %d", user.UserType)
 			}
 
 			// generates the association between the two submission and author
-			if err := tx.Model(&Submission{}).Where(submissionID).Association("Reviewers").Append(reviewer.ID); err != nil {
+			submission := &Submission{}
+			submission.ID = submissionID
+			if err := tx.Model(submission).Association("Reviewers").Append(reviewer.ID); err != nil {
 				return err
 			}
 			return nil
@@ -354,244 +359,190 @@ func addTags(tags []string, submissionID uint) error {
 // gets all authors which are written by a given user and returns them
 //
 // Params:
-// 	authorId (string) : the global id of the author as stored in the db
+// 	authorID (string) : the global id of the author as stored in the db
 // Return:
 // 	(map[int]string) : map of submission Ids to submission names
 // 	(error) : an error if something goes wrong, nil otherwise
-func getUserSubmissions(authorId string) (map[int]string, error) {
-	// gets the submission IDs mapped to submission Names
-	submissions := make(map[int]string)
-	if err := gormDb.Select("submissions.ID", "submissions.Name").Joins("GlobalUsers").Joins("submissions").Where(
-		"global_ids.id = ?", authorId).Find(&submissions).Error; err != nil {
+func getUserSubmissions(authorID string) (map[uint]string, error) {
+	// gets the author's submissions
+	var submissions []*Submission
+	if err := gormDb.Model(&GlobalUser{ID:authorID}).Association("Submissions").Find(&submissions); err != nil {
 		return nil, err
 	}
-	return submissions, nil
+	// formats the authors submissions into a map of form submission.ID -> submission.Name
+	subMap := make(map[uint]string)
+	for _, sub := range submissions {
+		subMap[sub.ID] = sub.Name
+	}
+	return subMap, nil
 }
 
-// // Get the submission struct corresponding to the id by querying the db and reading
-// // the submissions meta-data file
-// //
-// // Parameters:
-// // 	submissionId (int) : the submission's unique id
-// // Returns:
-// // 	(*Submission) : the data of the submission
-// // 	(error) : an error if one occurs
-// func getSubmission(submissionId int) (*Submission, error) {
-// 	submission := &Submission{ Id: submissionId }
+// gets all of the submissions which a given user is reviewing. Permissions
+// are not checked here, as any user without reviewer permissions will not
+// be listed as reviewer on any submissions
+//
+// Parameters:
+// 	reviewerID (string) : the global ID of the reviewer
+// Returns:
+// 	(map[int]string) : a map of form { <submission ID>:<submission name> }
+func getUserReviews(reviewerID string) (map[uint]string, error) {
+	// gets the author's submissions
+	var submissions []*Submission
+	if err := gormDb.Model(&GlobalUser{ID:reviewerID}).Association("ReviewedSubs").Find(&submissions); err != nil {
+		return nil, err
+	}
+	// formats the authors submissions into a map of form submission.ID -> submission.Name
+	subMap := make(map[uint]string)
+	for _, sub := range submissions {
+		subMap[sub.ID] = sub.Name
+	}
+	return subMap, nil
+}
 
-// 	// gets the submission name, creation date, and license
-// 	querySubmissionData := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Submission{}, "Name")+", "+
-// 		getDbTag(&Submission{}, "CreationDate")+", "+
-// 		getDbTag(&Submission{}, "License"),
-// 		TABLE_SUBMISSIONS,
-// 		getDbTag(&Submission{}, "Id"),
-// 	)
-// 	row := db.QueryRow(querySubmissionData, submissionId)
-// 	err := row.Scan(&submission.Name,
-// 		&submission.CreationDate, &submission.License)
-// 	if err == sql.ErrNoRows {
-// 		return nil, fmt.Errorf("No submission exists with ID: %d", submissionId)
-// 	} else if err != nil {
-// 		return nil, err
-// 	}
+// Get the submission struct corresponding to the id by querying the db and reading
+// the submissions meta-data file
+//
+// Parameters:
+// 	submissionID (int) : the submission's unique id
+// Returns:
+// 	(*Submission) : the data of the submission
+// 	(error) : an error if one occurs
+func getSubmission(submissionID uint) (*Submission, error) {
+	var err error
+	// retrieves the submission from the db
+	submission := &Submission{}
+	submission.ID = submissionID
+	if err = gormDb.Find(submission).Error; err != nil {
+		return nil, err
+	}
+	// gets the data which is not stored in the submissions table of the database
+	submission.Authors, err = getSubmissionAuthors(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	submission.Reviewers, err = getSubmissionReviewers(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	submission.Categories, err = getSubmissionCategories(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	submission.Files, err = getSubmissionFiles(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	submission.MetaData, err = getSubmissionMetaData(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	return submission, nil
+}
 
-// 	// gets the data which is not stored in the submissions table of the database
-// 	submission.Authors, err = getSubmissionAuthors(submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	submission.Reviewers, err = getSubmissionReviewers(submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	submission.Categories, err = getSubmissionCategories(submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	submission.FilePaths, err = getSubmissionFilePaths(submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	submission.MetaData, err = getSubmissionMetaData(submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return submission, nil
-// }
+// Query the authors of a given submission from the database
+//
+// Params:
+//	submissionId (int) : the id of the submission to get authors of
+// Returns:
+//	([]string) : of the author's names
+//	(error) : if something goes wrong during the query
+func getSubmissionAuthors(submissionId uint) ([]GlobalUser, error) {
+	// queries the database for the authors
+	var authors []GlobalUser
+	submission := &Submission{}
+	submission.ID = submissionId
+	if err := gormDb.Model(submission).Select("global_users.id").Association("Authors").Find(&authors); err != nil {
+		return nil, err
+	}
+	return authors, nil
+}
 
-// // Query the authors of a given submission from the database
-// //
-// // Params:
-// //	submissionId (int) : the id of the submission to get authors of
-// // Returns:
-// //	([]string) : of the author's names
-// //	(error) : if something goes wrong during the query
-// func getSubmissionAuthors(submissionId int) ([]string, error) {
-// 	// builds the query
-// 	stmt := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&AuthorsReviewers{}, "Id"),
-// 		TABLE_AUTHORS,
-// 		getDbTag(&AuthorsReviewers{}, "SubmissionId"),
-// 	)
-// 	// executes query
-// 	rows, err := db.Query(stmt, submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+// Query the reviewers of a given submission from the database
+//
+// Params:
+//	submissionId (int) : the id of the submission to get reviewers of
+// Returns:
+//	([]string) : of the reviewer's Ids
+//	(error) : if something goes wrong during the query
+func getSubmissionReviewers(submissionId uint) ([]GlobalUser, error) {
+	// queries the database for the authors
+	var reviewers []GlobalUser
+	submission := &Submission{}
+	submission.ID = submissionId
+	if err := gormDb.Model(submission).Select("global_users.id").Association("Reviewers").Find(&reviewers); err != nil {
+		return nil, err
+	}
+	return reviewers, nil
+}
 
-// 	// builds the array
-// 	var author string
-// 	var authors []string
-// 	for rows.Next() {
-// 		// if there is an error returned by scanning the row, the error is returned
-// 		// without the array
-// 		if err := rows.Scan(&author); err != nil {
-// 			return nil, err
-// 		}
-// 		authors = append(authors, author)
-// 	}
-// 	return authors, nil
-// }
+// Queries the database for categories (tags) associated with the given
+// submission
+//
+// Parameters:
+// 	submissionId (int) : the submission to get the categories for
+// Returns:
+// 	([]string) : an array of the tags associated with the given submission
+// 	(error) : an error if one occurs while retrieving the tags
+func getSubmissionCategories(submissionId uint) ([]string, error) {
+	// queries the Categories table
+	var categories []Category
+	if err := gormDb.Model(&Category{SubmissionID:submissionId}).Find(&categories).Error; err != nil {
+		return nil, err
+	}
+	// loops over the query results
+	tags := []string{}
+	for _, category := range categories {
+		tags = append(tags, category.Tag)
+	}
+	return tags, nil
+}
 
-// // Query the reviewers of a given submission from the database
-// //
-// // Params:
-// //	submissionId (int) : the id of the submission to get reviewers of
-// // Returns:
-// //	([]string) : of the reviewer's Ids
-// //	(error) : if something goes wrong during the query
-// func getSubmissionReviewers(submissionId int) ([]string, error) {
-// 	// builds the query
-// 	stmt := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&AuthorsReviewers{}, "Id"),
-// 		TABLE_REVIEWERS,
-// 		getDbTag(&AuthorsReviewers{}, "SubmissionId"),
-// 	)
-// 	// executes query
-// 	rows, err := db.Query(stmt, submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+// Queries the database for files with the given submission ID
+// (i.e. files in the submission)
+//
+// Params:
+//	submissionId (int) : the id of the submission to get the files of
+//Returns:
+//	([]File) : Array of files which are members of the given submission
+//	(error) : if something goes wrong during the query
+func getSubmissionFiles(submissionId uint) ([]File, error) {
+	// queries the database
+	var files []File
+	if err := gormDb.Select("files.path", "files.Name").Where("files.submission_id = ?", submissionId).Find(&files).Error; err != nil {
+		return nil, err
+	}
+	return files, nil
+}
 
-// 	// builds the array
-// 	var reviewer string
-// 	var reviewers []string
-// 	for rows.Next() {
-// 		// if there is an error returned by scanning the row, the error is returned
-// 		// without the array
-// 		if err := rows.Scan(&reviewer); err != nil {
-// 			return nil, err
-// 		}
-// 		reviewers = append(reviewers, reviewer)
-// 	}
-// 	return reviewers, nil
-// }
+// This function gets a submission's meta-data from its file in the filesystem
+//
+// Parameters:
+// 	submissionId (int) : the unique id of the submission
+// Returns:
+//	(*SubmissionData) : the submission's metadata if found
+// 	(error) : if anything goes wrong while retrieving the metadata
+func getSubmissionMetaData(submissionId uint) (*SubmissionData, error) {
+	// gets the submission name
+	submission := &Submission{}
+	submission.ID = submissionId
+	if err := gormDb.Model(submission).Select("submissions.Name").First(&submission).Error; err != nil {
+		return nil, err 
+	}
 
-// // Queries the database for categories (tags) associated with the given
-// // submission
-// //
-// // Parameters:
-// // 	submissionId (int) : the submission to get the categories for
-// // Returns:
-// // 	([]string) : an array of the tags associated with the given submission
-// // 	(error) : an error if one occurs while retrieving the tags
-// func getSubmissionCategories(submissionId int) ([]string, error) {
-// 	// gets categories of the submission
-// 	var currTag string
-// 	categories := []string{}
-// 	queryCategories := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Categories{}, "Tag"),
-// 		TABLE_CATEGORIES,
-// 		getDbTag(&Categories{}, "SubmissionId"),
-// 	)
-// 	rows, err := db.Query(queryCategories, submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	// iterates over the results of the query, adding them to the array of tags
-// 	for rows.Next() {
-// 		if err = rows.Scan(&currTag); err != nil {
-// 			return nil, err
-// 		}
-// 		categories = append(categories, currTag)
-// 	}
-// 	return categories, nil
-// }
+	// reads the data file into a string
+	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submission.Name+".json")
+	dataString, err := ioutil.ReadFile(dataPath)
+	if err != nil {
+		return nil, err
+	}
 
-// // Queries the database for file paths with the given submission ID
-// // (i.e. files in the submission)
-// //
-// // Params:
-// //	submissionId (int) : the id of the submission to get the files of
-// //Returns:
-// //	([]string) : Array of file paths which are members of the given submission
-// //	(error) : if something goes wrong during the query
-// func getSubmissionFilePaths(submissionId int) ([]string, error) {
-// 	// builds the query
-// 	stmt := fmt.Sprintf(SELECT_ROW,
-// 		getDbTag(&File{}, "Path"),
-// 		TABLE_FILES,
-// 		getDbTag(&File{}, "SubmissionId"),
-// 	)
-// 	// executes query
-// 	rows, err := db.Query(stmt, submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// builds the array
-// 	var filePath string
-// 	var files []string
-// 	for rows.Next() {
-// 		// returns error if one occurs
-// 		if err := rows.Scan(&filePath); err != nil {
-// 			return nil, err
-// 		}
-// 		files = append(files, filePath)
-// 	}
-// 	return files, nil
-// }
-
-// // This function gets a submission's meta-data from its file in the filesystem
-// //
-// // Parameters:
-// // 	submissionId (int) : the unique id of the submission
-// // Returns:
-// //	(*SubmissionData) : the submission's metadata if found
-// // 	(error) : if anything goes wrong while retrieving the metadata
-// func getSubmissionMetaData(submissionId int) (*SubmissionData, error) {
-// 	// gets the submission name from the database
-// 	var submissionName string
-// 	querySubmissionName := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Submission{}, "Name"),
-// 		TABLE_SUBMISSIONS,
-// 		getDbTag(&Submission{}, "Id"),
-// 	)
-// 	row := db.QueryRow(querySubmissionName, submissionId)
-// 	if err := row.Scan(&submissionName); err != nil {
-// 		return nil, err
-// 	}
-
-// 	// reads the data file into a string
-// 	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME, submissionName+".json")
-// 	dataString, err := ioutil.ReadFile(dataPath)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// marshalls the string of data into a struct
-// 	submissionData := &SubmissionData{}
-// 	if err := json.Unmarshal(dataString, submissionData); err != nil {
-// 		return nil, err
-// 	}
-// 	return submissionData, nil
-// }
+	// marshalls the string of data into a struct
+	submissionData := &SubmissionData{}
+	if err := json.Unmarshal(dataString, submissionData); err != nil {
+		return nil, err
+	}
+	return submissionData, nil
+}
 
 // // This function takes in a struct in the local submission format, and transforms
 // // it into the supergroup compliant format

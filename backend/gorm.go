@@ -52,8 +52,9 @@ type Server struct {
 type GlobalUser struct {
 	ID          string       `gorm:"not null;primaryKey;type:varchar(191)" json:"UserID"`
 	FullName    string       `json:"FullName"`
-	User        User         `json:"Profile"`
-	Submissions []Submission `gorm:"many2many:authors_submission"`
+	User        User         `json:"Profile,omitempty"`
+	Submissions []Submission `gorm:"many2many:authors_submission" json:"-"`
+	ReviewedSubs []Submission `gorm:"many2many:reviewers_submission" json:"-"`
 
 	CreatedAt time.Time      `json:"CreatedAt"`
 	UpdatedAt time.Time      `json:"-"`
@@ -116,7 +117,7 @@ type SupergroupSubmissionData struct {
 type File struct {
 	gorm.Model
 	// id of the submission this file is a part of
-	SubmissionID int `json:"submissionId"`
+	SubmissionID uint `json:"submissionId"`
 	// name of the submission this file is a part of
 	SubmissionName string `json:"submissionName"` // TODO: remove if obselete
 	// relative path to the file from the root of the submission's file structure
@@ -197,10 +198,10 @@ func gormClear(db *gorm.DB) error {
 		return err
 	}
 	for _, submission := range submissions {
-		db.Select(clause.Associations).Delete(&submission)
+		db.Select(clause.Associations).Unscoped().Delete(&submission)
 	}
 	// Deletes main tables
-	tables := []interface{}{&File{}, &Category{}, &User{}, &GlobalUser{}}
+	tables := []interface{}{&File{}, &Category{}, &User{}, &GlobalUser{}, &Submission{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
 			Unscoped().Delete(table)

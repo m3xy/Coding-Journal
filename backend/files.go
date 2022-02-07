@@ -22,11 +22,11 @@
 
 package main
 
-// import (
+import (
 	// "encoding/json"
 	// "errors"
 	// "fmt"
-	// "io/ioutil"
+	// "io/iout/il"
 	// "log"
 	// "net/http"
 	// "os"
@@ -34,7 +34,7 @@ package main
 	// "strconv"
 	// "strings"
 	// "time"
-// )
+)
 
 // file constants, includes
 const (
@@ -282,85 +282,73 @@ const (
 // // Helper Functions
 // // -----
 
-// // Add file into submission, and store it to FS and DB.
-// // Note: Need valid submission. No comments exist on file
-// // creation.
-// //
-// // Params:
-// //	file (*File) : the file to add to the db and filesystem (all fields but Id and SubmissionId MUST be set)
-// //	submissionId (int) : the id of the submission which the added file is to be linked
-// //		to as an unsigned integer
-// // Returns:
-// //	(int) : the id of the added file (0 if an error occurs)
-// //	(error) : if the operation fails
-// func addFileTo(file *File, submissionId int) (int, error) {
-// 	// declares return value variables
-// 	var fileId int
-// 	var err error
+// Add file into submission, and store it to FS and DB.
+// Note: Need valid submission. No comments exist on file
+// creation.
+//
+// Params:
+//	file (*File) : the file to add to the db and filesystem (all fields but ID and SubmissionID MUST be set)
+//	submissionId (int) : the id of the submission which the added file is to be linked
+//		to as an unsigned integer
+// Returns:
+//	(int) : the id of the added file (0 if an error occurs)
+//	(error) : if the operation fails
+// func addFileTo(file *File, submissionId uint) (uint, error) {
+	// if file.Name == "" {
+	// 	return 0, errors.New("File name must be set")
+	// }
 
-// 	// formats SQL query to insert the file into the db
-// 	insertFile := fmt.Sprintf(
-// 		INSERT_FILE,
-// 		TABLE_FILES,
-// 		getDbTag(&File{}, "SubmissionId"),
-// 		getDbTag(&File{}, "Path"),
-// 	)
-// 	// executes the formatted query, returning the fileId
-// 	// (note that here SQL implicitly checks that the submissionId exists in the submissions table via Foreign key constraint)
-// 	row := db.QueryRow(insertFile, submissionId, file.Path)
-// 	// gets the id from the just inserted file
-// 	if err = row.Scan(&fileId); err != nil {
-// 		return 0, err
-// 	}
+	// // inserts the file into the db
+	// file.SubmissionID = submissionId
+	// if err := gormDb.Create(file).Error; err != nil {
+	// 	return 0, err
+	// }
 
-// 	// Add file to filesystem
-// 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), file.SubmissionName, file.Path)
-// 	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
-// 		file.SubmissionName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
+	// // Add file to filesystem
+	// filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), file.SubmissionName, file.Path)
+	// fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
+	// 	file.SubmissionName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
 
-// 	// file paths without the file name (to create dirs if they don't exist yet)
-// 	fileDirPath := filepath.Dir(filePath)
-// 	fileDataDirPath := filepath.Dir(fileDataPath)
+	// // file paths without the file name (to create dirs if they don't exist yet)
+	// fileDirPath := filepath.Dir(filePath)
+	// fileDataDirPath := filepath.Dir(fileDataPath)
 
-// 	// mkdir files's dir in case they don't yet exist
-// 	if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
-// 		return 0, err
-// 	} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
-// 		return 0, err
-// 	}
+	// // creates all directories on the file's relative path in case any of them do not exist yet
+	// if err := os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+	// 	return 0, err
+	// } else if err := os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
+	// 	return 0, err
+	// }
 
-// 	// Create and open file and it's corresponding data file
-// 	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	dataFile, err := os.OpenFile(
-// 		fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// 	if err != nil {
-// 		return 0, err
-// 	}
+	// // Create and open content file and it's corresponding data file
+	// codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// dataFile, err := os.OpenFile(
+	// 	fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	// if err != nil {
+	// 	return 0, err
+	// }
 
-// 	// writes the file content
-// 	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-// 		return 0, err
-// 	}
-// 	// Writes given file's metadata
-// 	jsonString, err := json.Marshal(file.MetaData)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-// 		return 0, err
-// 	}
+	// // write the file content
+	// if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
+	// 	return 0, err
+	// }
+	// // Writes given file's metadata
+	// jsonString, err := json.Marshal(file.MetaData)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+	// 	return 0, err
+	// }
 
-// 	// closes files
-// 	codeFile.Close()
-// 	dataFile.Close()
+	// // closes files
+	// codeFile.Close()
+	// dataFile.Close()
 
-// 	// Operation was successful ==> file Id set in file object and file returned.
-// 	file.Id = fileId
-// 	file.SubmissionId = submissionId
-// 	return fileId, nil
+// 	return file.ID, nil
 // }
 
 // // Add a comment to a given file

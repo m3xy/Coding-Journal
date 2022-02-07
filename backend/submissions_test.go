@@ -22,6 +22,8 @@ import (
 )
 
 // data to use in the tests
+// NOTE: make sure to use these directly, not as pointers, so that the
+// .ID field will not be set in any test
 var testSubmissions []Submission = []Submission{
 	// valid
 	Submission{
@@ -29,7 +31,7 @@ var testSubmissions []Submission = []Submission{
 		License:    "MIT",
 		Authors:    []GlobalUser{},
 		Reviewers:  []GlobalUser{},
-		Files:      []File{*testFiles[0]},
+		Files:      []File{},
 		Categories: []string{"testtag"},
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
@@ -41,7 +43,7 @@ var testSubmissions []Submission = []Submission{
 		License:    "MIT",
 		Authors:    []GlobalUser{},
 		Reviewers:  []GlobalUser{},
-		Files:      []File{*testFiles[1]},
+		Files:      []File{},
 		Categories: []string{"testtag"},
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
@@ -507,100 +509,187 @@ func TestAddSubmission(t *testing.T) {
 // 	})
 // }
 
-// // test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
-// // Test Depends On:
-// // 	- TestAddSubmission
-// // 	- TestAddAuthors
-// func TestGetUserSubmissions(t *testing.T) {
-// 	// adds two submissions each with different authors to the db and then queries one author's submissions
-// 	t.Run("Get Single Submission from an Author", func(t *testing.T) {
-// 		testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
-// 		testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
-// 		testAuthor := testAuthors[0]          // test author of the submission being queried
-// 		testNonAuthor := testAuthors[3]       // test author of submission not being queried
+// test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
+// Test Depends On:
+// 	- TestAddSubmission
+// 	- TestAddAuthors
+func TestGetUserSubmissions(t *testing.T) {
+	// adds two submissions each with different authors to the db and then queries one author's submissions
+	t.Run("Get Single Submission from an Author", func(t *testing.T) {
+		testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
+		testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
+		testAuthor := testAuthors[0]          // test author of the submission being queried
+		testNonAuthor := testAuthors[3]       // test author of submission not being queried
 
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+		testInit()
 
-// 		// adds two test users to the db as authors
-// 		authorId, err := registerUser(testAuthor)
-// 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-// 		testSubmission1.Authors = []string{authorId}
+		// adds two test users to the db as authors
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission1.Authors = []GlobalUser{{ID:authorID}}
 
-// 		nonAuthorId, err := registerUser(testNonAuthor) // author of the submission we are not interested in
-// 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-// 		testSubmission2.Authors = []string{nonAuthorId}
+		nonauthorID, err := registerUser(testNonAuthor) // author of the submission we are not interested in
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission2.Authors = []GlobalUser{{ID:nonauthorID}}
 
-// 		// adds dummy reviewers
-// 		reviewerId, err := registerUser(testReviewers[0])
-// 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-// 		testSubmission1.Reviewers = []string{reviewerId}
-// 		testSubmission2.Reviewers = []string{reviewerId}
+		// adds dummy reviewers
+		reviewerId, err := registerUser(testReviewers[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission1.Reviewers = []GlobalUser{{ID:reviewerId}}
+		testSubmission2.Reviewers = []GlobalUser{{ID:reviewerId}}
 
-// 		// adds two test submissions to the db
-// 		testSubmission1.Id, err = addSubmission(testSubmission1)
-// 		assert.NoErrorf(t, err, "Error occurred while adding submission1: %v", err)
-// 		testSubmission2.Id, err = addSubmission(testSubmission2)
-// 		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
+		// adds two test submissions to the db
+		testSubmission1.ID, err = addSubmission(&testSubmission1)
+		assert.NoErrorf(t, err, "Error occurred while adding submission1: %v", err)
+		testSubmission2.ID, err = addSubmission(&testSubmission2)
+		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
 
-// 		// queries all of testAuthor's submissions
-// 		submissions, err := getUserSubmissions(authorId)
-// 		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
+		// queries all of testAuthor's submissions
+		submissions, err := getUserSubmissions(authorID)
+		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
 
-// 		// tests for equality of submission Id and that testSubmission2.Id is not in the map
-// 		_, ok := submissions[testSubmission2.Id]
-// 		assert.False(t, ok, "Returned submission where the test author is not an author")
-// 		assert.Equalf(t, submissions[testSubmission1.Id], testSubmission1.Name,
-// 			"Returned incorrect submission name: %s", submissions[testSubmission1.Id])
+		// tests for equality of submission Id and that testSubmission2.Id is not in the map
+		_, ok := submissions[testSubmission2.ID]
+		assert.False(t, ok, "Returned submission where the test author is not an author")
+		assert.Equalf(t, submissions[testSubmission1.ID], testSubmission1.Name,
+			"Returned incorrect submission name: %s", submissions[testSubmission1.ID])
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		testEnd()
+	})
+}
 
-// // tests the getSubmission() function, which returns a submission struct
-// //
-// // Test Depends On:
-// // 	- TestAddSubmission
-// // 	- TestAddFile
-// func TestGetSubmission(t *testing.T) {
-// 	// tests the basic case of getting back a valid submission
-// 	t.Run("Single Valid Submission", func(t *testing.T) {
-// 		testSubmission := testSubmissions[0]
-// 		testFile := testFiles[0]
+// test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
+// Test Depends On:
+// 	- TestAddSubmission
+// 	- TestAddAuthors
+// 	- TestAddReviewers
+func TestGetUserReviewedSubs(t *testing.T) {
+	// adds two submissions each with different authors to the db and then queries one author's submissions
+	t.Run("Get Single Submission from a Reviewer", func(t *testing.T) {
+		testSubmission1 := testSubmissions[0]    // test submission to return on getUserSubmissions()
+		testSubmission2 := testSubmissions[1]    // test submission to not return on getUserSubmissions()
+		testReviewer := testReviewers[0]          // test author of the submission being queried
+		testNonReviewer := testReviewers[3]       // test author of submission not being queried
 
-// 		// sets up test environment, and adds a submission with one file to the db and filesystem
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "Error occurred while adding submission: %v", err)
-// 		_, err = addFileTo(testFile, submissionId)
-// 		assert.NoErrorf(t, err, "Error occurred while adding test file: %v", err)
+		testInit()
 
-// 		// gets the submission back
-// 		queriedSubmission, err := getSubmission(submissionId)
+		// adds two test users to the db as authors
+		reviewerID, err := registerUser(testReviewer)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission1.Reviewers = []GlobalUser{{ID:reviewerID}}
 
-// 		assert.NoErrorf(t, err, "Error occurred while retrieving submission: %v", err)
-// 		// tests the submission was returned properly
-// 		assert.Equal(t, testSubmission.Name, queriedSubmission.Name, "Submission names do not match")
-// 		assert.Equal(t, testSubmission.License, queriedSubmission.License, "Submission Licenses do not match")
-// 		assert.ElementsMatch(t, testSubmission.Authors, queriedSubmission.Authors, "Author lists do not match")
-// 		assert.ElementsMatch(t, testSubmission.Reviewers, queriedSubmission.Reviewers, "Reviewer arrays do not match")
-// 		assert.ElementsMatch(t, testSubmission.Reviewers, queriedSubmission.Reviewers, "Reviewer arrays do not match")
-// 		assert.ElementsMatch(t, testSubmission.FilePaths, queriedSubmission.FilePaths, "File path arrays do not match")
-// 		assert.ElementsMatch(t, testSubmission.Categories, queriedSubmission.Categories, "Submission tags do not match")
-// 		assert.Equal(t, testSubmission.MetaData.Abstract, queriedSubmission.MetaData.Abstract, "Abstracts do not match")
+		nonreviewerID, err := registerUser(testNonReviewer) // author of the submission we are not interested in
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission2.Reviewers = []GlobalUser{{ID:nonreviewerID}}
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+		// adds dummy authors
+		authorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission1.Authors = []GlobalUser{{ID:authorID}}
+		testSubmission2.Authors = []GlobalUser{{ID:authorID}}
 
-// 	// tests trying to get an invalid submission
-// 	t.Run("Invalid Submission", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		_, err := getSubmission(100)
-// 		assert.Errorf(t, err, "No error was thrown for invalid submission")
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		// adds two test submissions to the db
+		testSubmission1.ID, err = addSubmission(&testSubmission1)
+		assert.NoErrorf(t, err, "Error occurred while adding submission1: %v", err)
+		testSubmission2.ID, err = addSubmission(&testSubmission2)
+		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
+
+		// queries all of testAuthor's submissions
+		submissions, err := getUserReviews(reviewerID)
+		assert.NoErrorf(t, err, "Error getting user reviewed submissions: %v", err)
+
+		// tests for equality of submission Id and that testSubmission2.Id is not in the map
+		_, ok := submissions[testSubmission2.ID]
+		assert.False(t, ok, "Returned submission where the test reviewer is not a reviewer")
+		assert.Equalf(t, submissions[testSubmission1.ID], testSubmission1.Name,
+			"Returned incorrect submission name: %s", submissions[testSubmission1.ID])
+
+		testEnd()
+	})
+}
+
+// tests the getSubmission() function, which returns a submission struct
+//
+// Test Depends On:
+// 	- TestAddSubmission
+// 	- TestAddFile
+func TestGetSubmission(t *testing.T) {
+	// tests the basic case of getting back a valid submission
+	t.Run("Single Valid Submission", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFile := testFiles[0]
+		testAuthor := testAuthors[0]
+		testReviewer := testReviewers[0]
+
+		// sets up test environment, and adds a submission with one file to the db and filesystem
+		testInit()
+
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID:authorID}}
+
+		reviewerID, err := registerUser(testReviewer)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID:reviewerID}}
+
+		testSubmission.Files = []File{testFile}
+		submissionId, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding submission: %v", err)
+
+		// gets the submission back
+		queriedSubmission, err := getSubmission(submissionId)
+		assert.NoErrorf(t, err, "Error occurred while retrieving submission: %v", err)
+
+		// tests the submission was returned properly
+		assert.Equal(t, testSubmission.Name, queriedSubmission.Name, "Submission names do not match")
+		assert.Equal(t, testSubmission.License, queriedSubmission.License, "Submission Licenses do not match")
+		assert.ElementsMatch(t, testSubmission.Categories, queriedSubmission.Categories, "Submission tags do not match")
+		assert.Equal(t, testSubmission.MetaData.Abstract, queriedSubmission.MetaData.Abstract, "Abstracts do not match")
+
+		// tests authors
+		authorIDs := []string{}
+		for _, author := range queriedSubmission.Authors {
+			authorIDs = append(authorIDs, author.ID)
+		}
+		testAuthorIDs := []string{}
+		for _, author := range testSubmission.Authors {
+			testAuthorIDs = append(testAuthorIDs, author.ID)
+		}
+		assert.ElementsMatch(t, testAuthorIDs, authorIDs, "author IDs don't match")
+
+		// tests reviewers
+		testReviewerIDs := []string{}
+		for _, reviewer := range testSubmission.Reviewers {
+			testReviewerIDs = append(testReviewerIDs, reviewer.ID)
+		}
+		reviewerIDs := []string{}
+		for _, reviewer := range queriedSubmission.Reviewers {
+			reviewerIDs = append(reviewerIDs, reviewer.ID)
+		}
+		assert.ElementsMatch(t, testReviewerIDs, reviewerIDs, "reviewer IDs don't match")
+
+		// tests files
+		testFiles := []File{}
+		for _, file := range testSubmission.Files {
+			testFiles = append(testFiles, File{Name:file.Name, Path:file.Path})
+		}
+		files := []File{}
+		for _, file := range queriedSubmission.Files {
+			files = append(files, File{Name:file.Name, Path:file.Path})
+		}
+		assert.ElementsMatch(t, testFiles, files, "reviewer IDs don't match")
+
+		testEnd()
+	})
+
+	// tests trying to get an invalid submission
+	t.Run("Invalid Submission", func(t *testing.T) {
+		testInit()
+		_, err := getSubmission(100)
+		assert.Errorf(t, err, "No error was thrown for invalid submission")
+		testEnd()
+	})
+}
 
 // // This function tests the getSubmissionAuthors function
 // //

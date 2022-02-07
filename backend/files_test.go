@@ -33,10 +33,12 @@ const (
 // 	TEST_SERVER_PORT = "3333"
 )
 
-var testFiles []*File = []*File{
-	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile1.txt",
+// NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
+// as to prevent adding a file with the same SubmissionID twice
+var testFiles []File = []File{
+	{SubmissionID: 0, SubmissionName: "testSubmission1", Path: "testFile1.txt",
 		Name: "testFile1.txt", Base64Value: "hello world", MetaData: nil},
-	{SubmissionID: -1, SubmissionName: "testSubmission1", Path: "testFile2.txt",
+	{SubmissionID: 0, SubmissionName: "testSubmission1", Path: "testFile2.txt",
 		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
 }
 
