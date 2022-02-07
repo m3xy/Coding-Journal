@@ -12,21 +12,24 @@
 
 package main
 
+import (
 // 	"bytes"
 // 	"context"
-// 	"encoding/json"
-// 	"fmt"
-// 	"io/ioutil"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 // 	"net/http"
 // 	"os"
-// 	"path/filepath"
-// 	"strings"
-// 	"testing"
-// 	"time"
-// 	"github.com/stretchr/testify/assert"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+	"github.com/stretchr/testify/assert"
+	// "gorm.io/gorm"
+)
 
 const (
-// 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
+	// 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
 	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
 
 // 	TEST_URL         = "http://localhost"
@@ -42,23 +45,23 @@ var testFiles []File = []File{
 		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
 }
 
-// var testComments []*Comment = []*Comment{
-// 	{
-// 		AuthorId:    "",
-// 		Time:        fmt.Sprint(time.Now()),
-// 		Base64Value: "Hello World",
-// 		Replies:     []*Comment{},
-// 	},
-// 	{
-// 		AuthorId:    "",
-// 		Time:        fmt.Sprint(time.Now()),
-// 		Base64Value: "Goodbye World",
-// 		Replies:     []*Comment{},
-// 	},
-// }
-// var testFileData []*FileData = []*FileData{
-// 	{Comments: testComments},
-// }
+var testComments []*Comment = []*Comment{
+	{
+		AuthorId:    "",
+		Time:        fmt.Sprint(time.Now()),
+		Base64Value: "Hello World",
+		Replies:     []*Comment{},
+	},
+	{
+		AuthorId:    "",
+		Time:        fmt.Sprint(time.Now()),
+		Base64Value: "Goodbye World",
+		Replies:     []*Comment{},
+	},
+}
+var testFileData []*FileData = []*FileData{
+	{Comments: testComments},
+}
 
 // // TODO: move these to some common place as they are used here and in submissions_test
 // // Initialise and clear filesystem and database.
@@ -186,70 +189,109 @@ var testFiles []File = []File{
 // 	})
 // }
 
-// // tests the ability of the backend to add comments to a given file.
-// // Test Depends On:
-// // 	- TestAddSubmission (in submissions_test.go)
-// // 	- TestAddFile
-// func TestAddComment(t *testing.T) {
-// 	// Utility function to add a comment to a given file
-// 	testAddComment := func(comment *Comment, testFile *File) {
-// 		// adds a comment to the file
-// 		assert.NoError(t, addComment(comment, testFile.Id), "failed to add comment to the submission")
+// tests the ability of the backend to add comments to a given file.
+// Test Depends On:
+// 	- TestAddSubmission (in submissions_test.go)
+// 	- TestAddFile
+func TestAddComment(t *testing.T) {
+	// tests adding one valid comment. Uses the testAddComment() utility method
+	t.Run("Add One Comment", func(t *testing.T) {
+		testSubmission := testSubmissions[0] // test submission to add testFile to
+		testFile := testFiles[0]             // test file to add comments to
+		testAuthor := testAuthors[1]         // test author of comment
+		testComment := testComments[0]
 
-// 		// reads the data file into a CodeDataFile struct
-// 		fileDataPath := filepath.Join(
-// 			TEST_FILES_DIR,
-// 			fmt.Sprint(testFile.SubmissionId),
-// 			DATA_DIR_NAME,
-// 			testFile.SubmissionName,
-// 			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
-// 		)
-// 		fileBytes, err := ioutil.ReadFile(fileDataPath)
-// 		assert.NoErrorf(t, err, "failed to read data file: %v", err)
+		testInit()
 
-// 		// unmarshalls the file's meta-data to extract the added comment
-// 		codeData := &FileData{}
-// 		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to unmarshal code file data")
+		// adds a submission for the test file to be added to
+		authorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-// 		// extracts the last comment (most recently added) from the comments and checks for equality with
-// 		// the passed in comment
-// 		addedComment := codeData.Comments[len(codeData.Comments)-1]
-// 		assert.Equalf(t, comment.AuthorId, addedComment.AuthorId,
-// 			"Comment author ID mismatch: %s vs %s", comment.AuthorId, addedComment.AuthorId)
-// 		assert.Equal(t, comment.Base64Value, addedComment.Base64Value, "Comment content does not match")
-// 	}
+		reviewerID, err := registerUser(testReviewers[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
-// 	// tests adding one valid comment. Uses the testAddComment() utility method
-// 	t.Run("Add One Comment", func(t *testing.T) {
-// 		testSubmission := testSubmissions[0] // test submission to add testFile to
-// 		testFile := testFiles[0]             // test file to add comments to
-// 		testAuthor := testAuthors[1]         // test author of comment
-// 		testComment := testComments[0]
+		testSubmission.Files = []File{testFile}
+		testSubmissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "failed to add submission: %v", err)
 
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
+		// adds a test user to author a comment
+		authorId, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "failed to add user to the database: %v", err)
+		testComment.AuthorId = authorId
 
-// 		// adds a submission for the test file to be added to
-// 		testSubmission.Authors = registerUsers(t, testAuthors[3:4])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "failed to add submission: %v", err)
-// 		testSubmission.Id = submissionId
 
-// 		// adds a test file to comment on
-// 		fileId, err := addFileTo(testFile, submissionId)
-// 		assert.NoErrorf(t, err, "failed to add a file to the submission: %v", err)
-// 		testFile.Id = fileId
+		// adds a comment to the file
+		assert.NoError(t, addComment(testComment, testFile.ID), "failed to add comment to the submission")
 
-// 		// adds a test user to author a comment
-// 		authorId, err := registerUser(testAuthor)
-// 		assert.NoErrorf(t, err, "failed to add user to the database: %v", err)
-// 		testComment.AuthorId = authorId
+		// reads the data file into a CodeDataFile struct
+		fileDataPath := filepath.Join(
+			TEST_FILES_DIR,
+			fmt.Sprint(testSubmissionID),
+			DATA_DIR_NAME,
+			testSubmission.Name,
+			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
+		)
+		fileBytes, err := ioutil.ReadFile(fileDataPath)
+		assert.NoErrorf(t, err, "failed to read data file: %v", err)
 
-// 		testAddComment(testComment, testFile)
+		// unmarshalls the file's meta-data to extract the added comment
+		codeData := &FileData{}
+		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to unmarshal code file data")
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		// extracts the last comment (most recently added) from the comments and checks for equality with
+		// the passed in comment
+		addedComment := codeData.Comments[len(codeData.Comments)-1]
+		assert.Equalf(t, testComment.AuthorId, addedComment.AuthorId,
+			"Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
+		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
+
+
+
+		testEnd()
+	})
+}
+
+// Tests the ability of the backend helper functions to retrieve a file's data
+//
+// Test Depends On:
+// 	- TestAddSubmission (in submissions_test.go)
+func TestGetFileData(t *testing.T) {
+	// getting single valid file TODO: add comments here
+	t.Run("Single Valid File", func(t *testing.T) {
+		testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+		testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
+		testAuthor := testAuthors[0]
+		testReviewer := testReviewers[0]
+
+		testInit()
+
+		// configures the test submission fields
+		testSubmission.Files = []File{testFile}
+
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		reviewerID, err := registerUser(testReviewer)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
+		// adds a submission to the database and filesystem
+		submissionId, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err)
+
+		// queries the file's data from it's ID
+		queriedFile, err := getFileData(testSubmission.Files[0].ID)
+
+		// tests the returned data for equality with the sent data (files do not have comments here)
+		assert.Equal(t, submissionId, queriedFile.SubmissionID, "Submission IDs do not match")
+		assert.Equal(t, testFile.Name, queriedFile.Name, "File names do not match")
+		assert.Equal(t, testFile.Path, queriedFile.Path, "File paths do not match")
+		assert.Equal(t, testFile.Base64Value, queriedFile.Base64Value, "File Content does not match")
+	})
+}
 
 // // Tests the basic ability of the files.go code to load the data from a
 // // valid file path passed to it via HTTP request

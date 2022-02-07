@@ -28,13 +28,13 @@ package main
 import (
 	// 	"database/sql"
 
-	"os"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"encoding/json"
-	"strings"
 	"gorm.io/gorm"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"io/ioutil"
 	// 	"net/http"
@@ -238,8 +238,7 @@ func addSubmission(submission *Submission) (uint, error) {
 		if err != nil {
 			return 0, err
 		}
-		dataFile, err := os.OpenFile(
-			fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+		dataFile, err := os.OpenFile(fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 		if err != nil {
 			return 0, err
 		}
@@ -249,6 +248,9 @@ func addSubmission(submission *Submission) (uint, error) {
 			return 0, err
 		}
 		// Writes given file's metadata
+		if file.MetaData == nil {
+			file.MetaData = &FileData{}
+		}
 		jsonString, err := json.Marshal(file.MetaData)
 		if err != nil {
 			return 0, err
@@ -297,7 +299,7 @@ func addAuthors(authors []GlobalUser, submissionID uint) error {
 			return err
 		}
 	}
-	return nil 
+	return nil
 }
 
 // Add an array of reviewers to the given submission provided the id given corresponds to a valid
@@ -366,7 +368,7 @@ func addTags(tags []string, submissionID uint) error {
 func getUserSubmissions(authorID string) (map[uint]string, error) {
 	// gets the author's submissions
 	var submissions []*Submission
-	if err := gormDb.Model(&GlobalUser{ID:authorID}).Association("Submissions").Find(&submissions); err != nil {
+	if err := gormDb.Model(&GlobalUser{ID: authorID}).Association("Submissions").Find(&submissions); err != nil {
 		return nil, err
 	}
 	// formats the authors submissions into a map of form submission.ID -> submission.Name
@@ -388,7 +390,7 @@ func getUserSubmissions(authorID string) (map[uint]string, error) {
 func getUserReviews(reviewerID string) (map[uint]string, error) {
 	// gets the author's submissions
 	var submissions []*Submission
-	if err := gormDb.Model(&GlobalUser{ID:reviewerID}).Association("ReviewedSubs").Find(&submissions); err != nil {
+	if err := gormDb.Model(&GlobalUser{ID: reviewerID}).Association("ReviewedSubs").Find(&submissions); err != nil {
 		return nil, err
 	}
 	// formats the authors submissions into a map of form submission.ID -> submission.Name
@@ -486,7 +488,7 @@ func getSubmissionReviewers(submissionId uint) ([]GlobalUser, error) {
 func getSubmissionCategories(submissionId uint) ([]string, error) {
 	// queries the Categories table
 	var categories []Category
-	if err := gormDb.Model(&Category{SubmissionID:submissionId}).Find(&categories).Error; err != nil {
+	if err := gormDb.Model(&Category{SubmissionID: submissionId}).Find(&categories).Error; err != nil {
 		return nil, err
 	}
 	// loops over the query results
@@ -526,7 +528,7 @@ func getSubmissionMetaData(submissionId uint) (*SubmissionData, error) {
 	submission := &Submission{}
 	submission.ID = submissionId
 	if err := gormDb.Model(submission).Select("submissions.Name").First(&submission).Error; err != nil {
-		return nil, err 
+		return nil, err
 	}
 
 	// reads the data file into a string

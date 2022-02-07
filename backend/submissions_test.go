@@ -10,12 +10,12 @@
 package main
 
 import (
-	"os"
-	"strings"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -136,7 +136,7 @@ func TestAddSubmission(t *testing.T) {
 			dataString, err := ioutil.ReadFile(fileDataPath)
 			assert.NoError(t, err, "error reading submission data")
 			assert.NoError(t, json.Unmarshal(dataString, fileData), "error unmarshalling submission data")
-	
+
 			// gets data about the file, and tests it for equality against the added file
 			_, err = os.Stat(fileDataPath)
 			assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
@@ -526,17 +526,17 @@ func TestGetUserSubmissions(t *testing.T) {
 		// adds two test users to the db as authors
 		authorID, err := registerUser(testAuthor)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Authors = []GlobalUser{{ID:authorID}}
+		testSubmission1.Authors = []GlobalUser{{ID: authorID}}
 
 		nonauthorID, err := registerUser(testNonAuthor) // author of the submission we are not interested in
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission2.Authors = []GlobalUser{{ID:nonauthorID}}
+		testSubmission2.Authors = []GlobalUser{{ID: nonauthorID}}
 
 		// adds dummy reviewers
 		reviewerId, err := registerUser(testReviewers[0])
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Reviewers = []GlobalUser{{ID:reviewerId}}
-		testSubmission2.Reviewers = []GlobalUser{{ID:reviewerId}}
+		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerId}}
+		testSubmission2.Reviewers = []GlobalUser{{ID: reviewerId}}
 
 		// adds two test submissions to the db
 		testSubmission1.ID, err = addSubmission(&testSubmission1)
@@ -566,27 +566,27 @@ func TestGetUserSubmissions(t *testing.T) {
 func TestGetUserReviewedSubs(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from a Reviewer", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0]    // test submission to return on getUserSubmissions()
-		testSubmission2 := testSubmissions[1]    // test submission to not return on getUserSubmissions()
-		testReviewer := testReviewers[0]          // test author of the submission being queried
-		testNonReviewer := testReviewers[3]       // test author of submission not being queried
+		testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
+		testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
+		testReviewer := testReviewers[0]      // test author of the submission being queried
+		testNonReviewer := testReviewers[3]   // test author of submission not being queried
 
 		testInit()
 
 		// adds two test users to the db as authors
 		reviewerID, err := registerUser(testReviewer)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Reviewers = []GlobalUser{{ID:reviewerID}}
+		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerID}}
 
 		nonreviewerID, err := registerUser(testNonReviewer) // author of the submission we are not interested in
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission2.Reviewers = []GlobalUser{{ID:nonreviewerID}}
+		testSubmission2.Reviewers = []GlobalUser{{ID: nonreviewerID}}
 
 		// adds dummy authors
 		authorID, err := registerUser(testAuthors[0])
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Authors = []GlobalUser{{ID:authorID}}
-		testSubmission2.Authors = []GlobalUser{{ID:authorID}}
+		testSubmission1.Authors = []GlobalUser{{ID: authorID}}
+		testSubmission2.Authors = []GlobalUser{{ID: authorID}}
 
 		// adds two test submissions to the db
 		testSubmission1.ID, err = addSubmission(&testSubmission1)
@@ -626,11 +626,11 @@ func TestGetSubmission(t *testing.T) {
 
 		authorID, err := registerUser(testAuthor)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission.Authors = []GlobalUser{{ID:authorID}}
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
 		reviewerID, err := registerUser(testReviewer)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission.Reviewers = []GlobalUser{{ID:reviewerID}}
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
 		testSubmission.Files = []File{testFile}
 		submissionId, err := addSubmission(&testSubmission)
@@ -671,11 +671,11 @@ func TestGetSubmission(t *testing.T) {
 		// tests files
 		testFiles := []File{}
 		for _, file := range testSubmission.Files {
-			testFiles = append(testFiles, File{Name:file.Name, Path:file.Path})
+			testFiles = append(testFiles, File{Name: file.Name, Path: file.Path})
 		}
 		files := []File{}
 		for _, file := range queriedSubmission.Files {
-			files = append(files, File{Name:file.Name, Path:file.Path})
+			files = append(files, File{Name: file.Name, Path: file.Path})
 		}
 		assert.ElementsMatch(t, testFiles, files, "reviewer IDs don't match")
 

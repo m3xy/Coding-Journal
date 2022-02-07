@@ -50,10 +50,10 @@ type Server struct {
 }
 
 type GlobalUser struct {
-	ID          string       `gorm:"not null;primaryKey;type:varchar(191)" json:"UserID"`
-	FullName    string       `json:"FullName"`
-	User        User         `json:"Profile,omitempty"`
-	Submissions []Submission `gorm:"many2many:authors_submission" json:"-"`
+	ID           string       `gorm:"not null;primaryKey;type:varchar(191)" json:"UserID"`
+	FullName     string       `json:"FullName"`
+	User         User         `json:"Profile,omitempty"`
+	Submissions  []Submission `gorm:"many2many:authors_submission" json:"-"`
 	ReviewedSubs []Submission `gorm:"many2many:reviewers_submission" json:"-"`
 
 	CreatedAt time.Time      `json:"CreatedAt"`
