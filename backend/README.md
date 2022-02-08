@@ -133,7 +133,7 @@ Client registration endpoint.
 
 1.  Endpoint
 
-    The endpoint is accessible as **GET** `/auth/register`
+    The endpoint is accessible as **POST** `/auth/register`
 
 2.  Request
 
@@ -180,7 +180,7 @@ User profile information query.
 
 1.  Endpoint
 
-    The endpoint for the query is `/user/{ID}`, where ID stands for the user&rsquo;s UUID in the server.
+    The endpoint for the query is **GET** `/user/{ID}`, where ID stands for the user&rsquo;s UUID in the server.
 
 2.  Request
 
