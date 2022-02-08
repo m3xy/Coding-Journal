@@ -34,7 +34,7 @@ import (
 	"gorm.io/gorm"
 	"os"
 	"path/filepath"
-	"strings"
+	// "strings"
 
 	"io/ioutil"
 	// 	"net/http"
@@ -215,53 +215,9 @@ func addSubmission(submission *Submission) (uint, error) {
 	}
 	dataFile.Close()
 
-	// Adds each member file to the filesystem
+	// Adds each member file to the filesystem and database
 	for _, file := range submission.Files {
-		// constructs the file paths for the content file and data file
-		filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name, file.Path)
-		fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME,
-			submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
-
-		// file paths without the file name (to create dirs if they don't exist yet)
-		fileDirPath := filepath.Dir(filePath)
-		fileDataDirPath := filepath.Dir(fileDataPath)
-
-		// mkdir files's dir in case they don't yet exist
-		if err = os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
-			return 0, err
-		} else if err = os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
-			return 0, err
-		}
-
-		// Create and open file and it's corresponding data file
-		codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-		if err != nil {
-			return 0, err
-		}
-		dataFile, err := os.OpenFile(fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-		if err != nil {
-			return 0, err
-		}
-
-		// writes the file content
-		if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-			return 0, err
-		}
-		// Writes given file's metadata
-		if file.MetaData == nil {
-			file.MetaData = &FileData{}
-		}
-		jsonString, err := json.Marshal(file.MetaData)
-		if err != nil {
-			return 0, err
-		}
-		if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-			return 0, err
-		}
-
-		// closes files
-		codeFile.Close()
-		dataFile.Close()
+		_, err = addFileTo(&file, submission.ID)
 	}
 	return submission.ID, nil
 }
@@ -291,7 +247,7 @@ func addAuthors(authors []GlobalUser, submissionID uint) error {
 			// generates the association between the two submission and author
 			submission := &Submission{}
 			submission.ID = submissionID
-			if err := tx.Model(submission).Association("Authors").Append(author.ID); err != nil {
+			if err := tx.Model(submission).Association("Authors").Append(&GlobalUser{ID:author.ID}); err != nil {
 				return err
 			}
 			return nil
@@ -327,7 +283,7 @@ func addReviewers(reviewers []GlobalUser, submissionID uint) error {
 			// generates the association between the two submission and author
 			submission := &Submission{}
 			submission.ID = submissionID
-			if err := tx.Model(submission).Association("Reviewers").Append(reviewer.ID); err != nil {
+			if err := tx.Model(submission).Association("Reviewers").Append(&GlobalUser{ID:reviewer.ID}); err != nil {
 				return err
 			}
 			return nil
@@ -346,14 +302,29 @@ func addReviewers(reviewers []GlobalUser, submissionID uint) error {
 // Returns:
 // 	(error) : an error if one occurs, nil otherwise
 func addTags(tags []string, submissionID uint) error {
+	// builds a list of category structs to be inserted
+	categories := []*Category{}
 	for _, tag := range tags {
 		if tag == "" {
-			return fmt.Errorf("tag cannot be empty") // TODO: figure out if this should err or just log
+			return errors.New("Tag cannot be an empty string")
 		}
-		// creates a catagory struct and adds it to the db
-		if err := gormDb.Create(&Category{Tag: tag, SubmissionID: submissionID}).Error; err != nil {
+		categories = append(categories, &Category{Tag: tag, SubmissionID: submissionID})
+	}
+	// inserts the tags using a transaction
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// checks that the submission exists
+		submission := &Submission{}
+		submission.ID = submissionID
+		if err := gormDb.Model(submission).First(submission).Error; err != nil {
 			return err
 		}
+		// inserts the array of categories
+		if err := gormDb.Model(&Category{}).Create(categories).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	return nil
 }
@@ -453,7 +424,8 @@ func getSubmissionAuthors(submissionId uint) ([]GlobalUser, error) {
 	var authors []GlobalUser
 	submission := &Submission{}
 	submission.ID = submissionId
-	if err := gormDb.Model(submission).Select("global_users.id").Association("Authors").Find(&authors); err != nil {
+	if err := gormDb.Model(submission).Select(
+		"global_users.id", "global_users.full_name").Association("Authors").Find(&authors); err != nil {
 		return nil, err
 	}
 	return authors, nil
@@ -471,7 +443,8 @@ func getSubmissionReviewers(submissionId uint) ([]GlobalUser, error) {
 	var reviewers []GlobalUser
 	submission := &Submission{}
 	submission.ID = submissionId
-	if err := gormDb.Model(submission).Select("global_users.id").Association("Reviewers").Find(&reviewers); err != nil {
+	if err := gormDb.Model(submission).Select(
+		"global_users.id", "global_users.full_name").Association("Reviewers").Find(&reviewers); err != nil {
 		return nil, err
 	}
 	return reviewers, nil
@@ -546,106 +519,57 @@ func getSubmissionMetaData(submissionId uint) (*SubmissionData, error) {
 	return submissionData, nil
 }
 
-// // This function takes in a struct in the local submission format, and transforms
-// // it into the supergroup compliant format
-// //
-// // Parameters:
-// // 	submissionId (int) : the id of the submission to be converted to a supergroup-compliant
-// // 		format
-// // Returns:
-// // 	(*SupergroupSubmission) : a supergroup compliant submission struct
-// // 	(error) : an error if one occurs
-// func localToGlobal(submissionId int) (*SupergroupSubmission, error) {
-// 	// gets the submission struct which submissionId refers to
-// 	localSubmission, err := getSubmission(submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	// creates the Supergroup metadata struct
-// 	supergroupData := &SupergroupSubmissionData{
-// 		CreationDate: localSubmission.CreationDate,
-// 		Categories: localSubmission.Categories,
-// 		Abstract: localSubmission.MetaData.Abstract,
-// 		License: localSubmission.License,
-// 	}
+// This function takes in a struct in the local submission format, and transforms
+// it into the supergroup compliant format
+//
+// Parameters:
+// 	submissionID (int) : the id of the submission to be converted to a supergroup-compliant
+// 		format
+// Returns:
+// 	(*SupergroupSubmission) : a supergroup compliant submission struct
+// 	(error) : an error if one occurs
+func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
+	// gets the submission struct which submissionID refers to
+	localSubmission, err := getSubmission(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	// creates the Supergroup metadata struct
+	supergroupData := &SupergroupSubmissionData{
+		CreationDate: fmt.Sprint(localSubmission.CreatedAt),
+		Categories: localSubmission.Categories,
+		Abstract: localSubmission.MetaData.Abstract,
+		License: localSubmission.License,
+	}
 
-// 	// builds a list of author names from the users table's first and last name fields
-// 	queryAuthorNames := fmt.Sprintf(
-// 		SELECT_ROW_INNER_JOIN,
-// 		getDbTag(&Credentials{}, "Fname")+", "+getDbTag(&Credentials{}, "Lname"),
-// 		VIEW_USER_INFO,
-// 		TABLE_AUTHORS,
-// 		VIEW_USER_INFO+"."+getDbTag(&IdMappings{}, "GlobalId"),
-// 		TABLE_AUTHORS+"."+getDbTag(&AuthorsReviewers{}, "Id"),
-// 		TABLE_AUTHORS+"."+getDbTag(&AuthorsReviewers{}, "SubmissionId"),
-// 	)
-// 	rows, err := db.Query(queryAuthorNames, submissionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	// iterates over each row to get the author names
-// 	var fname string
-// 	var lname string
-// 	authorNames := []string{}
-// 	for rows.Next() {
-// 		if err = rows.Scan(&fname, &lname); err != nil {
-// 			return nil, err
-// 		}
-// 		authorNames = append(authorNames, fname+" "+lname)
-// 	}
-// 	supergroupData.AuthorNames = authorNames
+	// adds author names to an array
+	authorNames := []string{}
+	for _, author := range localSubmission.Authors {
+		authorNames = append(authorNames, author.FullName)
+	}
+	supergroupData.AuthorNames = authorNames
 
-// 	// creates the list of file structs using the file paths and files.go
-// 	var base64 string
-// 	var supergroupFile *SupergroupFile
-// 	supergroupFiles := []*SupergroupFile{}
-// 	for _, path := range localSubmission.FilePaths {
-// 		fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(localSubmission.Id), localSubmission.Name, path)
-// 		base64, err = getFileContent(fullFilePath)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		supergroupFile = &SupergroupFile{
-// 			Name: filepath.Base(path),
-// 			Base64Value: base64,
-// 		}
-// 		supergroupFiles = append(supergroupFiles, supergroupFile)
-// 	}
+	// creates the list of file structs using the file paths and files.go
+	var base64 string
+	var supergroupFile *SupergroupFile
+	supergroupFiles := []*SupergroupFile{}
+	for _, file := range localSubmission.Files {
+		fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(localSubmission.ID), localSubmission.Name, file.Path)
+		base64, err = getFileContent(fullFilePath)
+		if err != nil {
+			return nil, err
+		}
+		supergroupFile = &SupergroupFile{
+			Name: filepath.Base(file.Path),
+			Base64Value: base64,
+		}
+		supergroupFiles = append(supergroupFiles, supergroupFile)
+	}
 
-// 	// creates the supergroup submission to return
-// 	return &SupergroupSubmission{
-// 		Name: localSubmission.Name,
-// 		Files: supergroupFiles,
-// 		MetaData: supergroupData,
-// 	}, nil
-// }
-
-// // TODO : finish this function once the router function for exporting supergroup things is written
-// // // Converts a supergroup compliant submission to the locally used format
-// // //
-// // // Parameters:
-// // // 	globalSubmission (*SupergroupSubmission) : a supergroup compliant submission
-// // // Returns:
-// // // 	(*Submission) : the locally formatted version of the above submission
-// // // 	(error) : an error if one occurs
-// // func globalToLocal(globalSubmission *SupergroupSubmission) (*Submission, error) {
-// // 	// creates the local metadata struct
-// // 	localData := &SubmissionData{
-// // 		Abstract: globalSubmission.MetaData.Abstract,
-// // 		Reviews: nil,
-// // 	}
-
-// // 	// registers the submission
-
-// // 	// creates the submission to return
-// // 	localSubmission &Submission{
-// // 		Name: globalSubmission.Name,
-// // 		CreationDate: globalSubmission.MetaData.CreationDate,
-// // 		License: globalSubmission.MetaData.License,
-// // 		Reviewers: nil, // TODO: discuss with group, how do we make this non-nil
-// // 		Authors: nil, // TODO: how do we do this??
-// // 		FilePaths: ,
-// // 		Categories: globalSubmission.MetaData.Categories,
-// // 		MetaData: localData,
-// // 	}, nil
-// // }
+	// creates the supergroup submission to return
+	return &SupergroupSubmission{
+		Name: localSubmission.Name,
+		Files: supergroupFiles,
+		MetaData: supergroupData,
+	}, nil
+}

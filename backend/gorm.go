@@ -157,9 +157,10 @@ type Comment struct {
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
+// uniqueIndex:idx_first_second specifies the first and second column as a unique pair
 type Category struct {
-	Tag          string `gorm:"column" json:"category"` // actual content of the tag
-	SubmissionID uint   `gorm:"foreignKey:SubmissionID; references:Submissions.ID"`
+	Tag          string `gorm:"column;uniqueIndex:idx_first_second" json:"category"` // actual content of the tag
+	SubmissionID uint   `gorm:"foreignKey:SubmissionID; references:Submissions.ID;uniqueIndex:idx_first_second"`
 }
 
 func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {

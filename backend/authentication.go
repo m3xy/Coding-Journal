@@ -141,7 +141,10 @@ func registerUser(user User) (string, error) {
 	// Hash password and store new credentials to database.
 	user.Password = string(hashPw(user.Password))
 
-	registeredUser := GlobalUser{User: user}
+	registeredUser := GlobalUser{
+		FullName: user.FirstName+" "+user.LastName,
+		User: user,
+	}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user
 		if !isUnique(tx, User{}, "Email", user.Email) {

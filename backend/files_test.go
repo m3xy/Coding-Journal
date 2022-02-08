@@ -13,18 +13,18 @@
 package main
 
 import (
-// 	"bytes"
-// 	"context"
+	// 	"bytes"
+	// 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-// 	"net/http"
-// 	"os"
+	// 	"net/http"
+	"os"
+	"github.com/stretchr/testify/assert"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-	"github.com/stretchr/testify/assert"
 	// "gorm.io/gorm"
 )
 
@@ -100,94 +100,96 @@ var testFileData []*FileData = []*FileData{
 // 	return nil
 // }
 
-// // tests the functionality to upload files from the backend (no use of HTTP requests in this test)
-// func TestAddFile(t *testing.T) {
-// 	// utility function to add a single file
-// 	testAddFile := func(file *File, submissionId int) {
-// 		var submissionName string     // name of the submission as queried from the SQL db
-// 		var fileId int                // id of the file as returned from addFileTo()
-// 		var queriedFileContent string // the content of the file
-// 		var queriedSubmissionId int   // the id of the submission as gotten from the files table
-// 		var queriedFilePath string    // the file path as queried from the files table
+// tests the functionality to upload files from the backend (no use of HTTP requests in this test)
+func TestAddFile(t *testing.T) {
+	// utility function to add a single file
+	testAddFile := func(file *File, submissionId uint) {
+		// adds file to the already instantiated submission
+		fileId, err := addFileTo(file, submissionId)
+		assert.NoErrorf(t, err, "failed to add file to the given submission: %v", err)
 
-// 		// adds file to the already instantiated submission
-// 		fileId, err := addFileTo(file, submissionId)
-// 		assert.NoErrorf(t, err, "failed to add file to the given submission: %v", err)
+		// gets the submission name from the db
+		submission := &Submission{}
+		submission.ID = submissionId
+		assert.NoError(t, gormDb.Model(submission).Select("submissions.name").First(submission).Error, "Error retrieving submission name")
 
-// 		// gets the submission name from the db
-// 		querySubmissionName := fmt.Sprintf(
-// 			SELECT_ROW,
-// 			getDbTag(&Submission{}, "Name"),
-// 			TABLE_SUBMISSIONS,
-// 			getDbTag(&Submission{}, "Id"),
-// 		)
-// 		// executes the query
-// 		row := db.QueryRow(querySubmissionName, submissionId)
-// 		assert.NoError(t, row.Scan(&submissionName), "Query failure on submission name")
+		// gets the file data from the db
+		queriedFile := &File{}
+		queriedFile.ID = fileId
+		assert.NoError(t, gormDb.Model(queriedFile).Select("files.submission_id", "files.path").First(queriedFile).Error, "Error retrieving added file")
 
-// 		// gets the file data from the db
-// 		queryFileData := fmt.Sprintf(
-// 			SELECT_ROW,
-// 			fmt.Sprintf("%s, %s", getDbTag(&File{}, "SubmissionId"), getDbTag(&File{}, "Path")),
-// 			TABLE_FILES,
-// 			getDbTag(&File{}, "Id"),
-// 		)
-// 		// executes query
-// 		row = db.QueryRow(queryFileData, fileId)
-// 		assert.NoError(t, row.Scan(&queriedSubmissionId, &queriedFilePath), "Failed to query submission name after db")
+		// gets the file content from the filesystem
+		filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId), submission.Name, queriedFile.Path)
+		fileBytes, err := ioutil.ReadFile(filePath)
+		assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err)
+		queriedFileContent := string(fileBytes)
 
-// 		// gets the file content from the filesystem
-// 		filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId), submissionName, queriedFilePath)
-// 		fileBytes, err := ioutil.ReadFile(filePath)
-// 		assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err)
-// 		queriedFileContent = string(fileBytes)
+		// checks that a data file has been generated for the uploaded file
+		fileDataPath := filepath.Join(
+			TEST_FILES_DIR,
+			fmt.Sprint(submissionId),
+			DATA_DIR_NAME,
+			submission.Name,
+			strings.TrimSuffix(queriedFile.Path, filepath.Ext(queriedFile.Path))+".json",
+		)
+		// gets data about the file, and tests it for equality against the added file
+		_, err = os.Stat(fileDataPath)
+		assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
+		assert.Equalf(t, submissionId, file.SubmissionID, "Submission ID mismatch: %d vs %d", submissionId, file.SubmissionID)
+		assert.Equalf(t, file.Path, queriedFile.Path, "File path mismatch:  %s vs %s", file.Path, queriedFile.Path)
+		assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly")
+	}
 
-// 		// checks that a data file has been generated for the uploaded file
-// 		fileDataPath := filepath.Join(
-// 			TEST_FILES_DIR,
-// 			fmt.Sprint(submissionId),
-// 			DATA_DIR_NAME,
-// 			submissionName,
-// 			strings.TrimSuffix(queriedFilePath, filepath.Ext(queriedFilePath))+".json",
-// 		)
-// 		// gets data about the file, and tests it for equality against the added file
-// 		_, err = os.Stat(fileDataPath)
-// 		assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
-// 		assert.Equalf(t, submissionId, queriedSubmissionId, "Submission ID mismatch: %d vs %d", submissionId, queriedSubmissionId)
-// 		assert.Equalf(t, file.Path, queriedFilePath, "File path mismatch:  %s vs %s", file.Path, queriedFilePath)
-// 		assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly")
-// 	}
+	// tests that a single given valid file will be uploaded to the db and filesystem properly
+	t.Run("Upload One File", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFile := testFiles[0]
 
-// 	// tests that a single given valid file will be uploaded to the db and filesystem properly
-// 	t.Run("Upload One File", func(t *testing.T) {
-// 		testSubmission := testSubmissions[0]
-// 		testFile := testFiles[0]
+		testInit()
+		authorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission) // adds a submission for the file to be uploaded to
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
-// 		testAddFile(testFile, submissionId)
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+		reviewerID, err := registerUser(testReviewers[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
-// 	// tests that multiple files can be successfully added to one code submission
-// 	t.Run("Upload Multiple Files to One Submission", func(t *testing.T) {
-// 		testSubmission := testSubmissions[0]
-// 		testFiles := testFiles[0:2]
+		submissionID, err := addSubmission(&testSubmission) // adds a submission for the file to be uploaded to
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		testAddFile(&testFile, submissionID)
+		testEnd()
+	})
 
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission) // adds a submission for the file to be uploaded to
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
-// 		for _, testFile := range testFiles {
-// 			testAddFile(testFile, submissionId)
-// 		}
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+	// tests that multiple files can be successfully added to one code submission
+	t.Run("Upload Multiple Files to One Submission", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFiles := testFiles[0:2]
+
+		testInit()
+		authorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		reviewerID, err := registerUser(testReviewers[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
+		submissionId, err := addSubmission(&testSubmission) // adds a submission for the file to be uploaded to
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		for _, testFile := range testFiles {
+			testAddFile(&testFile, submissionId)
+		}
+		testEnd()
+	})
+
+	// tests that a file cannot be added to a non-existant submission
+	t.Run("Non-existant submission", func(t *testing.T) {
+		testInit()
+		_, err := addFileTo(&testFiles[0], 1000) // invalid submission ID
+		assert.Error(t, err, "No error occurred when attempting to add a file to an invalid submission")
+		testEnd()
+	})
+}
 
 // tests the ability of the backend to add comments to a given file.
 // Test Depends On:
@@ -221,7 +223,6 @@ func TestAddComment(t *testing.T) {
 		assert.NoErrorf(t, err, "failed to add user to the database: %v", err)
 		testComment.AuthorId = authorId
 
-
 		// adds a comment to the file
 		assert.NoError(t, addComment(testComment, testFile.ID), "failed to add comment to the submission")
 
@@ -246,8 +247,6 @@ func TestAddComment(t *testing.T) {
 		assert.Equalf(t, testComment.AuthorId, addedComment.AuthorId,
 			"Comment author ID mismatch: %s vs %s", testComment.AuthorId, addedComment.AuthorId)
 		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
-
-
 
 		testEnd()
 	})

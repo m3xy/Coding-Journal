@@ -27,11 +27,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-// "log"
-// "net/http"
-// "os"
+	// "log"
+	// "net/http"
+	"os"
 	"path/filepath"
-// "strconv"
+	// "strconv"
 	"strings"
 	// "time"
 
@@ -280,78 +280,92 @@ const (
 // 	w.WriteHeader(http.StatusOK)
 // }
 
-// // -----
-// // Helper Functions
-// // -----
+// -----
+// Helper Functions
+// -----
 
 // Add file into submission, and store it to FS and DB.
 // Note: Need valid submission. No comments exist on file
 // creation.
-//
+// 
 // Params:
-//	file (*File) : the file to add to the db and filesystem (all fields but ID and SubmissionID MUST be set)
-//	submissionId (int) : the id of the submission which the added file is to be linked
-//		to as an unsigned integer
+// 	file (*File) : the file to add to the db and filesystem (all fields but ID and SubmissionID MUST be set)
+// 	submissionID (int) : the id of the submission which the added file is to be linked
+// 		to as an unsigned integer
 // Returns:
-//	(int) : the id of the added file (0 if an error occurs)
-//	(error) : if the operation fails
-// func addFileTo(file *File, submissionId uint) (uint, error) {
-// if file.Name == "" {
-// 	return 0, errors.New("File name must be set")
-// }
+// 	(int) : the id of the added file (0 if an error occurs)
+// 	(error) : if the operation fails
+func addFileTo(file *File, submissionID uint) (uint, error) {
+	if file.Name == "" {
+		return 0, errors.New("File name must be set")
+	}
 
-// // inserts the file into the db
-// file.SubmissionID = submissionId
-// if err := gormDb.Create(file).Error; err != nil {
-// 	return 0, err
-// }
+	// inserts the file into the db, and gets the submission name
+	submission := &Submission{}
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// queries the submission name (also serves to check that the given submission exists)
+		submission.ID = submissionID
+		if err := gormDb.Model(submission).Select("submissions.name").First(submission).Error; err != nil {
+			return err
+		}
+		// if submission.Name == "" || submission.Name == nil {
+		// 	return fmt.Errorf("Error adding file. No submission exists with ID: %d", submissionID)
+		// }
+		// adds a file to the submission in the db provided the submission exists
+		if err := gormDb.Model(submission).Association("Files").Append(file); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return 0, err
+	}
 
-// // Add file to filesystem
-// filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), file.SubmissionName, file.Path)
-// fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
-// 	file.SubmissionName, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
+	// Add file to filesystem
+	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), submission.Name, file.Path)
+	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), DATA_DIR_NAME,
+		submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
 
-// // file paths without the file name (to create dirs if they don't exist yet)
-// fileDirPath := filepath.Dir(filePath)
-// fileDataDirPath := filepath.Dir(fileDataPath)
+	// file paths without the file name (to create dirs if they don't exist yet)
+	fileDirPath := filepath.Dir(filePath)
+	fileDataDirPath := filepath.Dir(fileDataPath)
 
-// // creates all directories on the file's relative path in case any of them do not exist yet
-// if err := os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
-// 	return 0, err
-// } else if err := os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
-// 	return 0, err
-// }
+	// creates all directories on the file's relative path in case any of them do not exist yet
+	if err := os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	} else if err := os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
+		return 0, err
+	}
 
-// // Create and open content file and it's corresponding data file
-// codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// if err != nil {
-// 	return 0, err
-// }
-// dataFile, err := os.OpenFile(
-// 	fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-// if err != nil {
-// 	return 0, err
-// }
+	// Create and open content file and it's corresponding data file
+	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	if err != nil {
+		return 0, err
+	}
+	dataFile, err := os.OpenFile(
+		fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
+	if err != nil {
+		return 0, err
+	}
 
-// // write the file content
-// if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-// 	return 0, err
-// }
-// // Writes given file's metadata
-// jsonString, err := json.Marshal(file.MetaData)
-// if err != nil {
-// 	return 0, err
-// }
-// if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-// 	return 0, err
-// }
+	// write the file content
+	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
+		return 0, err
+	}
+	// Writes given file's metadata
+	jsonString, err := json.Marshal(file.MetaData)
+	if err != nil {
+		return 0, err
+	}
+	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
+		return 0, err
+	}
 
-// // closes files
-// codeFile.Close()
-// dataFile.Close()
+	// closes files
+	codeFile.Close()
+	dataFile.Close()
 
-// 	return file.ID, nil
-// }
+	return file.ID, nil
+}
 
 // Add a comment to a given file. Currently this can only append comments
 //
@@ -455,45 +469,6 @@ func getFileData(fileId uint) (*File, error) {
 	}
 	return file, nil
 }
-
-// // // Gets a supergroup compliant file struct given the file id
-// // //
-// // // Params:
-// // // 	fileId (int) : the unique of the given file
-// // // Returns:
-// // // 	(*SupergroupFile) : a supergroupp compliant file object
-// // // 	(error) : an error if one occurs
-// // func getSuperGroupFile(fileId int) (*SupergroupFile, error) {
-// // 	// builds a query to get the file's name from the database
-// // 	var fileName string
-// // 	queryName := fmt.Sprintf(
-// // 		SELECT_ROW,
-// // 		getDbTag(&File{}, "Name"),
-// // 		TABLE_FILES,
-// // 		getDbTag(&File{}, "Id")
-// // 	)
-// // 	// executes the query and builds the file path if it was successful
-// // 	row := db.QueryRow(queryPath, fileId)
-// // 	if err := row.Scan(&fileName); err != nil {
-// // 		return nil, err
-// // 	}
-
-// // 	// constructs a file object to return to the frontend
-// // 	file := &SupergroupFile{
-// // 		Name:           filepath.Base(filePath),
-// // 	}
-// // 	// gets file content and metadata
-// // 	var err error
-// // 	file.Base64Value, err = getFileContent(fullFilePath)
-// // 	if err != nil {
-// // 		return nil, err
-// // 	}
-// // 	file.MetaData, err = getFileMetaData(fullDataPath)
-// // 	if err != nil {
-// // 		return nil, err
-// // 	}
-// // 	return file, nil
-// // }
 
 // Get file content from filesystem.
 // Params:
