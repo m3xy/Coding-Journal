@@ -4,17 +4,36 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"net/http"
 	"testing"
+
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
 )
 
+const (
+	TEST_PORT_JOURNAL = ":59214"
+)
+
+func journalServerSetup() *http.Server {
+	router := mux.NewRouter()
+	router.Use(testingMiddleware)
+
+	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+
+	// Setup testing HTTP server
+	return &http.Server{
+		Addr:    TEST_PORT_JOURNAL,
+		Handler: router,
+	}
+}
+
 // Test user log in.
-func TestLogIn(t *testing.T) {
+func TestJournalLogIn(t *testing.T) {
 	// Set up test
 	testInit()
-	srv := testingServerSetup()
+	srv := journalServerSetup()
 
 	// Start server.
 	go func() {
@@ -36,7 +55,7 @@ func TestLogIn(t *testing.T) {
 			loginMap := make(map[string]string)
 			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
 			loginMap[JSON_TAG_PW] = testUsers[i].Password
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
+			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response status should be %d", http.StatusOK)
 
@@ -59,7 +78,7 @@ func TestLogIn(t *testing.T) {
 			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
 			loginMap[JSON_TAG_PW] = VALID_PW // Ensure this pw is different from all test users.
 
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
+			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
 		}
@@ -72,7 +91,7 @@ func TestLogIn(t *testing.T) {
 			loginMap[getJsonTag(&User{}, "Email")] = testUsers[0].Email
 			loginMap[JSON_TAG_PW] = testUsers[i].Password
 
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
+			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
 		}

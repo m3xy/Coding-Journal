@@ -11,6 +11,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"gopkg.in/validator.v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -27,8 +28,8 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
+	SUBROUTE_AUTH            = "/auth"
 	ENDPOINT_LOGIN           = "/login"
-	ENDPOINT_LOGIN_GLOBAL    = "/glogin"
 	ENDPOINT_SIGNUP          = "/register"
 	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
 	ENDPOINT_SUBMISSION      = "/submission"
@@ -96,8 +97,6 @@ func setupCORSsrv() *http.Server {
 
 	// Setup all routes.
 	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_SUBMISSION, sendSubmission).Methods(http.MethodGet, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
@@ -105,6 +104,10 @@ func setupCORSsrv() *http.Server {
 	// router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
 	router.HandleFunc("/users/{"+getJsonTag(&GlobalUser{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
+
+	// Auth subroutes
+	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
+	getAuthSubRoutes(auth)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
@@ -131,6 +134,10 @@ func setup(db *gorm.DB, logpath string) error {
 	if err != nil {
 		goto RETURN
 	}
+
+	// Set validation functions
+	validator.SetValidationFunc("ispw", ispw)
+	validator.SetValidationFunc("isemail", isemail)
 
 	// Check for filesystem existence.
 	/* if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {

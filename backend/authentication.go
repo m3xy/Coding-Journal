@@ -14,10 +14,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"gopkg.in/validator.v2"
-	"gorm.io/gorm"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/golang-jwt/jwt"
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	"gopkg.in/validator.v2"
+	"gorm.io/gorm"
 )
 
 const (
@@ -25,9 +30,20 @@ const (
 	A_NUMS        = "a-zA-Z0-9"
 )
 
-// ----
-// User log in
-// ----
+var JwtSecret string // JWT Secret variable.
+
+// Subrouter
+func getAuthSubRoutes(r *mux.Router) {
+	r.HandleFunc(ENDPOINT_LOGIN, authLogIn).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+
+	// Set up jwt secret
+	myEnv, err := godotenv.Read("secrets.env")
+	if err == nil {
+		JwtSecret = myEnv["JWT_SECRET"]
+	}
+}
+
 /*
 	Log in to website with any server's database.
 	Content type: application/json
@@ -98,9 +114,120 @@ func logInGlobal(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ----
-// User signup
-// ----
+/*
+  Client-made log in endpoint
+  Content-type: application/json
+  Input: {"email": string, "password": string, }
+  Success: 200, Credentials correc
+  		Returns: { access_token, refresh_token, redirect-url, expires }
+  Failure: 401, Unauthorized
+  		Returns: { message: string, error: bool }
+*/
+func authLogIn(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received auth log in request from %s.", r.RemoteAddr)
+
+	var credentials struct {
+		Email    string `json:"email" validate:"validEmail"`
+		Password string `json:"password"`
+	}
+	// Error on incorrectly formed request.
+	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(&StandardResponse{
+			Message: "Email or password incorrectly formed!",
+			Error:   true,
+		})
+		return
+	}
+
+	// Validate user credentials
+	var user struct {
+		GlobalUserID string
+		Email        string
+		Password     string
+	}
+	if res := gormDb.Model(&User{}).Limit(1).Find(&user, "Email = ?", credentials.Email); res.Error != nil {
+		log.Printf("[ERROR] SQL query error: %v\n", res.Error)
+		goto INTERNAL
+	} else if res.RowsAffected == 0 {
+		log.Printf("[INFO] No user found!")
+		goto CREDS
+	} else if !comparePw(credentials.Password, user.Password) {
+		log.Printf("[INFO] Password incorrect!")
+		goto CREDS
+	}
+
+	// Send successful response
+	if resp, err := createTokenSuite(user); err != nil {
+		log.Printf("[ERROR] Access Token Creation Error: %v", err)
+		goto INTERNAL
+	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] Response encoding error: %v", err)
+		goto INTERNAL
+	} else {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+CREDS:
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(&StandardResponse{
+		Message: "Email or password incorrect!",
+		Error:   true,
+	})
+	return
+INTERNAL:
+	w.WriteHeader(http.StatusInternalServerError)
+	_ = json.NewEncoder(w).Encode(&StandardResponse{
+		Message: "Internal Server Error",
+		Error:   true,
+	})
+	return
+}
+
+// Create access and refresh tokens for the user.
+func createTokenSuite(u struct {
+	GlobalUserID string
+	Email        string
+	Password     string
+}) (AuthLogInResponse, error) {
+	access_claims := JwtClaims{
+		ID:    u.GlobalUserID,
+		Email: u.Email,
+		Scope: "bearer",
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Unix() + 3600,
+			Issuer:    "CS3099User11_Project_Code",
+		},
+	}
+	refresh_claims := RefreshClaims{
+		ID:    u.GlobalUserID,
+		Scope: "refresh",
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Unix() + 72000,
+			Issuer:    "CS3099User11_Project_Code",
+		},
+	}
+	resp := AuthLogInResponse{
+		RedirectUrl: "/user",
+		Expires:     3600,
+	}
+
+	access, refresh := jwt.NewWithClaims(jwt.SigningMethodHS512, access_claims),
+		jwt.NewWithClaims(jwt.SigningMethodHS512, refresh_claims)
+	if signedAccess, err := access.SignedString([]byte(JwtSecret)); err != nil {
+		return AuthLogInResponse{}, err
+	} else {
+		resp.AccessToken = signedAccess
+	}
+	if signedRefresh, err := refresh.SignedString([]byte(JwtSecret)); err != nil {
+		return AuthLogInResponse{}, err
+	} else {
+		resp.RefreshToken = signedRefresh
+	}
+
+	return resp, nil
+}
 
 /*
   Router function to sign up to website.
@@ -118,7 +245,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
 		goto ERROR
 	}
-	if validator.SetValidationFunc("validpw", validpw); validator.Validate(*user) != nil {
+	if validator.Validate(*user) != nil {
 		log.Printf("[WARN] Invalid password format received.")
 		goto ERROR
 	}
@@ -142,8 +269,8 @@ func registerUser(user User) (string, error) {
 	user.Password = string(hashPw(user.Password))
 
 	registeredUser := GlobalUser{
-		FullName: user.FirstName+" "+user.LastName,
-		User: user,
+		FullName: user.FirstName + " " + user.LastName,
+		User:     user,
 	}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user

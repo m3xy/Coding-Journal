@@ -28,13 +28,13 @@ var gormDb *gorm.DB
 type User struct {
 	ID           uint   `gorm:"primaryKey" json:"-"`
 	GlobalUserID string `json:"-"`
-	Email        string `gorm:"uniqueIndex;unique;not null" json:"Email"`
-	Password     string `gorm:"not null" json:"Password,omitempty" validate:"min=8,max=64,validpw"`
+	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"isemail"`
+	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw"`
 	FirstName    string `validate:"nonzero,max=32" json:"FirstName"`
 	LastName     string `validate:"nonzero,max=32" json:"LastName"`
-	UserType     int    `gorm:"default:4" json:"UserType"`
-	PhoneNumber  string `json:"PhoneNumber"`
-	Organization string `json:"Organization"`
+	UserType     int    `gorm:"default:4" json:"userType"`
+	PhoneNumber  string `json:"phoneNumber"`
+	Organization string `json:"organization"`
 
 	CreatedAt time.Time      `json:",omitempty"`
 	UpdatedAt time.Time      `json:"-"`

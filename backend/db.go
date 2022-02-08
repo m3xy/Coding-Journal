@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"reflect"
 	"regexp"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -74,9 +76,9 @@ var DB_PARAMS map[string]string = map[string]string{
 // 	// User auto incremented ID.
 // 	Id string `json:"userId" db:"id"`
 // 	// Email Address.
-// 	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
+// 	Email string `json:"email" db:"email" validate:"nonzero,max=100,isemail"`
 // 	// Password - given as plaintext by front end, and as hash by the database.
-// 	Pw string `json:"password,omitempty" db:"password" validate:"min=8,max=64,validpw"`
+// 	Pw string `json:"password,omitempty" db:"password" validate:"min=8,max=64,ispw"`
 // 	// First Name.
 // 	Fname string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
 // 	// Last Name.
@@ -328,7 +330,7 @@ func getCols(v interface{}) []interface{} {
 // -----
 
 // Checks if a password contains upper case, lower case, numbers, and special characters.
-func validpw(v interface{}, param string) error {
+func ispw(v interface{}, param string) error {
 	st := reflect.ValueOf(v)
 	if st.Kind() != reflect.String {
 		return errors.New("Value must be string!")
@@ -348,6 +350,23 @@ func validpw(v interface{}, param string) error {
 		}
 		return nil
 	}
+}
+
+func isemail(v interface{}, param string) error {
+	st := reflect.ValueOf(v)
+	if st.Kind() != reflect.String {
+		return errors.New("Email must be a string.")
+	}
+	matcher := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	if !matcher.MatchString(st.String()) {
+		return errors.New("Wrong email format")
+	}
+	parts := strings.Split(st.String(), "@")
+	mx, err := net.LookupMX(parts[1])
+	if err != nil || len(mx) == 0 {
+		return errors.New("Email server invalid!")
+	}
+	return nil
 }
 
 // Hash a password
