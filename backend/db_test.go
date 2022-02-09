@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -104,26 +103,8 @@ func getObjectCopies(gc []GlobalUser) []GlobalUser {
 	return res
 }
 
-// Middleware for the test authentication server.
-func testingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !validateToken(gormDb, r.Header.Get(SECURITY_TOKEN_KEY)) {
-			fmt.Println("[WARN] Invalid security token!!")
-			w.WriteHeader(http.StatusUnauthorized)
-		} else {
-			if r.Header.Get("user") != "" {
-				ctx := context.WithValue(r.Context(), "user", r.Header.Get("user"))
-				next.ServeHTTP(w, r.WithContext(ctx))
-			} else {
-				next.ServeHTTP(w, r)
-			}
-		}
-	})
-}
-
 func testingServerSetup() *http.Server {
 	router := mux.NewRouter()
-	router.Use(testingMiddleware)
 
 	// Call authentication endpoints.
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet)

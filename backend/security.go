@@ -129,7 +129,7 @@ func sendSecureRequest(db *gorm.DB, req *http.Request, groupNb int) (*http.Respo
 }
 
 // Validate the given security token's authenticity.
-func validateToken(db *gorm.DB, token string) bool {
+func validateSecurityKey(db *gorm.DB, token string) bool {
 	// Query token from servers table.
 	var exists bool
 	if err := db.Model(&Server{}).Select("count(*) > 0").Where("token = ?", token).Limit(1).Find(&exists).Error; err != nil {
@@ -137,14 +137,4 @@ func validateToken(db *gorm.DB, token string) bool {
 	} else {
 		return exists
 	}
-}
-
-// Validate if given security token works.
-// Params:
-// 	Header: securityToken
-// Return:
-//  200: Success - security token valid.
-//  401: Failure - security token invalid.
-func tokenValidation(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Token validation from %v successful.", r.RemoteAddr)
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"testing"
 
@@ -18,15 +17,50 @@ const (
 
 func journalServerSetup() *http.Server {
 	router := mux.NewRouter()
-	router.Use(testingMiddleware)
+	router.Use(journalMiddleWare)
 
-	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+	journal := router.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
+	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+	journal.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet)
 
 	// Setup testing HTTP server
 	return &http.Server{
 		Addr:    TEST_PORT_JOURNAL,
 		Handler: router,
 	}
+}
+
+// Test security key validation.
+func TestTokenValidation(t *testing.T) {
+	testInit()
+	srv := journalServerSetup()
+
+	// Start server.
+	go srv.ListenAndServe()
+
+	// Write valid security token response
+	t.Run("Valid token validation", func(t *testing.T) {
+		validReq, _ := http.NewRequest("GET", LOCALHOST+TEST_PORT_JOURNAL+SUBROUTE_JOURNAL+ENDPOINT_VALIDATE, nil)
+		res, err := sendSecureRequest(gormDb, validReq, TEAM_ID)
+		if err != nil {
+			t.Errorf("HTTP request error: %v\n", err)
+		} else if res.StatusCode != http.StatusOK {
+			t.Errorf("Response Status code should be OK, but is %d", res.StatusCode)
+		}
+	})
+
+	// Write invalid security token response
+	t.Run("Invalid token validation", func(t *testing.T) {
+		client := http.Client{}
+		invalidReq, _ := http.NewRequest("GET", LOCALHOST+TEST_PORT_JOURNAL+SUBROUTE_JOURNAL+ENDPOINT_VALIDATE, nil)
+		invalidReq.Header.Set(SECURITY_TOKEN_KEY, WRONG_SECURITY_TOKEN)
+		res, err := client.Do(invalidReq)
+		if err != nil {
+			t.Errorf("HTTP request error: %v\n", err)
+		} else if res.StatusCode != http.StatusUnauthorized {
+			t.Errorf("Response Status code should be 401, but is %d", res.StatusCode)
+		}
+	})
 }
 
 // Test user log in.
@@ -36,11 +70,7 @@ func TestJournalLogIn(t *testing.T) {
 	srv := journalServerSetup()
 
 	// Start server.
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v\n", err)
-		}
-	}()
+	go srv.ListenAndServe()
 
 	// Populate database with valid users.
 	trialUsers := getGlobalCopies(testUsers)
@@ -55,7 +85,7 @@ func TestJournalLogIn(t *testing.T) {
 			loginMap := make(map[string]string)
 			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
 			loginMap[JSON_TAG_PW] = testUsers[i].Password
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
+			resp, err := sendJsonRequest(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response status should be %d", http.StatusOK)
 
@@ -78,7 +108,7 @@ func TestJournalLogIn(t *testing.T) {
 			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
 			loginMap[JSON_TAG_PW] = VALID_PW // Ensure this pw is different from all test users.
 
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
+			resp, err := sendJsonRequest(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
 		}
@@ -91,7 +121,7 @@ func TestJournalLogIn(t *testing.T) {
 			loginMap[getJsonTag(&User{}, "Email")] = testUsers[0].Email
 			loginMap[JSON_TAG_PW] = testUsers[i].Password
 
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
+			resp, err := sendJsonRequest(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
 		}

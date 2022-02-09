@@ -22,12 +22,6 @@ type AuthLogInResponse struct {
 
 type JwtClaims struct {
 	ID    string `json:"userId"`
-	Email string `json:"email"`
-	Scope string
-	jwt.StandardClaims
-}
-type RefreshClaims struct {
-	ID    string `json:"userId"`
 	Scope string
 	jwt.StandardClaims
 }

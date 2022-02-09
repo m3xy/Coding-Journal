@@ -16,6 +16,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -28,12 +29,15 @@ import (
 const (
 	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//://_//-//+//-//=//\"//'"
 	A_NUMS        = "a-zA-Z0-9"
+	CLAIM_BEARER  = "bearer"
+	CLAIM_REFRESH = "refresh"
 )
 
 var JwtSecret string // JWT Secret variable.
 
 // Subrouter
 func getAuthSubRoutes(r *mux.Router) {
+	r.Use(jwtMiddleware)
 	r.HandleFunc(ENDPOINT_LOGIN, authLogIn).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 
@@ -42,6 +46,28 @@ func getAuthSubRoutes(r *mux.Router) {
 	if err == nil {
 		JwtSecret = myEnv["JWT_SECRET"]
 	}
+}
+
+// Validate the user's access token.
+func validateWebToken(accessToken string, scope string) (bool, string) {
+	tokenSplit := strings.Split(accessToken, " ")
+	if len(tokenSplit) != 2 || strings.ToLower(tokenSplit[0]) != scope {
+		return false, "-"
+	}
+	token, err := jwt.ParseWithClaims(tokenSplit[1], &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte(JwtSecret), nil
+	})
+	if err != nil {
+		return false, "-"
+	}
+	if claims, ok := token.Claims.(*JwtClaims); !ok {
+		return false, "-"
+	} else if claims.Scope != "scope" {
+		return false, "-"
+	} else {
+		return true, claims.ID
+	}
+
 }
 
 /*
@@ -193,14 +219,13 @@ func createTokenSuite(u struct {
 }) (AuthLogInResponse, error) {
 	access_claims := JwtClaims{
 		ID:    u.GlobalUserID,
-		Email: u.Email,
 		Scope: "bearer",
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Unix() + 3600,
 			Issuer:    "CS3099User11_Project_Code",
 		},
 	}
-	refresh_claims := RefreshClaims{
+	refresh_claims := JwtClaims{
 		ID:    u.GlobalUserID,
 		Scope: "refresh",
 		StandardClaims: jwt.StandardClaims{

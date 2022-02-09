@@ -30,7 +30,6 @@ const (
 
 func authServerSetup() *http.Server {
 	router := mux.NewRouter()
-	router.Use(testingMiddleware)
 
 	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
 	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
@@ -229,6 +228,11 @@ func TestAuthLogIn(t *testing.T) {
 				t.Errorf("Login response decoding error: %v\n", err)
 				return
 			}
+			var actualUser User
+			if err := gormDb.Where("Email = ?", user.Email).Find(&actualUser).Error; err != nil {
+				t.Errorf("SQL query error: %v\n", err)
+				return
+			}
 
 			if token, err := jwt.ParseWithClaims(validBody.AccessToken, &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
 				return []byte(JwtSecret), nil
@@ -239,7 +243,7 @@ func TestAuthLogIn(t *testing.T) {
 				t.Errorf("Error getting JWT token claims: %v\n", err)
 				return
 			} else {
-				assert.Equal(t, user.Email, claims.Email, "User should be inside token.")
+				assert.Equal(t, actualUser.GlobalUserID, claims.ID, "User should be inside token.")
 			}
 		}
 	})

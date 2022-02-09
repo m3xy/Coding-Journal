@@ -5,11 +5,27 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
 // Set of all supergroup-appliant controllers and routes
 // Authors: 190014935
+
+func getJournalSubroute(r *mux.Router) {
+	r.Use(journalMiddleWare)
+	r.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+}
+
+// Validate if given security token works.
+// Params:
+// 	Header: securityToken
+// Return:
+//  200: Success - security token valid.
+//  401: Failure - security token invalid.
+func tokenValidation(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Token validation from %v successful.", r.RemoteAddr)
+}
 
 /*
  Log in to website, check credentials correctness.

@@ -29,6 +29,7 @@ const (
 
 	// end points for URLs
 	SUBROUTE_AUTH            = "/auth"
+	SUBROUTE_JOURNAL         = "/journal"
 	ENDPOINT_LOGIN           = "/login"
 	ENDPOINT_SIGNUP          = "/register"
 	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
@@ -92,11 +93,7 @@ func setupCORSsrv() *http.Server {
 		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PUT"},
 	})
 
-	// Set up middleware
-	router.Use(authenticationMiddleWare)
-
 	// Setup all routes.
-	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_SUBMISSION, sendSubmission).Methods(http.MethodGet, http.MethodOptions)
 	// router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
@@ -108,6 +105,10 @@ func setupCORSsrv() *http.Server {
 	// Auth subroutes
 	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
 	getAuthSubRoutes(auth)
+
+	// Journal subroutes
+	journal := router.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
+	getJournalSubroute(journal)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{

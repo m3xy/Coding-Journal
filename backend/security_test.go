@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,45 +51,12 @@ func TestValidateToken(t *testing.T) {
 		var storedToken string
 		err := gormDb.Model(&Server{}).Select("token").Find(&storedToken, TEAM_ID).Error
 		assert.Nil(t, err, "Database query should not error!")
-		assert.True(t, validateToken(gormDb, storedToken), "Token should be valid!")
+		assert.True(t, validateSecurityKey(gormDb, storedToken), "Token should be valid!")
 	})
 
 	// Test invalid security token.
 	t.Run("Invalid security token", func(t *testing.T) {
-		storedToken := WRONG_SECURITY_TOKEN
-		assert.False(t, validateToken(gormDb, storedToken), "Token should NOT be valid!")
+		assert.False(t, validateSecurityKey(gormDb, WRONG_SECURITY_TOKEN), "Token should NOT be valid!")
 	})
 	testEnd()
-}
-
-func TestTokenValidation(t *testing.T) {
-	testInit()
-	srv := setupCORSsrv()
-
-	// Start server
-	go srv.ListenAndServe()
-
-	// Write valid security token response
-	t.Run("Valid token validation", func(t *testing.T) {
-		validReq, _ := http.NewRequest("GET", BACKEND_ADDRESS+ENDPOINT_VALIDATE, nil)
-		res, err := sendSecureRequest(gormDb, validReq, TEAM_ID)
-		if err != nil {
-			t.Errorf("HTTP request error: %v\n", err)
-		} else if res.StatusCode != http.StatusOK {
-			t.Errorf("Response Status code should be OK, but is %d", res.StatusCode)
-		}
-	})
-
-	// Write invalid security token response
-	t.Run("Invalid token validation", func(t *testing.T) {
-		client := http.Client{}
-		invalidReq, _ := http.NewRequest("GET", BACKEND_ADDRESS+ENDPOINT_VALIDATE, nil)
-		invalidReq.Header.Set(SECURITY_TOKEN_KEY, WRONG_SECURITY_TOKEN)
-		res, err := client.Do(invalidReq)
-		if err != nil {
-			t.Errorf("HTTP request error: %v\n", err)
-		} else if res.StatusCode != http.StatusUnauthorized {
-			t.Errorf("Response Status code should be 401, but is %d", res.StatusCode)
-		}
-	})
 }
