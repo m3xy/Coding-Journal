@@ -68,6 +68,13 @@ func testInit() {
 	if err := gormDb.Transaction(gormClear); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
 	}
+	// clears the filesystem
+	if _, err := os.Stat(TEST_FILES_DIR); err == nil {
+		os.RemoveAll(TEST_FILES_DIR)
+	}
+	if err := os.Mkdir(TEST_FILES_DIR, DIR_PERMISSIONS); err != nil {
+		fmt.Printf("Error while clearing filesystem: %v", err)
+	}
 }
 
 // Get a copy of a user object.

@@ -27,13 +27,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	// "log"
-	// "net/http"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
-	// "strconv"
+	"strconv"
 	"strings"
-	// "time"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -53,6 +53,7 @@ const (
 // // Router functions
 // // -----
 
+// THE BELOW CODE IS NO LONGER USED
 // // Upload lone code file to system. File is wrapped to dummy submission with same name.
 // //
 // // TODO: Replace this function with a generalized submission upload method in the submissions.go file
@@ -85,7 +86,7 @@ const (
 
 // 	// Parse data into local variables
 // 	fileName := request[getJsonTag(&File{}, "Name")]			// file name as a string
-// 	fileAuthor := request["author"]                        		// author's user Id
+// 	fileAuthor := request["author"]                        		// author's user ID
 // 	fileContent := request[getJsonTag(&File{}, "Base64Value")]	// base64 encoding of file content
 
 // 	// Put parsed values into a file object and a submission object
@@ -106,19 +107,19 @@ const (
 // 	}
 
 // 	// adds file to the db and filesystem
-// 	submissionId, err := addSubmission(wrapperSubmission)
+// 	submissionID, err := addSubmission(wrapperSubmission)
 // 	if err != nil {
 // 		log.Printf("[ERROR] Submission creation failure: %v", err)
 // 		w.WriteHeader(http.StatusBadRequest)
 // 		return
 // 	}
-// 	_, err = addFileTo(file, submissionId)
+// 	_, err = addFileTo(file, submissionID)
 // 	if err != nil {
 // 		log.Printf("[ERROR] File import failure: %v", err)
 // 		w.WriteHeader(http.StatusBadRequest)
 // 		return
 // 	}
-// 	wrapperSubmission.Id = submissionId
+// 	wrapperSubmission.ID = submissionID
 
 // 	// writes the wraper submission as a response
 // 	jsonString, err := json.Marshal(wrapperSubmission)
@@ -131,154 +132,113 @@ const (
 // 	w.Write([]byte(jsonString))
 // }
 
-// // Retrieve code files from filesystem. Returns
-// // file with comments and metadata. Receives
-// // a FilePath and submissionId as header strings in
-// // the request
-// //
-// // TEMP: this might go away due to the supergroup spec
-// //
-// // Response Codes:
-// //	200 : File exists, getter success.
-// //	401 : if the request does not have the proper security token
-// //	400 : malformatted request, or non-existent submission/file id
-// //	500 : if something else goes wrong in the backend
-// // Response Body:
-// // 		file: object
-// // 			fileName: string
-// //			filePath: string
-// //			submissionName: string
-// //			submissionId: int
-// // 			base64Value: string
-// // 			comments: array of objects
-// // 				author: int
-// //				time: datetime string
-// //				base64Value: string
-// //				replies: object (same as comments)
-// func getFile(w http.ResponseWriter, r *http.Request) {
-// 	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
-// 	w.Header().Set("Content-Type", "application/json")
+// Retrieve code files from filesystem. Returns
+// file with comments and metadata. Receives
+// a FilePath and submissionID as header strings in
+// the request
+//
+// TEMP: this might go away due to the supergroup spec
+//
+// Response Codes:
+//	200 : File exists, getter success.
+//	401 : if the request does not have the proper security token
+//	400 : malformatted request, or non-existent submission/file id
+//	500 : if something else goes wrong in the backend
+// Response Body:
+// 		file: object
+// 			fileName: string
+//			filePath: string
+//			submissionName: string
+//			submissionID: int
+// 			base64Value: string
+// 			comments: array of objects
+// 				author: int
+//				time: datetime string
+//				base64Value: string
+//				replies: object (same as comments)
+func getFile(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
 
-// 	// gets the submission Id from the URL parameters
-// 	params := r.URL.Query()
-// 	submissionId, err := strconv.Atoi(params[getJsonTag(&File{}, "SubmissionId")][0])
-// 	if err != nil {
-// 		log.Printf("[ERROR] Invalid submission ID: %s", params[getJsonTag(&File{}, "SubmissionId")][0])
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	filePath := params[getJsonTag(&File{}, "Path")][0]
+	// gets the fileID from the URL parameters
+	params := r.URL.Query()
+	fileID64, err := strconv.ParseUint(params["id"][0], 10, 32)
+	if err != nil {
+		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"][0])
+		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
+		return
+	}
+	fileID := uint(fileID64) // gets uint from uint64
 
-// 	// queries the submission name from the database
-// 	var submissionName string
-// 	querySubmissionName := fmt.Sprintf(
-// 		SELECT_ROW,
-// 		getDbTag(&Submission{}, "Name"),
-// 		TABLE_SUBMISSIONS,
-// 		getDbTag(&Submission{}, "Id"),
-// 	)
-// 	row := db.QueryRow(querySubmissionName, submissionId)
-// 	if err = row.Scan(&submissionName); err != nil {
-// 		log.Printf("[ERROR] Database query failed: %v", err)
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
+	// gets the file data from the db and filesystem
+	file, err := getFileData(fileID)
+	if err != nil {
+		log.Printf("[ERROR] unable to get file data: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-// 	// builds path to the file and it's corresponding data file using the queried submission name
-// 	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), submissionName, filePath)
-// 	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionId), DATA_DIR_NAME,
-// 		submissionName, strings.Replace(filePath, filepath.Ext(filePath), ".json", 1))
+	// writes JSON data for the file to the HTTP connection if no error has occured
+	response, err := json.Marshal(file)
+	if err != nil {
+		log.Printf("[ERROR] JSON formatting failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
+	w.Write(response)
+}
 
-// 	// constructs a file object to return to the frontend
-// 	file := &File{
-// 		SubmissionId:   submissionId,
-// 		SubmissionName: submissionName,
-// 		Path:           filePath,
-// 		Name:           filepath.Base(filePath),
-// 	}
-// 	// gets file content and comments
-// 	file.Base64Value, err = getFileContent(fullFilePath)
-// 	if err != nil {
-// 		log.Printf("[ERROR] Failed to retrieve file content: %v", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
-// 	file.MetaData, err = getFileMetaData(fullDataPath)
-// 	if err != nil {
-// 		log.Printf("[ERROR] Failed to retrieve file metadata: %v", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
+// upload comment router function. Takes in a POST request and
+// uses it to add a comment to the given file
+//
+// Response Codes:
+// 	200 : comment was added succesfully
+// 	401 : if the request does not have the proper security token
+// 	400 : if the comment was not sent in the proper format
+// 	500 : if something else goes wrong in the backend
+// Response Body: empty
+func uploadUserComment(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
 
-// 	// writes JSON data for the file to the HTTP connection if no error has occured
-// 	response, err := json.Marshal(file)
-// 	if err != nil {
-// 		log.Printf("[ERROR] JSON formatting failed: %v", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
-// 	log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
-// 	w.Write(response)
-// }
+	// gets the fileID and authorID from the URL parameters
+	params := r.URL.Query()
+	authorID := params["authorID"][0]
+	fileID64, err := strconv.ParseUint(params["fileID"][0], 10, 32)
+	if err != nil {
+		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"][0])
+		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
+		return
+	}
+	fileID := uint(fileID64) // gets uint from uint64
 
-// // upload comment router function. Takes in a POST request and
-// // uses it to add a comment to the given file
-// //
-// // Response Codes:
-// // 	200 : comment was added succesfully
-// // 	401 : if the request does not have the proper security token
-// // 	400 : if the comment was not sent in the proper format
-// // 	500 : if something else goes wrong in the backend
-// // Response Body: empty
-// func uploadUserComment(w http.ResponseWriter, r *http.Request) {
-// 	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
-// 	w.Header().Set("Content-Type", "application/json")
+	// parses the json request body into a map
+	var request map[string]interface{}
+	err = json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		log.Printf("[ERROR] JSON decoding failed: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-// 	// parses the json request body into a map
-// 	var request map[string]interface{}
-// 	err := json.NewDecoder(r.Body).Decode(&request)
-// 	if err != nil {
-// 		log.Printf("[ERROR] JSON decoding failed: %v", err)
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
+	// Parse data into Comment structure
+	comment := &Comment{
+		AuthorID:    authorID, // authors user id
+		Time:        fmt.Sprint(time.Now()),
+		Base64Value: request[getJsonTag(&Comment{}, "Base64Value")].(string),
+		Replies:     nil, // replies are nil upon insertion
+	}
 
-// 	// gets submission Id and file path
-// 	filePath := request[getJsonTag(&File{}, "Path")].(string)
-// 	submissionId := int(request[getJsonTag(&File{}, "SubmissionId")].(float64))
-// 	// Parse data into Comment structure
-// 	comment := &Comment{
-// 		AuthorId: request[getJsonTag(&Comment{}, "AuthorId")].(string), // authors user id
-// 		Time:     fmt.Sprint(time.Now()),
-// 		Base64Value:  request[getJsonTag(&Comment{}, "Base64Value")].(string),
-// 		Replies:  nil, // replies are nil upon insertion
-// 	}
-
-// 	// gets the fileId from the database
-// 	var fileId int
-// 	queryFileId := fmt.Sprintf(
-// 		SELECT_ROW_TWO_CONDITION,
-// 		getDbTag(&File{}, "Id"),
-// 		TABLE_FILES,
-// 		getDbTag(&File{}, "SubmissionId"),
-// 		getDbTag(&File{}, "Path"),
-// 	)
-// 	row := db.QueryRow(queryFileId, submissionId, filePath)
-// 	if err = row.Scan(&fileId); err != nil {
-// 		log.Printf("[ERROR] Database query failed: %v\n", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	// adds the comment to the file, returns code OK if successful
-// 	if err = addComment(comment, fileId); err != nil {
-// 		log.Printf("[ERROR] Comment creation failed: %v\n", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
-// 	log.Printf("uploadUserComment request from %v successful.", r.RemoteAddr)
-// 	w.WriteHeader(http.StatusOK)
-// }
+	// adds the comment to the file, returns code OK if successful
+	if err = addComment(comment, fileID); err != nil {
+		log.Printf("[ERROR] Comment creation failed: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
+	w.WriteHeader(http.StatusOK)
+}
 
 // -----
 // Helper Functions
@@ -287,7 +247,7 @@ const (
 // Add file into submission, and store it to FS and DB.
 // Note: Need valid submission. No comments exist on file
 // creation.
-// 
+//
 // Params:
 // 	file (*File) : the file to add to the db and filesystem (all fields but ID and SubmissionID MUST be set)
 // 	submissionID (int) : the id of the submission which the added file is to be linked
@@ -371,10 +331,10 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 //
 // Params:
 //	comment (*Comment) : The comment struct to add to the file
-//	fileId (uint) : the id of the file to add a comment to
+//	fileID (uint) : the id of the file to add a comment to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
-func addComment(comment *Comment, fileId uint) error {
+func addComment(comment *Comment, fileID uint) error {
 	// error cases
 	if comment == nil {
 		return errors.New("Comment cannot be nil")
@@ -382,7 +342,7 @@ func addComment(comment *Comment, fileId uint) error {
 
 	// checks that the author of the comment is a registered user (either here or in another journal)
 	author := &GlobalUser{}
-	author.ID = comment.AuthorId
+	author.ID = comment.AuthorID
 	if err := gormDb.Model(author).Omit("*").First(author).Error; err != nil {
 		return err
 	}
@@ -392,7 +352,7 @@ func addComment(comment *Comment, fileId uint) error {
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// queries the file from the database
-		file.ID = fileId
+		file.ID = fileID
 		if err := gormDb.Model(file).Select("files.name", "files.path", "files.submission_id").Find(file).Error; err != nil {
 			return err
 		}
@@ -429,16 +389,16 @@ func addComment(comment *Comment, fileId uint) error {
 // TODO : write tests for this function
 //
 // Params:
-// 	fileId (int) : the file's unique id
+// 	fileID (int) : the file's unique id
 // Returns:
 //	(*File) : the a file struct corresponding to the given ID
 // 	(error) : an error if something goes wrong
-func getFileData(fileId uint) (*File, error) {
+func getFileData(fileID uint) (*File, error) {
 	submission := &Submission{}
 	file := &File{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// queries the file from the database
-		file.ID = fileId
+		file.ID = fileID
 		if err := gormDb.Model(file).Find(file).Error; err != nil {
 			return err
 		}

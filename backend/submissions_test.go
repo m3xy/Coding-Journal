@@ -10,9 +10,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,26 +79,134 @@ var testReviewers []User = []User{
 		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
-// // TODO: move this function to somewhere more sensible
-// // utility function to register an array of users and return an array of their Ids
-// func registerUsers(t *testing.T, users []*Credentials) ([]string) {
-// 	var id string
-// 	var err error
-// 	userIds := []string{}
-// 	for _, user := range users {
-// 		id, err = registerUser(user)
-// 		assert.NoError(t, err, "error while registering user")
-// 		userIds = append(userIds, id)
-// 	}
-// 	return userIds
-// }
+// ------------
+// Router Function Tests
+// ------------
+
+// Tests the ability of the getAllSubmissions() function to get all submission ids and names from the db
+// at once
+//
+// Test Depends On:
+// 	- TestAddSubmission
+// 	- TestGetUserSubmissions
+func TestGetAllSubmissions(t *testing.T) {
+	// tests that multiple valid submissions can be uploaded, then retrieved from the database
+	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
+		// Set up server and test environment
+		testInit()
+		srv := setupCORSsrv()
+		go srv.ListenAndServe()
+
+		// registers authors and reviewers of the submissions (same for all submissions here)
+		authorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+
+		reviewerID, err := registerUser(testReviewers[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+
+		// adds all of the submissions and stores their ids and names
+		sentSubmissions := make(map[uint]string) // variable to hold the id: submission name mappings which are sent to the db
+		for _, sub := range testSubmissions[0:2] {
+			sub.Authors = []GlobalUser{{ID: authorID}}
+			sub.Reviewers = []GlobalUser{{ID: reviewerID}}
+			submissionID, err := addSubmission(&sub)
+			assert.NoErrorf(t, err, "Error adding submission %s: %v", sub.Name, err)
+			sentSubmissions[submissionID] = sub.Name
+		}
+
+		// builds and sends and http request to get the names and IDs of all submissions
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", BACKEND_ADDRESS, ENDPOINT_ALL_SUBMISSIONS), nil)
+		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error occurred while sending get request to the Go server: %v", err)
+		defer resp.Body.Close()
+		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
+
+		// checks the returned list of submissions for equality with the sent list
+		returnedSubmissions := make(map[uint]string)
+		json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
+		for k, v := range returnedSubmissions {
+			assert.Equalf(t, v, sentSubmissions[k],
+				"Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
+		}
+
+		// clears test env and shuts down the test server
+		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
+		testEnd()
+	})
+}
+
+// Tests the ability of the CodeFiles module to get a submission from the db
+//
+// Test Depends On:
+// 	- TestCreateSubmissions()
+// 	- TestAddFiles()
+// 	- TestAddReviewers()
+// 	- TestAddAuthors()
+func TestSendSubmission(t *testing.T) {
+	// tests that a single valid submission with one reviewer and one author can be retrieved
+	t.Run("Get Valid Submission", func(t *testing.T) {
+		testFile := testFiles[0]             // defines the file to use for the test here so that it can be easily changed
+		testSubmission := testSubmissions[0] // defines the submission to use for the test here so that it can be easily changed
+		testAuthor := testAuthors[0]         // defines the author of the submission
+		testReviewer := testReviewers[0]     // defines the reviewer of the submission
+
+		// Set up server and test environment
+		testInit()
+		srv := setupCORSsrv()
+		go srv.ListenAndServe()
+
+		// registers author and reviewer
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error registering author in the db: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		reviewerID, err := registerUser(testReviewer)
+		assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
+		// uploads the test submission and adds a file to it
+		testSubmission.Files = []File{testFile}
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error adding submission %v", err)
+
+		// creates a request to send to the test server
+		urlString := fmt.Sprintf("%s%s?%s=%d", BACKEND_ADDRESS,
+			ENDPOINT_SUBMISSION, "id", submissionID)
+		fmt.Println(urlString)
+		req, _ := http.NewRequest("GET", urlString, nil)
+		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error while sending Get request: %v", err)
+		defer resp.Body.Close()
+		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
+
+		// decodes the json response into a Submission struct
+		submission := &Submission{}
+		assert.NoErrorf(t, json.NewDecoder(resp.Body).Decode(submission), "Error while decoding server response: %v", err)
+
+		// tests that the returned submission matches the passed in data
+		assert.Equal(t, testSubmission.ID, submission.ID, "Submission IDs do not match")
+		assert.Equal(t, testSubmission.Name, submission.Name, "Submission Names do not match.")
+		assert.Equal(t, authorID, submission.Authors[0].ID, "Author IDs do not match")
+		assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, submission.Authors[0].FullName, "Author Names not match")
+		assert.Equal(t, reviewerID, submission.Reviewers[0].ID, "Reviewer IDs not match")
+		assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, submission.Reviewers[0].FullName, "Reviewer Names not match")
+
+		// clears test env and shuts down the test server
+		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
+		testEnd()
+	})
+}
+
+// ------------
+// Helper Function Tests
+// ------------
 
 // test the addSubmission() function in submissions.go
 func TestAddSubmission(t *testing.T) {
 	// Utility function to be re-used for testing adding submissions to the db
 	testAddSubmission := func(testSub *Submission) {
 		// adds the submission to the db and filesystem
-		submissionId, err := addSubmission(testSub)
+		submissionID, err := addSubmission(testSub)
 		assert.NoErrorf(t, err, "Error adding submission: %v", err)
 
 		// retrieve the submission
@@ -106,7 +216,7 @@ func TestAddSubmission(t *testing.T) {
 
 		// checks that the filesystem has a proper corresponding entry and metadata file
 		submissionData := &SubmissionData{}
-		submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionId))
+		submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionID))
 		fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, testSub.Name+".json")
 		dataString, err := ioutil.ReadFile(fileDataPath)
 		assert.NoError(t, err, "error reading submission data")
@@ -215,22 +325,22 @@ func TestAddSubmission(t *testing.T) {
 // 	- TestAddSubmission
 func TestAddAuthor(t *testing.T) {
 	// utility function to add submissions just to the database (not filesystem), without checking for correctness
-	testAddSubmission := func(submission *Submission) (uint) {
+	testAddSubmission := func(submission *Submission) uint {
 		assert.NoError(t, gormDb.Create(submission).Error, "Error creating submission")
 		return submission.ID
 	}
 
 	// utility function which tests that an author can be added to a valid submission properly
-	testAddAuthor := func(submissionId uint, author User) {
+	testAddAuthor := func(submissionID uint, author User) {
 		// registers the author as a user and then to the given submission as an author
-		authorId, err := registerUser(author)
+		authorID, err := registerUser(author)
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.NoErrorf(t, addAuthors([]GlobalUser{{ID:authorId}}, submissionId), "Error adding the author to the db: %v", err)
+		assert.NoErrorf(t, addAuthors([]GlobalUser{{ID: authorID}}, submissionID), "Error adding the author to the db: %v", err)
 
 		// queries the authors table in the database for author IDs which match that returned from registerUser()
 		var authors []GlobalUser
 		submission := &Submission{}
-		submission.ID = submissionId
+		submission.ID = submissionID
 		err = gormDb.Model(submission).Select("global_users.id", "global_users.full_name").Association("Authors").Find(&authors)
 		assert.NoErrorf(t, err, "Error querying submission Authors: %v", err)
 
@@ -241,7 +351,7 @@ func TestAddAuthor(t *testing.T) {
 			authorIDs = append(authorIDs, author.ID)
 			authorNames = append(authorNames, author.FullName)
 		}
-		assert.Contains(t, authorIDs, authorId, "author id not in the queried array")
+		assert.Contains(t, authorIDs, authorID, "author id not in the queried array")
 		assert.Contains(t, authorNames, author.FirstName+" "+author.LastName, "author id not in the queried array")
 	}
 
@@ -251,10 +361,10 @@ func TestAddAuthor(t *testing.T) {
 		// defines test submission and author to use for this test, and uploads the submission
 		testSubmission := testSubmissions[0]
 		testAuthor := testAuthors[0]
-		submissionId := testAddSubmission(&testSubmission)
+		submissionID := testAddSubmission(&testSubmission)
 
 		// uses the utility function to add the author, and test that it was done properly
-		testAddAuthor(submissionId, testAuthor)
+		testAddAuthor(submissionID, testAuthor)
 		testEnd()
 	})
 
@@ -265,12 +375,12 @@ func TestAddAuthor(t *testing.T) {
 		testAuthor := testAuthors[1] // user without publisher permissions
 
 		// uploads a test submission
-		submissionId := testAddSubmission(&testSubmission)
+		submissionID := testAddSubmission(&testSubmission)
 
 		// registers the author as a user and then to the given submission as an author
-		authorId, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor)
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.Error(t, addAuthors([]GlobalUser{{ID:authorId}}, submissionId), "Author without publisher permissions registered")
+		assert.Error(t, addAuthors([]GlobalUser{{ID: authorID}}, submissionID), "Author without publisher permissions registered")
 
 		testEnd()
 	})
@@ -279,9 +389,9 @@ func TestAddAuthor(t *testing.T) {
 	t.Run("Add Non-User Author", func(t *testing.T) {
 		testInit()
 		testSubmission := testSubmissions[0]
-		authorId := "u881jafjka" // non-user fake id
-		submissionId := testAddSubmission(&testSubmission)
-		assert.Error(t, addAuthors([]GlobalUser{{ID:authorId}}, submissionId), "Non-user added as author")
+		authorID := "u881jafjka" // non-user fake id
+		submissionID := testAddSubmission(&testSubmission)
+		assert.Error(t, addAuthors([]GlobalUser{{ID: authorID}}, submissionID), "Non-user added as author")
 		testEnd()
 	})
 }
@@ -291,22 +401,22 @@ func TestAddAuthor(t *testing.T) {
 // 	- TestAddSubmission
 func TestAddReviewer(t *testing.T) {
 	// utility function to add submissions just to the database (not filesystem), without checking for correctness
-	testAddSubmission := func(submission *Submission) (uint) {
+	testAddSubmission := func(submission *Submission) uint {
 		assert.NoError(t, gormDb.Create(submission).Error, "Error creating submission")
 		return submission.ID
 	}
 
 	// utility function which tests that an reviewer can be added to a valid submission properly
-	testAddReviewer := func(submissionId uint, reviewer User) {
+	testAddReviewer := func(submissionID uint, reviewer User) {
 		// registers the reviewer as a user and then to the given submission as an reviewer
-		reviewerId, err := registerUser(reviewer)
+		reviewerID, err := registerUser(reviewer)
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
-		assert.NoErrorf(t, addReviewers([]GlobalUser{{ID:reviewerId}}, submissionId), "Error adding the reviewer to the db: %v", err)
+		assert.NoErrorf(t, addReviewers([]GlobalUser{{ID: reviewerID}}, submissionID), "Error adding the reviewer to the db: %v", err)
 
 		// queries the reviewers table in the database for reviewer IDs which match that returned from registerUser()
 		var reviewers []GlobalUser
 		submission := &Submission{}
-		submission.ID = submissionId
+		submission.ID = submissionID
 		err = gormDb.Model(submission).Select("global_users.id", "global_users.full_name").Association("Reviewers").Find(&reviewers)
 		assert.NoErrorf(t, err, "Error querying submission Reviewers: %v", err)
 
@@ -317,7 +427,7 @@ func TestAddReviewer(t *testing.T) {
 			reviewerIDs = append(reviewerIDs, reviewer.ID)
 			reviewerNames = append(reviewerNames, reviewer.FullName)
 		}
-		assert.Contains(t, reviewerIDs, reviewerId, "reviewer id not in the queried array")
+		assert.Contains(t, reviewerIDs, reviewerID, "reviewer id not in the queried array")
 		assert.Contains(t, reviewerNames, reviewer.FirstName+" "+reviewer.LastName, "reviewer id not in the queried array")
 	}
 
@@ -327,10 +437,10 @@ func TestAddReviewer(t *testing.T) {
 		// defines test submission and reviewer to use for this test, and uploads the submission
 		testSubmission := testSubmissions[0]
 		testReviewer := testReviewers[0]
-		submissionId := testAddSubmission(&testSubmission)
+		submissionID := testAddSubmission(&testSubmission)
 
 		// uses the utility function to add the reviewer, and test that it was done properly
-		testAddReviewer(submissionId, testReviewer)
+		testAddReviewer(submissionID, testReviewer)
 		testEnd()
 	})
 
@@ -339,12 +449,12 @@ func TestAddReviewer(t *testing.T) {
 		testInit()
 		testSubmission := testSubmissions[0]
 		testReviewer := testReviewers[1] // user without publisher permissions
-		submissionId := testAddSubmission(&testSubmission)
+		submissionID := testAddSubmission(&testSubmission)
 
 		// registers the reviewer as a user and then to the given submission as an reviewer
-		reviewerId, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer)
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
-		assert.Error(t, addReviewers([]GlobalUser{{ID:reviewerId}}, submissionId), "Reviewer without reviewer permissions registered")
+		assert.Error(t, addReviewers([]GlobalUser{{ID: reviewerID}}, submissionID), "Reviewer without reviewer permissions registered")
 		testEnd()
 	})
 
@@ -352,9 +462,9 @@ func TestAddReviewer(t *testing.T) {
 	t.Run("Add Non-User Reviewer", func(t *testing.T) {
 		testInit()
 		testSubmission := testSubmissions[0]
-		reviewerId := "u881jafjka" // non-user fake id
-		submissionId := testAddSubmission(&testSubmission)
-		assert.Error(t, addReviewers([]GlobalUser{{ID:reviewerId}}, submissionId), "Non-user added as reviewer")
+		reviewerID := "u881jafjka" // non-user fake id
+		submissionID := testAddSubmission(&testSubmission)
+		assert.Error(t, addReviewers([]GlobalUser{{ID: reviewerID}}, submissionID), "Non-user added as reviewer")
 		testEnd()
 	})
 }
@@ -384,7 +494,7 @@ func TestAddTags(t *testing.T) {
 
 		// queries the db to make sure the tag was added properly
 		cat := &Category{}
-		assert.NoError(t, gormDb.Model(&Category{SubmissionID:submissionID, Tag:testTag}).Find(cat).Error, "Tag unable to be retrieved")
+		assert.NoError(t, gormDb.Model(&Category{SubmissionID: submissionID, Tag: testTag}).Find(cat).Error, "Tag unable to be retrieved")
 		testEnd()
 	})
 
@@ -421,8 +531,8 @@ func TestAddTags(t *testing.T) {
 
 		// queries the db to make sure the tags were added properly
 		cat := &Category{}
-		assert.NoError(t, gormDb.Model(&Category{SubmissionID:submissionID1, Tag:testTag}).Find(cat).Error, "Tag 1 unable to be retrieved")
-		assert.NoError(t, gormDb.Model(&Category{SubmissionID:submissionID2, Tag:testTag}).Find(cat).Error, "Tag 2 unable to be retrieved")
+		assert.NoError(t, gormDb.Model(&Category{SubmissionID: submissionID1, Tag: testTag}).Find(cat).Error, "Tag 1 unable to be retrieved")
+		assert.NoError(t, gormDb.Model(&Category{SubmissionID: submissionID2, Tag: testTag}).Find(cat).Error, "Tag 2 unable to be retrieved")
 
 		testEnd()
 	})
@@ -472,10 +582,10 @@ func TestGetUserSubmissions(t *testing.T) {
 		testSubmission2.Authors = []GlobalUser{{ID: nonauthorID}}
 
 		// adds dummy reviewers
-		reviewerId, err := registerUser(testReviewers[0])
+		reviewerID, err := registerUser(testReviewers[0])
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerId}}
-		testSubmission2.Reviewers = []GlobalUser{{ID: reviewerId}}
+		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerID}}
+		testSubmission2.Reviewers = []GlobalUser{{ID: reviewerID}}
 
 		// adds two test submissions to the db
 		testSubmission1.ID, err = addSubmission(&testSubmission1)
@@ -487,7 +597,7 @@ func TestGetUserSubmissions(t *testing.T) {
 		submissions, err := getUserSubmissions(authorID)
 		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
 
-		// tests for equality of submission Id and that testSubmission2.Id is not in the map
+		// tests for equality of submission ID and that testSubmission2.ID is not in the map
 		_, ok := submissions[testSubmission2.ID]
 		assert.False(t, ok, "Returned submission where the test author is not an author")
 		assert.Equalf(t, submissions[testSubmission1.ID], testSubmission1.Name,
@@ -537,7 +647,7 @@ func TestGetUserReviewedSubs(t *testing.T) {
 		submissions, err := getUserReviews(reviewerID)
 		assert.NoErrorf(t, err, "Error getting user reviewed submissions: %v", err)
 
-		// tests for equality of submission Id and that testSubmission2.Id is not in the map
+		// tests for equality of submission ID and that testSubmission2.ID is not in the map
 		_, ok := submissions[testSubmission2.ID]
 		assert.False(t, ok, "Returned submission where the test reviewer is not a reviewer")
 		assert.Equalf(t, submissions[testSubmission1.ID], testSubmission1.Name,
@@ -572,11 +682,11 @@ func TestGetSubmission(t *testing.T) {
 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
 		testSubmission.Files = []File{testFile}
-		submissionId, err := addSubmission(&testSubmission)
+		submissionID, err := addSubmission(&testSubmission)
 		assert.NoErrorf(t, err, "Error occurred while adding submission: %v", err)
 
 		// gets the submission back
-		queriedSubmission, err := getSubmission(submissionId)
+		queriedSubmission, err := getSubmission(submissionID)
 		assert.NoErrorf(t, err, "Error occurred while retrieving submission: %v", err)
 
 		// tests the submission was returned properly
@@ -630,138 +740,170 @@ func TestGetSubmission(t *testing.T) {
 	})
 }
 
-// // This function tests the getSubmissionAuthors function
-// //
-// // This test depends on:
-// // 	- TestAddSubmission
-// func TestGetSubmissionAuthors(t *testing.T) {
-// 	// valid metadata file and format
-// 	t.Run("Valid Author List", func(t *testing.T) {
-// 		// sets up the test environment, and uploads a test submission
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission := testSubmissions[0]
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+// This function tests the getSubmissionAuthors function
+//
+// This test depends on:
+// 	- TestAddSubmission
+func TestGetSubmissionAuthors(t *testing.T) {
+	// valid metadata file and format
+	t.Run("Valid Single Author", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testAuthor := testAuthors[0]
 
-// 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
-// 		authors, err := getSubmissionAuthors(submissionId)
-// 		assert.NoErrorf(t, err, "Error getting submission authors: %v", err)
-// 		assert.ElementsMatch(t, testSubmission.Authors, authors, "authors lists do not match")
+		// sets up the test environment, and uploads a test submission
+		testInit()
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
 
-// // This function tests the getSubmissionReviewers function
-// //
-// // This test depends on:
-// // 	- TestAddSubmission
-// func TestGetSubmissionReviewers(t *testing.T) {
-// 	// valid metadata file and format
-// 	t.Run("Valid Reviewer List", func(t *testing.T) {
-// 		// sets up the test environment, and uploads a test submission
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission := testSubmissions[0]
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		// tests that the metadata can be read back properly, and that it matches the uploaded submission
+		authors, err := getSubmissionAuthors(submissionID)
+		assert.NoErrorf(t, err, "Error getting submission authors: %v", err)
 
-// 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
-// 		reviewers, err := getSubmissionReviewers(submissionId)
-// 		assert.NoErrorf(t, err, "Error getting submission reviewers: %v", err)
-// 		assert.ElementsMatch(t, testSubmission.Reviewers, reviewers, "reviewers lists do not match")
+		// compares the authors
+		assert.Equal(t, authorID, authors[0].ID, "author IDs do not match")
+		assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, authors[0].FullName, "Author names do not match")
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		testEnd()
+	})
+}
 
-// // This function tests the getSubmissionCategories function
-// //
-// // This test depends on:
-// // 	- TestAddSubmission
-// func TestGetSubmissionCategories(t *testing.T) {
-// 	// valid metadata file and format
-// 	t.Run("Valid Categories", func(t *testing.T) {
-// 		// sets up the test environment, and uploads a test submission
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission := testSubmissions[0]
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+// This function tests the getSubmissionReviewers function
+//
+// This test depends on:
+// 	- TestAddSubmission
+func TestGetSubmissionReviewers(t *testing.T) {
+	// valid metadata file and format
+	t.Run("Valid Single Reviewer", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testAuthor := testAuthors[0]
+		testReviewer := testReviewers[0]
 
-// 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
-// 		categories, err := getSubmissionCategories(submissionId)
-// 		assert.NoErrorf(t, err, "Error getting submission tags: %v", err)
-// 		assert.ElementsMatch(t, testSubmission.Categories, categories, "Submission tags do not match")
+		// sets up the test environment, and uploads a test submission
+		testInit()
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		reviewerID, err := registerUser(testReviewer)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
-// // This function tests the getSubmissionFilePaths function
-// //
-// // This test depends on:
-// // 	- TestAddSubmission
-// func TestGetSubmissionFilePaths(t *testing.T) {
-// 	// valid metadata file and format
-// 	t.Run("Valid Submission", func(t *testing.T) {
-// 		// sets up the test environment, and uploads a test submission
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission := testSubmissions[0]
-// 		testFile := testFiles[0]
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		_, err = addFileTo(testFile, submissionId)
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
 
-// 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
-// 		filePaths, err := getSubmissionFilePaths(submissionId)
-// 		// note that testSubmission.FilePaths is not used here, as this array is hard-coded and thus not useful here
-// 		assert.ElementsMatch(t, []string{testFile.Path}, filePaths, "Filepath arrays do not match")
+		// tests that the metadata can be read back properly, and that it matches the uploaded submission
+		reviewers, err := getSubmissionReviewers(submissionID)
+		assert.NoErrorf(t, err, "Error getting submission reviewers: %v", err)
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		// compares the reviewers
+		assert.Equal(t, reviewerID, reviewers[0].ID, "author IDs do not match")
+		assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, reviewers[0].FullName, "Author names do not match")
 
-// // This function tests the getSubmissionMetaData function
-// //
-// // This test depends on:
-// // 	- TestAddSubmission
-// func TestGetSubmissionMetaData(t *testing.T) {
-// 	// valid metadata file and format
-// 	t.Run("Valid Metadata", func(t *testing.T) {
-// 		// sets up the test environment, and uploads a test submission
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		testSubmission := testSubmissions[0]
-// 		testSubmission.Authors = registerUsers(t, testAuthors[:1])
-// 		testSubmission.Reviewers = registerUsers(t, testReviewers[:1])
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		testEnd()
+	})
+}
 
-// 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
-// 		submissionData, err := getSubmissionMetaData(submissionId)
-// 		assert.NoErrorf(t, err, "Error getting submission metadata: %v", err)
-// 		assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
-// 			"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
-// 			submissionData.Abstract, testSubmission.MetaData.Abstract)
-// 		assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
+// This function tests the getSubmissionCategories function
+//
+// This test depends on:
+// 	- TestAddSubmission
+func TestGetSubmissionCategories(t *testing.T) {
+	// valid metadata file and format
+	t.Run("Valid Categories", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testAuthor := testAuthors[0]
 
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
+		// sets up the test environment, and uploads a test submission
+		testInit()
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-// 	// Tests that getSubmissionMetaData will throw an error if an incorrect submission ID is passed in
-// 	t.Run("Invalid Submission Id", func(t *testing.T) {
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		_, err := getSubmissionMetaData(400)
-// 		assert.Errorf(t, err, "No error was thrown for invalid submission")
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+
+		// tests that the metadata can be read back properly, and that it matches the uploaded submission
+		categories, err := getSubmissionCategories(submissionID)
+		assert.NoErrorf(t, err, "Error getting submission tags: %v", err)
+		assert.ElementsMatch(t, testSubmission.Categories, categories, "Submission tags do not match")
+		testEnd()
+	})
+}
+
+// This function tests the getSubmissionFiles function
+func TestGetSubmissionFiles(t *testing.T) {
+	// valid metadata file and format
+	t.Run("Single Valid File", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFile := testFiles[0]
+		testAuthor := testAuthors[0]
+
+		// sets up the test environment, and uploads a test submission
+		testInit()
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+		fileID, err := addFileTo(&testFile, submissionID)
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+
+		// retrieves the files
+		files, err := getSubmissionFiles(submissionID)
+		assert.NoErrorf(t, err, "Error retrieving submission files: %v", err)
+
+		// compares the retrieved files with those which were added
+		assert.Equal(t, fileID, files[0].ID, "File IDs do not match")
+		assert.Equal(t, submissionID, files[0].SubmissionID, "Submission IDs do not match")
+		assert.Equal(t, testFile.Name, files[0].Name, "File names do not match")
+		assert.Equal(t, testFile.Path, files[0].Path, "File paths do not match")
+
+		testEnd()
+	})
+}
+
+// This function tests the getSubmissionMetaData function
+//
+// This test depends on:
+// 	- TestAddSubmission
+func TestGetSubmissionMetaData(t *testing.T) {
+	// valid metadata file and format
+	t.Run("Valid Metadata", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testAuthor := testAuthors[0]
+
+		// sets up the test environment, and uploads a test submission
+		testInit()
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+
+		// tests that the metadata can be read back properly, and that it matches the uploaded submission
+		submissionData, err := getSubmissionMetaData(submissionID)
+		assert.NoErrorf(t, err, "Error getting submission metadata: %v", err)
+		assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
+			"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
+			submissionData.Abstract, testSubmission.MetaData.Abstract)
+		assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
+		testEnd()
+	})
+
+	// Tests that getSubmissionMetaData will throw an error if an incorrect submission ID is passed in
+	t.Run("Invalid Submission ID", func(t *testing.T) {
+		testInit()
+		_, err := getSubmissionMetaData(400)
+		assert.Errorf(t, err, "No error was thrown for invalid submission")
+		testEnd()
+	})
+}
 
 // This tests converting from the local submission data format to the supergroup specified format
 func TestLocalToGlobal(t *testing.T) {
@@ -809,113 +951,3 @@ func TestLocalToGlobal(t *testing.T) {
 		testEnd()
 	})
 }
-
-// // Tests the ability of the getAllSubmissions() function to get all submission ids and names from the db
-// // at once
-// //
-// // Test Depends On:
-// // 	- TestAddSubmission
-// // 	- TestGetUserSubmissions
-// func TestGetAllSubmissions(t *testing.T) {
-// 	// tests that multiple valid submissions can be uploaded, then retrieved from the database
-// 	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
-// 		// Set up server and test environment
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		srv := setupCORSsrv()
-// 		go srv.ListenAndServe()
-
-// 		// registers authors and reviewers of the submissions (same for all submissions here)
-// 		authors := registerUsers(t, testAuthors[:1])
-// 		reviewers := registerUsers(t, testReviewers[:1])
-
-// 		// adds all of the submissions and stores their ids and names
-// 		sentSubmissions := make(map[int]string) // variable to hold the id: submission name mappings which are sent to the db
-// 		for _, sub := range testSubmissions[0:2] {
-// 			sub.Authors = authors
-// 			sub.Reviewers = reviewers
-// 			submissionId, err := addSubmission(sub)
-// 			assert.NoErrorf(t, err, "Error adding submission %s: %v", sub.Name, err)
-// 			sentSubmissions[submissionId] = sub.Name
-// 		}
-
-// 		// builds and sends and http request to get the names and Ids of all submissions
-// 		req, err := http.NewRequest("GET", fmt.Sprintf("%s:%s%s", TEST_URL, TEST_SERVER_PORT, ENDPOINT_ALL_SUBMISSIONS), nil)
-// 		resp, err := sendSecureRequest(req, TEAM_ID)
-// 		assert.NoErrorf(t, err, "Error occurred while sending get request to the Go server: %v", err)
-// 		defer resp.Body.Close()
-
-// 		// checks the returned list of submissions for equality with the sent list
-// 		returnedSubmissions := make(map[int]string)
-// 		json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
-// 		for k, v := range returnedSubmissions {
-// 			assert.Equalf(t, v,  sentSubmissions[k],
-// 				"Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
-// 		}
-
-// 		// clears test env and shuts down the test server
-// 		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }
-
-// // Tests the ability of the CodeFiles module to get a submission from the db
-// //
-// // Test Depends On:
-// // 	- TestCreateSubmissions()
-// // 	- TestAddFiles()
-// // 	- TestAddReviewers()
-// // 	- TestAddAuthors()
-// func TestSendSubmission(t *testing.T) {
-// 	// tests that a single valid submission with one reviewer and one author can be retrieved
-// 	t.Run("Get Valid Submission", func(t *testing.T) {
-// 		testFile := testFiles[0]             // defines the file to use for the test here so that it can be easily changed
-// 		testSubmission := testSubmissions[0] // defines the submission to use for the test here so that it can be easily changed
-// 		testAuthor := testAuthors[0]         // defines the author of the submission
-// 		testReviewer := testReviewers[0]     // defines the reviewer of the submission
-
-// 		// Set up server and test environment
-// 		assert.NoError(t, initTestEnvironment(), "failed to initialise test environment")
-// 		srv := setupCORSsrv()
-// 		go srv.ListenAndServe()
-
-// 		// registers author and reviewer
-// 		authorId, err := registerUser(testAuthor)
-// 		assert.NoErrorf(t, err, "Error registering author in the db: %v", err)
-// 		testSubmission.Authors = []string{authorId}
-// 		reviewerId, err := registerUser(testReviewer)
-// 		assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err)
-// 		testSubmission.Reviewers = []string{reviewerId}
-
-// 		// uploads the test submission and adds a file to it
-// 		submissionId, err := addSubmission(testSubmission)
-// 		assert.NoErrorf(t, err, "Error adding submission %v", err)
-// 		_, err = addFileTo(testFile, submissionId)
-// 		assert.NoErrorf(t, err, "Error adding file to the submission %v", err)
-
-// 		// creates a request to send to the test server
-// 		urlString := fmt.Sprintf("%s:%s%s?%s=%d", TEST_URL, TEST_SERVER_PORT,
-// 			ENDPOINT_SUBMISSION, getJsonTag(&Submission{}, "Id"), submissionId)
-// 		req, _ := http.NewRequest("GET", urlString, nil)
-// 		resp, err := sendSecureRequest(req, TEAM_ID)
-// 		assert.NoErrorf(t, err, "Error while sending Get request: %v", err)
-// 		defer resp.Body.Close()
-// 		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
-
-// 		// decodes the json response into a Submission struct
-// 		submission := &Submission{}
-// 		assert.NoErrorf(t, json.NewDecoder(resp.Body).Decode(submission), "Error while decoding server response: %v", err)
-
-// 		// tests that the returned submission matches the passed in data
-// 		assert.Equalf(t, testSubmission.Id, submission.Id,
-// 			"Submission IDs do not match. Given: %d != Returned: %d", testSubmission.Id, submission.Id)
-// 		assert.Equalf(t, testSubmission.Name, submission.Name,
-// 			"Submission Names do not match. Given: %s != Returned: %s", testSubmission.Name, submission.Name)
-// 		assert.ElementsMatch(t, []string{authorId}, submission.Authors, "Authors do not match")
-// 		assert.ElementsMatch(t, []string{reviewerId}, submission.Reviewers, "Reviewers do not match")
-// 		assert.ElementsMatch(t, testSubmission.FilePaths, submission.FilePaths, "Submission file path lists do not match.")
-
-// 		// clears test env and shuts down the test server
-// 		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-// 		assert.NoError(t, clearTestEnvironment(), "failed to tear down test environment")
-// 	})
-// }

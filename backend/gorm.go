@@ -117,9 +117,7 @@ type SupergroupSubmissionData struct {
 type File struct {
 	gorm.Model
 	// id of the submission this file is a part of
-	SubmissionID uint `json:"submissionId"`
-	// name of the submission this file is a part of
-	SubmissionName string `json:"submissionName"` // TODO: remove if obselete
+	SubmissionID uint `json:"submissionID"`
 	// relative path to the file from the root of the submission's file structure
 	Path string `json:"filePath" db:"filePath"`
 	// base name of the file with extension
@@ -147,7 +145,7 @@ type FileData struct {
 // Structure for user comments on code (not written to db)
 type Comment struct {
 	// author of the comment as an id
-	AuthorId string `json:"author"`
+	AuthorID string `json:"author"`
 	// time that the comment was recorded as a string
 	Time string `json:"time"`
 	// content of the comment as a string
