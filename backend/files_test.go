@@ -17,7 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -25,16 +24,29 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
 	// "gorm.io/gorm"
 )
 
 const (
 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
-	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
-
-	// TEST_URL         = "http://localhost"
-	// TEST_SERVER_PORT = "3333"
+	TEST_FILES_DIR     = "../filesystem/" // environment variable set to this value
+	TEST_PORT_FILES    = ":59216"
+	TEST_FILES_ADDRESS = "http://localhost:59216"
 )
+
+func resourceServerSetup() *http.Server {
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet)
+	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+
+	return &http.Server{
+		Addr:    TEST_PORT_FILES,
+		Handler: router,
+	}
+}
 
 // NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
 // as to prevent adding a file with the same SubmissionID twice
@@ -83,7 +95,7 @@ func TestGetFile(t *testing.T) {
 
 		// Set up server and configures filesystem/db
 		testInit()
-		srv := setupCORSsrv()
+		srv := resourceServerSetup()
 		go srv.ListenAndServe()
 
 		// adds a submission to the database and filesystem
@@ -103,7 +115,7 @@ func TestGetFile(t *testing.T) {
 		assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Name, err)
 
 		// builds the request url inserting query parameters
-		urlString := fmt.Sprintf("%s%s?%s=%d", BACKEND_ADDRESS, ENDPOINT_FILE, "id", fileID)
+		urlString := fmt.Sprintf("%s%s?%s=%d", TEST_FILES_ADDRESS, ENDPOINT_FILE, "id", fileID)
 		req, err := http.NewRequest("GET", urlString, nil)
 
 		// send GET request
@@ -128,66 +140,6 @@ func TestGetFile(t *testing.T) {
 	})
 }
 
-// THE FUNCTION THIS TESTS IS NO LONGER USED
-// Tests the ability of the files.go code to upload files to the backend
-//
-// Test Depends on:
-// 	- TestCreateSubmission()
-// 	- TestAddFile()
-// func TestUploadFile(t *testing.T) {
-// 	// uploads a single valid file
-// 	t.Run("Upload Single File", func(t *testing.T) {
-// 		// the test values added to the db and filesystem
-// 		testFile := testFiles[0]
-// 		testAuthor := testAuthors[0]
-
-// 		// Set up server and configures filesystem/db
-// 		srv := setupCORSsrv()
-// 		go srv.ListenAndServe()
-// 		testInit()
-
-// 		// adds a submission to the database and filesystem
-// 		authorID, err := registerUser(testAuthor)
-// 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-// 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-// 		reviewerID, err := registerUser(testReviewers[0])
-// 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-// 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
-// 		submissionID, err := addSubmission(&testSubmission)
-// 		assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err)
-
-// 		// adds a file to the database and filesystem
-// 		fileID, err := addFileTo(&testFile, submissionID)
-// 		assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Name, err)
-
-// 		// formats the request body to send to the server to add a comment
-// 		reqBody, err := json.Marshal(map[string]string{
-// 			"author":                       testAuthor.ID,
-// 			getJsonTag(&File{}, "Name"):    testFile.Name,
-// 			getJsonTag(&File{}, "Base64Value"): testFile.Base64Value,
-// 		})
-// 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
-
-// 		// formats and executes the request
-// 		req, err := http.NewRequest("POST", fmt.Sprintf("%s:%s%s",
-// 			TEST_URL, TEST_SERVER_PORT, ENDPOINT_NEWFILE), bytes.NewBuffer(reqBody))
-// 		assert.NoErrorf(t, err, "Error creating request: %v", err)
-// 		resp, err := sendSecureRequest(req, TEAM_ID)
-// 		assert.NoErrorf(t, err, "Error executing request: %v", err)
-// 		defer resp.Body.Close()
-
-// 		// TODO : maybe add more checks for correctness here??
-// 		// tests that the result is as desired
-// 		assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode)
-
-// 		// clears environment
-// 		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
-// 		testEnd()
-// 	})
-// }
-
 // Tests the basic ability of the CodeFiles module to add a comment to a file
 // given file path and submission id
 //
@@ -206,7 +158,7 @@ func TestUploadUserComment(t *testing.T) {
 
 		// Set up server and configures filesystem/db
 		testInit()
-		srv := setupCORSsrv()
+		srv := resourceServerSetup()
 		go srv.ListenAndServe()
 
 		// adds test values to the db and filesystem
@@ -236,7 +188,7 @@ func TestUploadUserComment(t *testing.T) {
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s?%s=%s&%s=%d", BACKEND_ADDRESS, ENDPOINT_NEWCOMMENT,
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s?%s=%s&%s=%d", TEST_FILES_ADDRESS, ENDPOINT_NEWCOMMENT,
 			"authorID", authorID, "fileID", fileID), bytes.NewBuffer(reqBody))
 		assert.NoErrorf(t, err, "Error creating request: %v", err)
 
@@ -428,14 +380,13 @@ func TestAddComment(t *testing.T) {
 */
 
 // Tests the ability of the backend helper functions to retrieve a file's data
-//
 // Test Depends On:
 // 	- TestAddSubmission (in submissions_test.go)
 func TestGetFileData(t *testing.T) {
 	// getting single valid file TODO: add comments here
 	t.Run("Single Valid File", func(t *testing.T) {
-		testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
-		testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
+		testFile := testFiles[0]             // the test file to be added to the db and filesystem.
+		testSubmission := testSubmissions[0] // test submission to be added to db and filesystem.
 		testAuthor := testAuthors[0]
 		testReviewer := testReviewers[0]
 

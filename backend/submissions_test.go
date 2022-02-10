@@ -20,7 +20,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	TEST_PORT_SUBMISSION = ":59217"
+	ADDRESS_SUBMISSION   = "http://localhost:59217"
 )
 
 // data to use in the tests
@@ -28,7 +34,7 @@ import (
 // .ID field will not be set in any test
 var testSubmissions []Submission = []Submission{
 	// valid
-	Submission{
+	{
 		Name:       "TestSubmission1",
 		License:    "MIT",
 		Authors:    []GlobalUser{},
@@ -40,7 +46,7 @@ var testSubmissions []Submission = []Submission{
 			Reviews:  []*Comment{},
 		},
 	},
-	Submission{
+	{
 		Name:       "TestSubmission2",
 		License:    "MIT",
 		Authors:    []GlobalUser{},
@@ -79,6 +85,18 @@ var testReviewers []User = []User{
 		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
+func submissionServerSetup() *http.Server {
+	router := mux.NewRouter()
+
+	router.HandleFunc(ENDPOINT_SUBMISSION, sendSubmission).Methods(http.MethodGet)
+	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet)
+
+	return &http.Server{
+		Addr:    TEST_PORT_SUBMISSION,
+		Handler: router,
+	}
+}
+
 // ------------
 // Router Function Tests
 // ------------
@@ -94,7 +112,7 @@ func TestGetAllSubmissions(t *testing.T) {
 	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
 		// Set up server and test environment
 		testInit()
-		srv := setupCORSsrv()
+		srv := submissionServerSetup()
 		go srv.ListenAndServe()
 
 		// registers authors and reviewers of the submissions (same for all submissions here)
@@ -115,7 +133,7 @@ func TestGetAllSubmissions(t *testing.T) {
 		}
 
 		// builds and sends and http request to get the names and IDs of all submissions
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", BACKEND_ADDRESS, ENDPOINT_ALL_SUBMISSIONS), nil)
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", ADDRESS_SUBMISSION, ENDPOINT_ALL_SUBMISSIONS), nil)
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
 		assert.NoErrorf(t, err, "Error occurred while sending get request to the Go server: %v", err)
 		defer resp.Body.Close()
@@ -152,7 +170,7 @@ func TestSendSubmission(t *testing.T) {
 
 		// Set up server and test environment
 		testInit()
-		srv := setupCORSsrv()
+		srv := submissionServerSetup()
 		go srv.ListenAndServe()
 
 		// registers author and reviewer
@@ -170,7 +188,7 @@ func TestSendSubmission(t *testing.T) {
 		assert.NoErrorf(t, err, "Error adding submission %v", err)
 
 		// creates a request to send to the test server
-		urlString := fmt.Sprintf("%s%s?%s=%d", BACKEND_ADDRESS,
+		urlString := fmt.Sprintf("%s%s?%s=%d", ADDRESS_SUBMISSION,
 			ENDPOINT_SUBMISSION, "id", submissionID)
 		fmt.Println(urlString)
 		req, _ := http.NewRequest("GET", urlString, nil)
