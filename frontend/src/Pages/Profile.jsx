@@ -4,6 +4,7 @@
  * 
  * User's profile page
  */
+
 import React, { useState, useEffect } from "react";
 import {Tabs, Tab, ListGroup} from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
@@ -33,8 +34,8 @@ function Profile() {
 	const [userSubmissions, setSubmissions] = useState('')
 
 
-    function openSubmission(submissionsID) {
-        navigate("/code/" + submissionsID)
+    function openSubmission(submissionsID, submissionName) {
+        navigate("/code/" + submissionsID + "/" + submissionName)
     }
 
 	if(getUserID() === null) {
@@ -63,7 +64,7 @@ function Profile() {
 	const userTypes = ["None", "Publisher", "Reviewer", "Reviewer-Publisher", "User"]
 	const submissions = Object.entries(userSubmissions).map(([id, name]) => {
 		return (
-			<ListGroup.Item as="li" key={id} action onClick={() => {openSubmission(id)}}>
+			<ListGroup.Item as="li" key={id} action onClick={() => {openSubmission(id, name)}}>
 				<label>{name}</label>
 			</ListGroup.Item>
 		);

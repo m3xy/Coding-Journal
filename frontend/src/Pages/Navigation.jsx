@@ -1,7 +1,7 @@
 
 /**
  * Navigation.jsx
- * Author: 190010714
+ * Author: 190010714, 190019931
  * 
  * Navigation Bar Component Class
  */
@@ -58,20 +58,23 @@ function Navigation() {
 					<LinkContainer to="/code">
 						<Nav.Link>Code</Nav.Link>
 					</ LinkContainer>
+					<LinkContainer to="/comment">
+						<Nav.Link>Comment</Nav.Link>
+					</ LinkContainer>
 					<LinkContainer to="/about">
 						<Nav.Link>About</Nav.Link>
 					</ LinkContainer>
 					<LinkContainer to="/contact">
 						<Nav.Link>Contact</Nav.Link>
 					</ LinkContainer>
-					<LinkContainer to="/commentModal">
-						<Nav.Link>Comment</Nav.Link>
-					</ LinkContainer>
 					<LinkContainer to="/upload">
 						<Nav.Link>Upload</Nav.Link>
 					</ LinkContainer>
 					<LinkContainer to="/profile">
 						<Nav.Link>Profile</Nav.Link>
+					</ LinkContainer>
+					<LinkContainer to="/submissions">
+						<Nav.Link>Submissions</Nav.Link>
 					</ LinkContainer>
 				</Nav>
 			</Container>

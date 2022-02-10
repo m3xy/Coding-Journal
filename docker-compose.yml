@@ -29,3 +29,5 @@ services:
       - "23409:23409"
     environment:
       NODE_ENV: "nodocker"
+    volumes:
+      - ./frontend:/usr/src/app
