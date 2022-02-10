@@ -175,10 +175,12 @@ func testAuth(t *testing.T) {
 
 // Test database initialisation
 func TestDbInit(t *testing.T) {
-	err := dbInit(dbname)
+	testDb, err := gormInit(dbname, testLogger)
 	if err != nil {
 		t.Error(err.Error())
 	}
+	getDB, _ := testDb.DB()
+	getDB.Close()
 }
 
 // Test credential uniqueness with test database.
