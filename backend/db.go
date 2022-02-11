@@ -88,13 +88,13 @@ type Submission struct {
 	// license which the code is published under
 	License string `gorm:"size:64" json:"license"`
 	// an array of the submission's files
-	Files []File
+	Files []File `json:"files,omitempty"`
 	// an array of the submissions's authors
-	Authors []GlobalUser `gorm:"many2many:authors_submission"`
+	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty"`
 	// an array of the submission's reviewers
-	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission"`
+	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
 	// tags for organizing/grouping code submissions
-	Categories []string `gorm:"-" json:"categories"`
+	Categories []string `gorm:"-" json:"categories,omitempty"`
 	// metadata about the submission
 	MetaData *SubmissionData `gorm:"-" json:"metadata,omitempty"`
 }
@@ -177,7 +177,7 @@ type Comment struct {
 // uniqueIndex:idx_first_second specifies the first and second column as a unique pair
 type Category struct {
 	Tag          string `gorm:"column;uniqueIndex:idx_first_second" json:"category"` // actual content of the tag
-	SubmissionID uint   `gorm:"uniqueIndex:idx_first_second"`
+	SubmissionID uint   `gorm:"uniqueIndex:idx_first_second" json:"-"`
 }
 
 // ---- Database and reflect utilities ----
