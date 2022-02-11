@@ -2,15 +2,15 @@ package main
 
 import "github.com/golang-jwt/jwt"
 
-// API Response types
+// --- API Responses --- //
 
-// Standard response issued on empty content requests - e.g. errors.
+// Standard response in content requests - e.g. errors.
 type StandardResponse struct {
 	Message string `json:"message"`
 	Error   bool   `json:"error"`
 }
 
-// Response used by authentication log in.
+// POST /auth/login response.
 type AuthLogInResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -18,8 +18,27 @@ type AuthLogInResponse struct {
 	Expires      int64  `json:"expires"`
 }
 
-// JWT Claim types
+// POST /journal/login response.
+type JournalLogInResponse struct {
+	ID string `json:"userId"`
+}
 
+// --- Request bodies --- //
+
+// POST /auth/login body.
+type AuthLoginPostBody struct {
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	GroupNumber int    `json:"groupNumber"`
+}
+
+// POST /journal/login body.
+type JournalLoginPostBody struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`
 	Scope string
