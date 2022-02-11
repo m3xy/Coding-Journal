@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -38,7 +37,6 @@ var JwtSecret string // JWT Secret variable.
 
 // Subrouter
 func getAuthSubRoutes(r *mux.Router) {
-	r.Use(jwtMiddleware)
 	r.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 
@@ -47,28 +45,6 @@ func getAuthSubRoutes(r *mux.Router) {
 	if err == nil {
 		JwtSecret = myEnv["JWT_SECRET"]
 	}
-}
-
-// Validate the user's access token.
-func validateWebToken(accessToken string, scope string) (bool, string) {
-	tokenSplit := strings.Split(accessToken, " ")
-	if len(tokenSplit) != 2 || strings.ToLower(tokenSplit[0]) != scope {
-		return false, "-"
-	}
-	token, err := jwt.ParseWithClaims(tokenSplit[1], &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
-		return []byte(JwtSecret), nil
-	})
-	if err != nil {
-		return false, "-"
-	}
-	if claims, ok := token.Claims.(*JwtClaims); !ok {
-		return false, "-"
-	} else if claims.Scope != "scope" {
-		return false, "-"
-	} else {
-		return true, claims.ID
-	}
-
 }
 
 // -- Log In -- //
@@ -199,7 +175,6 @@ func GetLocalUserID(credentials JournalLoginPostBody) (string, int) {
 		Email        string
 		Password     string
 	}
-	fmt.Printf("User: %#v\n", credentials)
 	res := gormDb.Model(&User{}).Limit(1).Find(&user, "Email = ?", credentials.Email)
 	switch {
 	case res.Error != nil:
@@ -213,6 +188,39 @@ func GetLocalUserID(credentials JournalLoginPostBody) (string, int) {
 		return "", http.StatusUnauthorized
 	}
 	return user.GlobalUserID, http.StatusOK
+}
+
+// -- Token Control -- //
+
+/*
+  Client refresh token getter function.
+  Content-type: application/json
+  Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
+*/
+func GetToken(w http.ResponseWriter, r *http.Request) {
+
+}
+
+// Validate the user's access token.
+func validateWebToken(accessToken string, scope string) (bool, string) {
+	tokenSplit := strings.Split(accessToken, " ")
+	if len(tokenSplit) != 2 || strings.ToLower(tokenSplit[0]) != scope {
+		return false, "-"
+	}
+	token, err := jwt.ParseWithClaims(tokenSplit[1], &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte(JwtSecret), nil
+	})
+	if err != nil {
+		return false, "-"
+	}
+	if claims, ok := token.Claims.(*JwtClaims); !ok {
+		return false, "-"
+	} else if claims.Scope != "scope" {
+		return false, "-"
+	} else {
+		return true, claims.ID
+	}
+
 }
 
 // Create a token with given scope.

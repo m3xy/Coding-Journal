@@ -28,6 +28,7 @@ const (
 	TEST_PORT_AUTH = ":59215"
 )
 
+// Set up server used for authentication testing.
 func authServerSetup() *http.Server {
 	router := mux.NewRouter()
 

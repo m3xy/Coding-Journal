@@ -85,11 +85,12 @@ var testReviewers []User = []User{
 		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
+// Set up server used for submissions testing.
 func submissionServerSetup() *http.Server {
 	router := mux.NewRouter()
 
-	router.HandleFunc(ENDPOINT_SUBMISSION, sendSubmission).Methods(http.MethodGet)
-	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet)
+	router.HandleFunc(ENDPOINT_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
+	router.HandleFunc("/{id}"+ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 
 	return &http.Server{
 		Addr:    TEST_PORT_SUBMISSION,
@@ -106,7 +107,7 @@ func submissionServerSetup() *http.Server {
 //
 // Test Depends On:
 // 	- TestAddSubmission
-// 	- TestGetUserSubmissions
+// 	- TestGetUserAuthoredSubmissions
 func TestGetAllSubmissions(t *testing.T) {
 	// tests that multiple valid submissions can be uploaded, then retrieved from the database
 	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
@@ -133,7 +134,7 @@ func TestGetAllSubmissions(t *testing.T) {
 		}
 
 		// builds and sends and http request to get the names and IDs of all submissions
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", ADDRESS_SUBMISSION, ENDPOINT_ALL_SUBMISSIONS), nil)
+		req, err := http.NewRequest("GET", ADDRESS_SUBMISSION+"/"+authorID+ENDPOINT_ALL_SUBMISSIONS, nil)
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
 		assert.NoErrorf(t, err, "Error occurred while sending get request to the Go server: %v", err)
 		defer resp.Body.Close()
@@ -160,7 +161,7 @@ func TestGetAllSubmissions(t *testing.T) {
 // 	- TestAddFiles()
 // 	- TestAddReviewers()
 // 	- TestAddAuthors()
-func TestSendSubmission(t *testing.T) {
+func TestRouteGetSubmission(t *testing.T) {
 	// tests that a single valid submission with one reviewer and one author can be retrieved
 	t.Run("Get Valid Submission", func(t *testing.T) {
 		testFile := testFiles[0]             // defines the file to use for the test here so that it can be easily changed
@@ -188,8 +189,8 @@ func TestSendSubmission(t *testing.T) {
 		assert.NoErrorf(t, err, "Error adding submission %v", err)
 
 		// creates a request to send to the test server
-		urlString := fmt.Sprintf("%s%s?%s=%d", ADDRESS_SUBMISSION,
-			ENDPOINT_SUBMISSION, "id", submissionID)
+		urlString := fmt.Sprintf("%s%s/%d", ADDRESS_SUBMISSION,
+			ENDPOINT_SUBMISSION, submissionID)
 		fmt.Println(urlString)
 		req, _ := http.NewRequest("GET", urlString, nil)
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
@@ -580,11 +581,11 @@ func TestAddTags(t *testing.T) {
 // Test Depends On:
 // 	- TestAddSubmission
 // 	- TestAddAuthors
-func TestGetUserSubmissions(t *testing.T) {
+func TestGetUserAuthoredSubmissions(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from an Author", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
-		testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
+		testSubmission1 := testSubmissions[0] // test submission to return on getUserAuthoredSubmissions()
+		testSubmission2 := testSubmissions[1] // test submission to not return on getUserAuthoredSubmissions()
 		testAuthor := testAuthors[0]          // test author of the submission being queried
 		testNonAuthor := testAuthors[3]       // test author of submission not being queried
 
@@ -612,7 +613,7 @@ func TestGetUserSubmissions(t *testing.T) {
 		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
 
 		// queries all of testAuthor's submissions
-		submissions, err := getUserSubmissions(authorID)
+		submissions, err := getUserAuthoredSubmissions(authorID)
 		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
 
 		// tests for equality of submission ID and that testSubmission2.ID is not in the map
@@ -630,11 +631,11 @@ func TestGetUserSubmissions(t *testing.T) {
 // 	- TestAddSubmission
 // 	- TestAddAuthors
 // 	- TestAddReviewers
-func TestGetUserReviewedSubs(t *testing.T) {
+func TestGetUserReviewedSubmissions(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from a Reviewer", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0] // test submission to return on getUserSubmissions()
-		testSubmission2 := testSubmissions[1] // test submission to not return on getUserSubmissions()
+		testSubmission1 := testSubmissions[0] // test submission to return on getUserAuthoredSubmissions()
+		testSubmission2 := testSubmissions[1] // test submission to not return on getUserAuthoredSubmissions()
 		testReviewer := testReviewers[0]      // test author of the submission being queried
 		testNonReviewer := testReviewers[3]   // test author of submission not being queried
 

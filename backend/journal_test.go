@@ -15,6 +15,7 @@ const (
 	TEST_PORT_JOURNAL = ":59214"
 )
 
+// Set up server used for journal testing.
 func journalServerSetup() *http.Server {
 	router := mux.NewRouter()
 	router.Use(journalMiddleWare)

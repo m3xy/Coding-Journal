@@ -35,6 +35,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
@@ -48,6 +49,12 @@ const (
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for submission files
 )
+
+func getFilesSubRoutes(r *mux.Router) {
+	files := r.PathPrefix("/").Subrouter()
+	files.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
+	files.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+}
 
 // // -----
 // // Router functions
