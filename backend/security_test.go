@@ -10,19 +10,6 @@ const (
 	WRONG_SECURITY_TOKEN = "testwrongToken"
 )
 
-func TestRandString(t *testing.T) {
-	// Test if given new rand string is not null.
-	t.Run("Valid size=128", func(t *testing.T) {
-		assert.NotEqual(t, "", randStringBase64(1, 128), "Random string must have been created!")
-	})
-	t.Run("Valid size=8", func(t *testing.T) {
-		assert.NotEqual(t, "", randStringBase64(2, 8), "Random string must have been created!")
-	})
-	t.Run("Invalid size=0", func(t *testing.T) {
-		assert.Equal(t, "", randStringBase64(3, 0), "Random string must be empty!")
-	})
-}
-
 func TestSecurityCheck(t *testing.T) {
 	testInit()
 	// Test security check

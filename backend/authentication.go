@@ -37,8 +37,7 @@ var JwtSecret string // JWT Secret variable.
 
 // Subrouter
 func getAuthSubRoutes(r *mux.Router) {
-	r.Use(jwtMiddleware)
-	r.HandleFunc(ENDPOINT_LOGIN, authLogIn).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
 	r.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 
 	// Set up jwt secret
@@ -46,6 +45,160 @@ func getAuthSubRoutes(r *mux.Router) {
 	if err == nil {
 		JwtSecret = myEnv["JWT_SECRET"]
 	}
+}
+
+// -- Log In -- //
+
+/*
+  Client-made log in endpoint
+  Content-type: application/json
+  Input: {"email": string, "password": string, "groupNumber": int}
+  Success: 200, Credentials correc
+  		Returns: { access_token, refresh_token, redirect-url, expires }
+  Failure: 401, Unauthorized
+  		Returns: { message: string, error: bool }
+*/
+func PostAuthLogIn(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received Auth Log-In request from %s.", r.RemoteAddr)
+
+	// Check if the body's correctly formed.
+	var credentials AuthLoginPostBody
+	var encodable interface{}
+	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+		if err := json.NewEncoder(w).Encode(&StandardResponse{
+			Message: "Email or password incorrectly formed!",
+			Error:   true,
+		}); err != nil {
+			log.Printf("[ERROR] JSON Encoding error: %v", err)
+		}
+		log.Printf("[WARN] Request body not correctly formed: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+	// Get access token from controller.
+	response, status := ControllerAuthLogin(credentials)
+	switch {
+	case status == http.StatusInternalServerError:
+		encodable = &StandardResponse{Message: "Internal Server Error", Error: true}
+		break
+	case status == http.StatusUnauthorized:
+		encodable = &StandardResponse{Message: "Email or password incorrect!", Error: true}
+		break
+	case status == http.StatusOK:
+		encodable = response
+	}
+
+	// Send response
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(encodable); err != nil {
+		log.Printf("[ERROR] Response encoding failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller for the Auth Login POST method.
+func ControllerAuthLogin(credentials AuthLoginPostBody) (AuthLogInResponse, int) {
+	// Get where to fetch user from given group number.
+	var uuid string
+	if credentials.GroupNumber == TEAM_ID {
+		userID, status := GetLocalUserID(JournalLoginPostBody{Email: credentials.Email, Password: credentials.Password})
+		if status != http.StatusOK {
+			return AuthLogInResponse{}, status
+		}
+		uuid = userID
+	} else if userID, err := GetForeignUserID(credentials); err != nil {
+		return AuthLogInResponse{}, http.StatusUnauthorized
+	} else {
+		uuid = userID
+	}
+
+	// Get tokens from successful login.
+	var err error
+	resp := AuthLogInResponse{
+		RedirectUrl: "/user",
+		Expires:     3600,
+	}
+	if resp.AccessToken, err = createToken(uuid, "bearer"); err != nil {
+		return AuthLogInResponse{}, http.StatusInternalServerError
+	}
+	if resp.RefreshToken, err = createToken(uuid, "refresh"); err != nil {
+		return AuthLogInResponse{}, http.StatusInternalServerError
+	}
+	return resp, http.StatusOK
+}
+
+// Get a foreign user's ID from a foreign journal's POST /login endpoint.
+func GetForeignUserID(credentials AuthLoginPostBody) (string, error) {
+	// Get foreign server to request login from.
+	var retServer Server
+	res := gormDb.Limit(1).Find(&retServer, credentials.GroupNumber)
+	switch {
+	case res.Error != nil:
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		return "", res.Error
+	case res.RowsAffected == 0:
+		log.Printf("[WARN] Group number %d doesn't exist in database.", credentials.GroupNumber)
+		return "", res.Error
+	}
+
+	// Send request to foreign server.
+	var ResBody struct {
+		ID string `json:"userId"`
+	}
+	if resp, err := func() (*http.Response, error) {
+		if body, err := json.Marshal(JournalLoginPostBody{credentials.Email, credentials.Password}); err != nil {
+			log.Printf("[ERROR] JSON body encoding failed: %v", err)
+			return nil, err
+		} else if req, err := http.NewRequest(http.MethodPost, retServer.Url+ENDPOINT_LOGIN, bytes.NewBuffer(body)); err != nil {
+			log.Printf("[ERROR] Request creation failed: %v", err)
+			return nil, err
+		} else {
+			req.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
+			client := &http.Client{}
+			return client.Do(req)
+		}
+	}(); err != nil {
+		log.Printf("[WARN] Response getter failed: %v", err)
+		return "", err // Error in request/response
+	} else if err := json.NewDecoder(resp.Body).Decode(&ResBody); err != nil {
+		log.Printf("[ERROR] Body decoding failed: %v", err)
+		return "", err // Decoding error.
+	} else {
+		return ResBody.ID, nil
+	}
+}
+
+// Get a local user ID's from the given credentials.
+func GetLocalUserID(credentials JournalLoginPostBody) (string, int) {
+	var user struct {
+		GlobalUserID string
+		Email        string
+		Password     string
+	}
+	res := gormDb.Model(&User{}).Limit(1).Find(&user, "Email = ?", credentials.Email)
+	switch {
+	case res.Error != nil:
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		return "", http.StatusInternalServerError
+	case res.RowsAffected == 0:
+		log.Printf("[WARN] User not found: %s", credentials.Email)
+		return "", http.StatusUnauthorized
+	case credentials.Email != user.Email || !comparePw(credentials.Password, user.Password):
+		log.Printf("[WARN] User's password invalid: %s", user.GlobalUserID)
+		return "", http.StatusUnauthorized
+	}
+	return user.GlobalUserID, http.StatusOK
+}
+
+// -- Token Control -- //
+
+/*
+  Client refresh token getter function.
+  Content-type: application/json
+  Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
+*/
+func GetToken(w http.ResponseWriter, r *http.Request) {
+
 }
 
 // Validate the user's access token.
@@ -70,189 +223,27 @@ func validateWebToken(accessToken string, scope string) (bool, string) {
 
 }
 
-/*
-	Log in to website with any server's database.
-	Content type: application/json
-	Input: {"email": string, "password": string, "groupNumber": int}
-	Success: 200, Credentials are correct.
-	Failure: 401, Unauthorized
-	Returns: userId
-*/
-func logInGlobal(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received global login request from %s.", r.RemoteAddr)
-	propsMap := make(map[string]string)
-	err := json.NewDecoder(r.Body).Decode(&propsMap)
-	if err != nil {
-		log.Printf("[WARN] Invalid security token received from %s.", r.RemoteAddr)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// Query path from team ID.
-	var retServer Server
-	res := gormDb.Limit(1).Find(&retServer, propsMap[getJsonTag(&Server{}, "GroupNumber")])
-	if res.RowsAffected == 0 {
-		log.Printf("[WARN] Group number %s doesn't exist in database.", propsMap[getJsonTag(&Server{}, "GroupNumber")])
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	} else if res.Error != nil {
-		log.Printf("[ERROR] SQL query error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// Make request from given URL and security token
-	jsonBody, err := json.Marshal(propsMap)
-	if err != nil {
-		log.Printf("[ERROR] JSON body encoding failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	globalReq, _ := http.NewRequest(
-		"POST", retServer.Url+"/login", bytes.NewBuffer(jsonBody))
-	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
-
-	// Get response from login request.
-	client := &http.Client{}
-	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
-	foreignRes, err := client.Do(globalReq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("[ERROR] HTTP Request error: %v", err)
-		return
-	} else if foreignRes.StatusCode != http.StatusOK {
-		log.Printf("[WARN] Foreign server login request failed, mirroring...")
-		w.WriteHeader(foreignRes.StatusCode)
-		return
-	}
-
-	mirrorProps := make(map[string]string)
-	err = json.NewDecoder(foreignRes.Body).Decode(&mirrorProps)
-	if err != nil {
-		log.Printf("[ERROR] JSON decoding error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	err = json.NewEncoder(w).Encode(&propsMap)
-	if err != nil {
-		log.Printf("[ERROR] JSON encoding error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-/*
-  Client-made log in endpoint
-  Content-type: application/json
-  Input: {"email": string, "password": string, }
-  Success: 200, Credentials correc
-  		Returns: { access_token, refresh_token, redirect-url, expires }
-  Failure: 401, Unauthorized
-  		Returns: { message: string, error: bool }
-*/
-func authLogIn(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received auth log in request from %s.", r.RemoteAddr)
-
-	var credentials struct {
-		Email    string `json:"email" validate:"validEmail"`
-		Password string `json:"password"`
-	}
-	// Error on incorrectly formed request.
-	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		_ = json.NewEncoder(w).Encode(&StandardResponse{
-			Message: "Email or password incorrectly formed!",
-			Error:   true,
-		})
-		return
-	}
-
-	// Validate user credentials
-	var user struct {
-		GlobalUserID string
-		Email        string
-		Password     string
-	}
-	if res := gormDb.Model(&User{}).Limit(1).Find(&user, "Email = ?", credentials.Email); res.Error != nil {
-		log.Printf("[ERROR] SQL query error: %v\n", res.Error)
-		goto INTERNAL
-	} else if res.RowsAffected == 0 {
-		log.Printf("[INFO] No user found!")
-		goto CREDS
-	} else if !comparePw(credentials.Password, user.Password) {
-		log.Printf("[INFO] Password incorrect!")
-		goto CREDS
-	}
-
-	// Send successful response
-	if resp, err := createTokenSuite(user); err != nil {
-		log.Printf("[ERROR] Access Token Creation Error: %v", err)
-		goto INTERNAL
-	} else if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("[ERROR] Response encoding error: %v", err)
-		goto INTERNAL
-	} else {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-CREDS:
-	w.WriteHeader(http.StatusUnauthorized)
-	_ = json.NewEncoder(w).Encode(&StandardResponse{
-		Message: "Email or password incorrect!",
-		Error:   true,
-	})
-	return
-INTERNAL:
-	w.WriteHeader(http.StatusInternalServerError)
-	_ = json.NewEncoder(w).Encode(&StandardResponse{
-		Message: "Internal Server Error",
-		Error:   true,
-	})
-	return
-}
-
-// Create access and refresh tokens for the user.
-func createTokenSuite(u struct {
-	GlobalUserID string
-	Email        string
-	Password     string
-}) (AuthLogInResponse, error) {
-	access_claims := JwtClaims{
-		ID:    u.GlobalUserID,
-		Scope: "bearer",
+// Create a token with given scope.
+func createToken(ID string, scope string) (string, error) {
+	claims := JwtClaims{
+		ID:    ID,
+		Scope: scope,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + 3600,
-			Issuer:    "CS3099User11_Project_Code",
+			Issuer: "CS3099User11_Project_Code",
 		},
 	}
-	refresh_claims := JwtClaims{
-		ID:    u.GlobalUserID,
-		Scope: "refresh",
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Unix() + 72000,
-			Issuer:    "CS3099User11_Project_Code",
-		},
+	switch scope {
+	case "refresh":
+		claims.ExpiresAt = time.Now().Unix() + 72000
+		break
+	default:
+		claims.ExpiresAt = time.Now().Unix() + 3600
+		break
 	}
-	resp := AuthLogInResponse{
-		RedirectUrl: "/user",
-		Expires:     3600,
-	}
-
-	access, refresh := jwt.NewWithClaims(jwt.SigningMethodHS512, access_claims),
-		jwt.NewWithClaims(jwt.SigningMethodHS512, refresh_claims)
-	if signedAccess, err := access.SignedString([]byte(JwtSecret)); err != nil {
-		return AuthLogInResponse{}, err
-	} else {
-		resp.AccessToken = signedAccess
-	}
-	if signedRefresh, err := refresh.SignedString([]byte(JwtSecret)); err != nil {
-		return AuthLogInResponse{}, err
-	} else {
-		resp.RefreshToken = signedRefresh
-	}
-
-	return resp, nil
+	return jwt.NewWithClaims(jwt.SigningMethodHS512, claims).SignedString([]byte(JwtSecret))
 }
+
+// -- Sign Up -- //
 
 /*
   Router function to sign up to website.

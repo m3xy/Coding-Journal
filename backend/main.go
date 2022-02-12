@@ -94,14 +94,9 @@ func setupCORSsrv() *http.Server {
 	})
 
 	// Setup all routes.
-	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_SUBMISSION, sendSubmission).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 	// router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/users/{"+getJsonTag(&GlobalUser{}, "ID")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
 
 	// Auth subroutes
 	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
@@ -110,6 +105,13 @@ func setupCORSsrv() *http.Server {
 	// Journal subroutes
 	journal := router.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
 	getJournalSubroute(journal)
+
+	// Users subroutes
+	users := router.PathPrefix(SUBROUTE_USERS).Subrouter()
+	getUserSubroutes(users)
+
+	// Submissions and files routes
+	getSubmissionsSubRoutes(router)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{

@@ -9,6 +9,16 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	SUBROUTE_USERS = "/users"
+	ENDPOINT_GET   = "/get"
+)
+
+func getUserSubroutes(r *mux.Router) {
+	r.HandleFunc(ENDPOINT_GET+"/{id}", getUserProfile).Methods(http.MethodGet)
+	r.HandleFunc("/{id}"+ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
+}
+
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
 	return tx.Select("GlobalUserID", "Email", "FirstName", "LastName", "UserType", "PhoneNumber", "Organization", "CreatedAt")
 }
@@ -24,23 +34,16 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Get user details from user ID.
 	vars := mux.Vars(r)
-	user := &GlobalUser{ID: vars[getJsonTag(&GlobalUser{}, "ID")]}
-	if res := gormDb.Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
+	user := &GlobalUser{ID: vars["id"]}
+	if res := gormDb.Preload("AuthoredSubmissions").Preload("ReviewedSubmissions").Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else if res.RowsAffected == 0 {
-		log.Printf("[WARN] No user linked to %s", vars[getJsonTag(&GlobalUser{}, "ID")])
+		log.Printf("[WARN] No user linked to %s", vars["id"])
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	// Get map of submission IDs to submission names.
-	/* submissionsMap, err := getUserSubmissions(vars[getJsonTag(&Credentials{}, "Id")])
-	if err != nil {
-		log.Printf("[ERROR] Failed to retrieve user (%s)'s projects: %v'", vars[getJsonTag(&Credentials{}, "Id")], err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	} */
 
 	// Encode user and send.
 	err := json.NewEncoder(w).Encode(user)

@@ -15,6 +15,7 @@ const (
 	TEST_PORT_JOURNAL = ":59214"
 )
 
+// Set up server used for journal testing.
 func journalServerSetup() *http.Server {
 	router := mux.NewRouter()
 	router.Use(journalMiddleWare)
@@ -93,7 +94,7 @@ func TestJournalLogIn(t *testing.T) {
 			respMap := make(map[string]string)
 			err = json.NewDecoder(resp.Body).Decode(&respMap)
 			assert.Nil(t, err, "Body unparsing should succeed")
-			storedId, exists := respMap[getJsonTag(&User{}, "ID")]
+			storedId, exists := respMap[getJsonTag(&JournalLogInResponse{}, "ID")]
 			assert.True(t, exists, "ID should exist in response.")
 
 			// Check if gotten

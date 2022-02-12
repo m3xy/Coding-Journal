@@ -2,11 +2,8 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
-	"time"
 
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
@@ -39,23 +36,6 @@ var serverArr []Server = []Server{
 	{GroupNumber: 20,
 		Url:   "https://cs3099user20.host.cs.st-andrews.ac.uk/api/v1/supergroup",
 		Token: "cs3099user20ThisIsASecretTokenPlzDontShare:)"},
-}
-
-// Generate a new security key.
-func getNewSecurityKey() string {
-	return randStringBase64(int(time.Now().UnixNano()), SECURITY_KEY_SIZE)
-}
-
-// Generate a random base64 string.
-func randStringBase64(seed int, n int) string {
-	retStr := ""
-	for i := 0; i < n; i++ {
-		rand.Seed(int64(seed))
-		randIndex := rand.Int() % 64
-		retStr = fmt.Sprintf(retStr+"%c", BASE64_CHARS[randIndex])
-		seed++
-	}
-	return retStr
 }
 
 // Get security key from database.

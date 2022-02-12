@@ -37,6 +37,7 @@ const (
 	TEST_FILES_ADDRESS = "http://localhost:59216"
 )
 
+// Set up server used for files testing.
 func resourceServerSetup() *http.Server {
 	router := mux.NewRouter()
 	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet)

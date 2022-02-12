@@ -28,12 +28,13 @@ const (
 	TEST_PORT_AUTH = ":59215"
 )
 
+// Set up server used for authentication testing.
 func authServerSetup() *http.Server {
 	router := mux.NewRouter()
 
 	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
 	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
-	auth.HandleFunc(ENDPOINT_LOGIN, authLogIn).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
 
 	return &http.Server{
 		Addr:    TEST_PORT_AUTH,
@@ -211,8 +212,10 @@ func TestAuthLogIn(t *testing.T) {
 
 	t.Run("Valid logins", func(t *testing.T) {
 		for _, user := range testUsers {
+			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
+
 			// Send request
-			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_LOGIN, http.MethodPost, user, TEST_PORT_AUTH)
+			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_LOGIN, http.MethodPost, body, TEST_PORT_AUTH)
 			if err != nil {
 				t.Errorf("Request error: %v\n", err)
 				return
@@ -250,8 +253,9 @@ func TestAuthLogIn(t *testing.T) {
 
 	t.Run("Invalid logins", func(t *testing.T) {
 		for _, user := range wrongCredsUsers {
+			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
 			// Send request
-			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_LOGIN, http.MethodPost, user, TEST_PORT_AUTH)
+			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_LOGIN, http.MethodPost, body, TEST_PORT_AUTH)
 			if err != nil {
 				t.Errorf("Request error: %v\n", err)
 				return

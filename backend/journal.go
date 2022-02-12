@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"gorm.io/gorm"
 )
 
 // Set of all supergroup-appliant controllers and routes
@@ -36,43 +35,27 @@ func tokenValidation(w http.ResponseWriter, r *http.Request) {
 */
 func logIn(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] Received log in request from %v", r.RemoteAddr)
-
-	// Set up writer response.
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from log in request.
-	user := &User{}
-	err := json.NewDecoder(r.Body).Decode(user)
-	if err != nil {
+	user := JournalLoginPostBody{}
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		log.Printf("[ERROR] JSON decoder failed on log in.")
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// Get credentials at given email, and assign it.
-	var globalUser GlobalUser
-	res := gormDb.Joins("User", func(tx *gorm.DB) *gorm.DB {
-		return tx.Select("Password", "Email")
-	}).Limit(1).Find(&globalUser, "Email = ?", user.Email)
-	if res.RowsAffected == 0 {
-		w.WriteHeader(http.StatusUnauthorized)
-		log.Printf("[INFO] Incorrect email: %s", user.Email)
-		return
-	} else if err := res.Error; err != nil {
-		log.Printf("[ERROR] SQL query failure on login: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// Compare password to hash in database, and conclude status.
-	if !comparePw(user.Password, globalUser.User.Password) {
-		log.Printf("[INFO] Given password and password registered on %s do not match.", user.Email)
-		w.WriteHeader(http.StatusUnauthorized)
+	// Get User ID from local credentials check.
+	uuid, status := GetLocalUserID(user)
+	if status != http.StatusOK {
+		w.WriteHeader(status)
 		return
 	}
 
 	// Marshal JSON and insert it into the response.
-	jsonResp, _ := json.Marshal(map[string]string{getJsonTag(&User{}, "ID"): globalUser.ID})
-	w.Write(jsonResp)
+	if err := json.NewEncoder(w).Encode(JournalLogInResponse{ID: uuid}); err != nil {
+		log.Printf("[ERROR] JSON Response Encoding failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
 }

@@ -29,16 +29,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/gorilla/mux"
+	"gorm.io/gorm"
+
 	// "strings"
 
 	"io/ioutil"
 	"net/http"
 	"strconv"
 )
+
+func getSubmissionsSubRoutes(r *mux.Router) {
+	r.HandleFunc(ENDPOINT_SUBMISSION, RouteGetSubmission).Methods(http.MethodGet)
+}
 
 // ------
 // Router Functions
@@ -53,8 +60,8 @@ import (
 //	500 : otherwise
 // Response Body:
 //	A JSON object of form: {...<submission id>:<submission name>...}
-func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetAllSubmissions request received from %v", r.RemoteAddr)
+func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] GetAllAuthoredSubmissions request received from %v", r.RemoteAddr)
 	// gets the userID from the URL
 	var userID string
 	params := r.URL.Query()
@@ -67,8 +74,8 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
-	// uses getUserSubmissions to get all user submissions by setting authorID = *
-	submissions, err := getUserSubmissions(userID)
+	// uses getUserAuthoredSubmissions to get all user submissions by setting authorID = *
+	submissions, err := getUserAuthoredSubmissions(userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -94,15 +101,15 @@ func getAllSubmissions(w http.ResponseWriter, r *http.Request) {
 //	400 : if the request is invalid or badly formatted
 // 	500 : if something else goes wrong in the backend
 // Response Body:
-func sendSubmission(w http.ResponseWriter, r *http.Request) {
+func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
 
 	w.Header().Set("Content-Type", "application/json")
 	// gets the submission ID from the URL parameters
-	params := r.URL.Query()
-	submissionID64, err := strconv.ParseUint(params["id"][0], 10, 32)
+	params := mux.Vars(r)
+	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
 	if err != nil {
-		log.Printf("[ERROR] Submission ID: %s unable to be parsed", params["id"][0])
+		log.Printf("[ERROR] Submission ID: %s unable to be parsed", params["id"])
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -316,10 +323,10 @@ func addTags(tags []string, submissionID uint) error {
 // Return:
 // 	(map[int]string) : map of submission IDs to submission names
 // 	(error) : an error if something goes wrong, nil otherwise
-func getUserSubmissions(authorID string) (map[uint]string, error) {
+func getUserAuthoredSubmissions(authorID string) (map[uint]string, error) {
 	// gets the author's submissions
 	var submissions []*Submission
-	if err := gormDb.Model(&GlobalUser{ID: authorID}).Association("Submissions").Find(&submissions); err != nil {
+	if err := gormDb.Model(&GlobalUser{ID: authorID}).Association("AuthoredSubmissions").Find(&submissions); err != nil {
 		return nil, err
 	}
 	// formats the authors submissions into a map of form submission.ID -> submission.Name
@@ -341,7 +348,7 @@ func getUserSubmissions(authorID string) (map[uint]string, error) {
 func getUserReviews(reviewerID string) (map[uint]string, error) {
 	// gets the author's submissions
 	var submissions []*Submission
-	if err := gormDb.Model(&GlobalUser{ID: reviewerID}).Association("ReviewedSubs").Find(&submissions); err != nil {
+	if err := gormDb.Model(&GlobalUser{ID: reviewerID}).Association("ReviewedSubmissions").Find(&submissions); err != nil {
 		return nil, err
 	}
 	// formats the authors submissions into a map of form submission.ID -> submission.Name
