@@ -215,3 +215,112 @@ interface Profile {
   CreatedAt: DateTime; // Format -
 }
 ```
+
+### Submission Upload
+
+Uploading submissions from the local journal
+
+1. Enpoint
+
+    The enpoint to upload submission is **POST** `/submissions/create`
+
+2. Request
+
+    1. Headers
+
+    2. Body - the request body is shown below
+
+```typescript
+interface Submission {
+    Name: string;
+    License: string;
+    Files: File[];
+    Authors: GlobalUser[];
+    Reviewers: GlobalUser[];
+    Categories: string[];
+}
+
+interface File {
+    Path: string;
+    Name: string;
+    Base64Value: string; // base64 encoded content
+}
+
+interface GlobalUser {
+    ID: string
+}
+```
+
+3. Response
+
+    1.  Status
+
+        - 200 - if the submision is uploaded properly
+        - 400 - if the submission is not sent in the right form
+        - 500 - if something else goes wrotn in the backend
+
+    2.  Body - the submission object shown below
+
+```typescript 
+interface Submission {
+    ID: uint;
+}
+```
+
+### Submission Retrieval
+
+Gets a submission by ID to send to the frontend
+
+1. Enpoint
+
+    The enpoint to upload submission is **GET** `/submissions/{id}` where ID
+    is the submission ID as a uint
+
+2. Request
+
+    1. Headers - request needs no headers 
+
+    2. Body - request has no body
+
+3. Response
+
+    1.  Status
+
+        - 200 - if the submision is uploaded properly
+        - 400 - if the submission is not sent in the right form
+        - 500 - if something else goes wrotn in the backend
+
+    2.  Body - the submission object shown below
+
+```typescript
+interface Submission {
+    ID: uint;
+    CreatedAt: DateTime;
+    UpdatedAt: DateTime;
+    DeletedAt: DateTime;
+    Name: string;
+    License: string;
+    Files: File[];
+    Authors: GlobalUser[];
+    Reviewers: GlobalUser[];
+    Categories: string[];
+    MetaData: SubmissionData;
+}
+
+interface SubmissionData  {
+    Abstract: string;
+    Reviews: Comment[]
+}
+
+interface File {
+    ID: uint;
+    SubmissionID: uint;
+    Path: string;
+    Name: string;
+}
+
+interface GlobalUser {
+    ID: string;
+    FullName: string;
+}
+```
