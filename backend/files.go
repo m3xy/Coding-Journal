@@ -1,24 +1,24 @@
-// // ================================================================================
-// // files.go
-// // Authors: 190010425
-// // Created: November 23, 2021
-// //
-// // This file handles reading/writing code files along with their
-// // data.
-// //
-// // The directory structure for the filesystem is as follows:
-// //
-// // Submission ID (as stored in db submissions table)
-// // 	> <submission_name>/ (as stored in the submissions table)
-// // 		... (submission directory structure)
-// // 	> .data/
-// // 		> submission_data.json
-// // 		... (submission directory structure)
-// // notice that in the filesystem, the .data dir structure mirrors the
-// // submission, so that each file in the submission can have a .json file storing
-// // its data which is named in the same way as the source code (the only difference
-// // being the extension)
-// // ================================================================================
+// ================================================================================
+// files.go
+// Authors: 190010425
+// Created: November 23, 2021
+//
+// This file handles reading/writing code files along with their
+// data.
+//
+// The directory structure for the filesystem is as follows:
+//
+// Submission ID (as stored in db submissions table)
+// 	> <submission_name>/ (as stored in the submissions table)
+// 		... (submission directory structure)
+// 	> .data/
+// 		> submission_data.json
+// 		... (submission directory structure)
+// notice that in the filesystem, the .data dir structure mirrors the
+// submission, so that each file in the submission can have a .json file storing
+// its data which is named in the same way as the source code (the only difference
+// being the extension)
+// ================================================================================
 
 package main
 
@@ -41,8 +41,8 @@ import (
 
 // file constants, includes
 const (
-	// TEMP: hard coded for testing
-	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories TEMP: maybe set with an env variable?
+	// TEMP: hard coded for testing. Adapt to using an environment variable
+	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories
 	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
 	// File Mode Constants
@@ -56,120 +56,42 @@ func getFilesSubRoutes(r *mux.Router) {
 	files.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
 
-// // -----
-// // Router functions
-// // -----
-
-// THE BELOW CODE IS NO LONGER USED
-// // Upload lone code file to system. File is wrapped to dummy submission with same name.
-// //
-// // TODO: Replace this function with a generalized submission upload method in the submissions.go file
-// //
-// // Responses:
-// //	- 200 : if action completes successfully
-// // 	- 401 : if request does not have the proper security token
-// // 	- 400 : for malformatted request
-// // 	- 500 : if something goes wrong in the backend
-// // Response Body:
-// // 	submission: Object
-// //		id: String
-// //		name: String
-// //		authors: Array of Author userIDs
-// // 		reviewers: Array of Reviewer userIDs
-// // 		files: Array of file path strings
-// //		metadata: object
-// //			abstract: String
-// // 			reviews: array of objects
-// // 				author: int
-// //				time: datetime string
-// //				base64Value: string
-// //				replies: object (same as comments)
-// func uploadSingleFile(w http.ResponseWriter, r *http.Request) {
-// 	log.Printf("uploadSingleFile request received from %v", r.RemoteAddr)
-
-// 	w.Header().Set("Content-Type", "application/json")
-// 	var request map[string]interface{}
-// 	json.NewDecoder(r.Body).Decode(&request)
-
-// 	// Parse data into local variables
-// 	fileName := request[getJsonTag(&File{}, "Name")]			// file name as a string
-// 	fileAuthor := request["author"]                        		// author's user ID
-// 	fileContent := request[getJsonTag(&File{}, "Base64Value")]	// base64 encoding of file content
-
-// 	// Put parsed values into a file object and a submission object
-// 	wrapperSubmission := &Submission{
-// 		Name:      fileName.(string),
-// 		Authors:   []string{fileAuthor.(string)},
-// 		Reviewers: []string{},
-// 		MetaData: &SubmissionData{
-// 			Abstract: "",
-// 			Reviews:  comments,
-// 		},
-// 	}
-// 	file := &File{
-// 		SubmissionName: fileName.(string),
-// 		Path:           fileName.(string),
-// 		Name:           fileName.(string),
-// 		Base64Value:	fileContent.(string),
-// 	}
-
-// 	// adds file to the db and filesystem
-// 	submissionID, err := addSubmission(wrapperSubmission)
-// 	if err != nil {
-// 		log.Printf("[ERROR] Submission creation failure: %v", err)
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	_, err = addFileTo(file, submissionID)
-// 	if err != nil {
-// 		log.Printf("[ERROR] File import failure: %v", err)
-// 		w.WriteHeader(http.StatusBadRequest)
-// 		return
-// 	}
-// 	wrapperSubmission.ID = submissionID
-
-// 	// writes the wraper submission as a response
-// 	jsonString, err := json.Marshal(wrapperSubmission)
-// 	if err != nil {
-// 		log.Printf("[ERROR] JSON formatting failure: %v", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
-// 	log.Printf("uploadSingleFile request from %v successful.", r.RemoteAddr)
-// 	w.Write([]byte(jsonString))
-// }
+// -----
+// Router functions
+// -----
 
 // Retrieve code files from filesystem. Returns
-// file with comments and metadata. Receives
-// a FilePath and submissionID as header strings in
-// the request
-//
-// TEMP: this might go away due to the supergroup spec
+// file with comments and metadata. Recieves a request
+// with a file ID as a URL parameter
 //
 // Response Codes:
-//	200 : File exists, getter success.
-//	401 : if the request does not have the proper security token
-//	400 : malformatted request, or non-existent submission/file id
-//	500 : if something else goes wrong in the backend
+// 	200 : File exists, retrieved successfully
+// 	401 : if the request does not have the proper security token
+// 	400 : malformatted request, or non-existent file ID
+// 	500 : if something else goes wrong in the backend
 // Response Body:
-// 		file: object
-// 			fileName: string
-//			filePath: string
-//			submissionName: string
-//			submissionID: int
-// 			base64Value: string
-// 			comments: array of objects
+// 	file: object
+// 		ID: uint
+//		CreatedAt: string
+// 		UpdatedAt: string
+// 		DeletedAt: string
+// 		FilePath: string
+// 		FileName: string
+// 		SubmissionID: int
+// 		Base64Value: string
+// 		Comments: array
+// 			Comment: object
 // 				author: int
-//				time: datetime string
-//				base64Value: string
-//				replies: object (same as comments)
+// 				CreatedAt: datetime string
+// 				base64Value: string
+// 				replies: object (same as comments)
 func getFile(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the fileID from the URL parameters
+	// gets the fileID from the URL parameters as uint. Must unwrap from uint64
 	params := r.URL.Query()
-	fileID64, err := strconv.ParseUint(params["id"][0], 10, 32)
+	fileID64, err := strconv.ParseUint(params["id"][0], 10, 32) // specifies width as 32
 	if err != nil {
 		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"][0])
 		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
@@ -220,7 +142,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	}
 	fileID := uint(fileID64) // gets uint from uint64
 
-	// parses the json request body into a map
+	// parses the json request body into a map (should just contain base64 comment content)
 	var request map[string]interface{}
 	err = json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
@@ -229,10 +151,10 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse data into Comment structure
+	// Insert data into Comment structure
 	comment := &Comment{
 		AuthorID:    authorID, // authors user id
-		Time:        fmt.Sprint(time.Now()),
+		CreatedAt:        fmt.Sprint(time.Now()),
 		Base64Value: request[getJsonTag(&Comment{}, "Base64Value")].(string),
 		Replies:     nil, // replies are nil upon insertion
 	}
@@ -243,6 +165,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
 	w.WriteHeader(http.StatusOK)
 }
@@ -251,7 +174,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 // Helper Functions
 // -----
 
-// Add file into submission, and store it to FS and DB.
+// Add file into submission, and store it to filesystem and database
 // Note: Need valid submission. No comments exist on file
 // creation.
 //
@@ -263,6 +186,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 // 	(int) : the id of the added file (0 if an error occurs)
 // 	(error) : if the operation fails
 func addFileTo(file *File, submissionID uint) (uint, error) {
+	// error cases 
 	if file.Name == "" {
 		return 0, errors.New("File name must be set")
 	}
@@ -270,14 +194,11 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 	// inserts the file into the db, and gets the submission name
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		// queries the submission name (also serves to check that the given submission exists)
+		// queries the submission name (for use in accessing the filesystem)
 		submission.ID = submissionID
 		if err := gormDb.Model(submission).Select("submissions.name").First(submission).Error; err != nil {
 			return err
 		}
-		// if submission.Name == "" || submission.Name == nil {
-		// 	return fmt.Errorf("Error adding file. No submission exists with ID: %d", submissionID)
-		// }
 		// adds a file to the submission in the db provided the submission exists
 		if err := gormDb.Model(submission).Association("Files").Append(file); err != nil {
 			return err
@@ -392,8 +313,6 @@ func addComment(comment *Comment, fileID uint) error {
 }
 
 // helper function to return a file object given its ID
-//
-// TODO : write tests for this function
 //
 // Params:
 // 	fileID (int) : the file's unique id

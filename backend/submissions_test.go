@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"bytes"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -91,6 +92,7 @@ func submissionServerSetup() *http.Server {
 
 	router.HandleFunc(ENDPOINT_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
 	router.HandleFunc("/{id}"+ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
+	router.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 
 	return &http.Server{
 		Addr:    TEST_PORT_SUBMISSION,
@@ -107,7 +109,7 @@ func submissionServerSetup() *http.Server {
 //
 // Test Depends On:
 // 	- TestAddSubmission
-// 	- TestGetUserAuthoredSubmissions
+// 	- TestGetAuthoredSubmissions
 func TestGetAllSubmissions(t *testing.T) {
 	// tests that multiple valid submissions can be uploaded, then retrieved from the database
 	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
@@ -154,7 +156,63 @@ func TestGetAllSubmissions(t *testing.T) {
 	})
 }
 
-// Tests the ability of the CodeFiles module to get a submission from the db
+// Tests that submissions.go can upload submissions properly
+func TestUploadSubmission(t *testing.T) {
+	// tests that a single valid submission with one reviewer and one author can be retrieved
+	t.Run("Upload Single Valid Submission", func(t *testing.T) {
+		testSubmission := testSubmissions[0]
+		testFile := testFiles[0]
+		testSubmission.Files = []File{testFile}
+		testAuthor := testAuthors[0]
+		testReviewer := testReviewers[0]
+
+		// Set up server and configures filesystem/db
+		testInit()
+		srv := submissionServerSetup()
+		go srv.ListenAndServe()
+
+		// registers author and reviewer
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "Error registering author in the db: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		reviewerID, err := registerUser(testReviewer)
+		assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
+		// constructs the request body
+		reqBody, err := json.Marshal(testSubmission)
+		assert.NoError(t, err, "Error marshalling test submission to Json")
+
+		// creates a request to send to the test server
+		urlString := fmt.Sprintf("%s%s", ADDRESS_SUBMISSION, ENDPOINT_UPLOAD_SUBMISSION)
+		req, _ := http.NewRequest("POST", urlString, bytes.NewBuffer(reqBody))
+		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error while sending Post request: %v", err)
+		defer resp.Body.Close()
+		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
+
+		// gets the added submission back
+		respBody := &Submission{}
+		err = json.NewDecoder(resp.Body).Decode(&respBody)
+		uploadedSubmission, err := getSubmission(respBody.ID)
+		assert.NoError(t, err, "Error retrieving uploaded submission")
+
+		// tests that the returned submission matches the passed in data
+		assert.Equal(t, respBody.ID, uploadedSubmission.ID, "Submission IDs do not match")
+		assert.Equal(t, testSubmission.Name, uploadedSubmission.Name, "Submission Names do not match.")
+		assert.Equal(t, authorID, uploadedSubmission.Authors[0].ID, "Author IDs do not match")
+		assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, uploadedSubmission.Authors[0].FullName, "Author Names not match")
+		assert.Equal(t, reviewerID, uploadedSubmission.Reviewers[0].ID, "Reviewer IDs not match")
+		assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, uploadedSubmission.Reviewers[0].FullName, "Reviewer Names not match")
+
+		// clears test env and shuts down the test server
+		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
+		testEnd()
+	})
+}
+
+// Tests the ability of the submissions file to get a submission from the db
 //
 // Test Depends On:
 // 	- TestCreateSubmissions()
@@ -581,11 +639,11 @@ func TestAddTags(t *testing.T) {
 // Test Depends On:
 // 	- TestAddSubmission
 // 	- TestAddAuthors
-func TestGetUserAuthoredSubmissions(t *testing.T) {
+func TestGetAuthoredSubmissions(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from an Author", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0] // test submission to return on getUserAuthoredSubmissions()
-		testSubmission2 := testSubmissions[1] // test submission to not return on getUserAuthoredSubmissions()
+		testSubmission1 := testSubmissions[0] // test submission to return on getAuthoredSubmissions()
+		testSubmission2 := testSubmissions[1] // test submission to not return on getAuthoredSubmissions()
 		testAuthor := testAuthors[0]          // test author of the submission being queried
 		testNonAuthor := testAuthors[3]       // test author of submission not being queried
 
@@ -613,7 +671,7 @@ func TestGetUserAuthoredSubmissions(t *testing.T) {
 		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
 
 		// queries all of testAuthor's submissions
-		submissions, err := getUserAuthoredSubmissions(authorID)
+		submissions, err := getAuthoredSubmissions(authorID)
 		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
 
 		// tests for equality of submission ID and that testSubmission2.ID is not in the map
@@ -631,11 +689,11 @@ func TestGetUserAuthoredSubmissions(t *testing.T) {
 // 	- TestAddSubmission
 // 	- TestAddAuthors
 // 	- TestAddReviewers
-func TestGetUserReviewedSubmissions(t *testing.T) {
+func TestGetReviewedSubmissions(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from a Reviewer", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0] // test submission to return on getUserAuthoredSubmissions()
-		testSubmission2 := testSubmissions[1] // test submission to not return on getUserAuthoredSubmissions()
+		testSubmission1 := testSubmissions[0] // test submission to return on getAuthoredSubmissions()
+		testSubmission2 := testSubmissions[1] // test submission to not return on getAuthoredSubmissions()
 		testReviewer := testReviewers[0]      // test author of the submission being queried
 		testNonReviewer := testReviewers[3]   // test author of submission not being queried
 
@@ -663,7 +721,7 @@ func TestGetUserReviewedSubmissions(t *testing.T) {
 		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
 
 		// queries all of testAuthor's submissions
-		submissions, err := getUserReviews(reviewerID)
+		submissions, err := getReviewedSubmissions(reviewerID)
 		assert.NoErrorf(t, err, "Error getting user reviewed submissions: %v", err)
 
 		// tests for equality of submission ID and that testSubmission2.ID is not in the map

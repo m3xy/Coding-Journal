@@ -61,13 +61,13 @@ var testFiles []File = []File{
 var testComments []*Comment = []*Comment{
 	{
 		AuthorID:    "",
-		Time:        fmt.Sprint(time.Now()),
+		CreatedAt:        fmt.Sprint(time.Now()),
 		Base64Value: "Hello World",
 		Replies:     []*Comment{},
 	},
 	{
 		AuthorID:    "",
-		Time:        fmt.Sprint(time.Now()),
+		CreatedAt:        fmt.Sprint(time.Now()),
 		Base64Value: "Goodbye World",
 		Replies:     []*Comment{},
 	},

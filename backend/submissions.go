@@ -5,8 +5,6 @@
 //
 // TODO: write functionality for popularity statistics and an ordering algorithm
 // for suggested submissions
-// TODO: make sure the creation date for the submissions is written to the db
-// TODO: Change router function doc comments
 //
 // This file handles the reading/writing of all submissions (just the submission
 // with its data, not the files themselves)
@@ -19,8 +17,7 @@
 // 		... (submission directory structure)
 // notice that in the filesystem, the .data dir structure mirrors the
 // submission, so that each file in the submission can have a .json file storing
-// its data which is named in the same way as the source code (the only difference
-// being the extension)
+// its data which is named in the same way as the source code
 // =============================================================================
 
 package main
@@ -32,19 +29,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-
-	"github.com/gorilla/mux"
-	"gorm.io/gorm"
-
-	// "strings"
-
 	"io/ioutil"
 	"net/http"
 	"strconv"
+
+	"github.com/gorilla/mux"
+	"gorm.io/gorm"
 )
 
 func getSubmissionsSubRoutes(r *mux.Router) {
 	r.HandleFunc(ENDPOINT_SUBMISSION, RouteGetSubmission).Methods(http.MethodGet)
+	r.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ------
@@ -65,7 +60,7 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 	// gets the userID from the URL
 	var userID string
 	params := r.URL.Query()
-	userIDs := params[getJsonTag(&User{}, "ID")]
+	userIDs := params["authorID"]
 	if userIDs == nil {
 		userID = "*"
 	} else {
@@ -74,8 +69,8 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 
 	// set content type for return
 	w.Header().Set("Content-Type", "application/json")
-	// uses getUserAuthoredSubmissions to get all user submissions by setting authorID = *
-	submissions, err := getUserAuthoredSubmissions(userID)
+	// uses getAuthoredSubmissions to get all user submissions by setting authorID = *
+	submissions, err := getAuthoredSubmissions(userID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -92,6 +87,44 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonString)
 }
 
+// Router function to upload new submissions to the db. The body of the
+// sent request should be a valid submission Json objects as specified
+// in backend/README.md
+func uploadSubmission(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] uploadSubmission request received from %v", r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
+
+	// parses the Json request body into a submission struct
+	submission := &Submission{}
+	err := json.NewDecoder(r.Body).Decode(submission)
+	if err != nil {
+		log.Printf("[ERROR] JSON decoding failed: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// adds the parsed submission to the DB and filesystem
+	submissionID, err := addSubmission(submission)
+	if err != nil {
+		log.Printf("[ERROR] error adding submission: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// formats and sends the response
+	respSub := &Submission{}
+	respSub.ID = submissionID
+	response, err := json.Marshal(respSub)
+	if err != nil {
+		log.Printf("[ERROR] error formatting response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Print("[INFO] uploadSubmission request successful\n")
+	w.Write(response)
+	return
+}
+
 // Send submission data to the frontend for display. ID included for file
 // and comment queries.
 //
@@ -100,10 +133,9 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 // 	401 : if the proper security token was not given in the request
 //	400 : if the request is invalid or badly formatted
 // 	500 : if something else goes wrong in the backend
-// Response Body:
+// Response Body: a submission object as specified in README.md
 func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
-
 	w.Header().Set("Content-Type", "application/json")
 	// gets the submission ID from the URL parameters
 	params := mux.Vars(r)
@@ -113,7 +145,7 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	submissionID := uint(submissionID64) // gets uint from uint64
+	submissionID := uint(submissionID64)
 
 	// gets the submission struct
 	submission, err := getSubmission(submissionID)
@@ -122,7 +154,6 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
 	// writes JSON data for the submission to the HTTP connection
 	response, err := json.Marshal(submission)
 	if err != nil {
@@ -139,8 +170,8 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 // Helper Functions
 // ------
 
-// Add submission to filesystem and database.
-// Note: the Files, Authors, and Reviewers fields should be empty here
+// Add submission to filesystem and database. All fields should be set.
+// Authors and reviewers arrays only use GlobalUser.ID in this function
 //
 // Params:
 //	submission (*Submission) : the submission to be added to the db
@@ -156,7 +187,6 @@ func addSubmission(submission *Submission) (uint, error) {
 		return 0, errors.New("Submission.Name must be set to a valid string")
 	} else if submission.Authors == nil || len(submission.Authors) == 0 {
 		return 0, errors.New("Authors array cannot be nil or length 0")
-		// TODO: potentially make it so there must be at least 1 reviewer per submission
 	} else if submission.Reviewers == nil {
 		return 0, errors.New("Reviewers array cannot be nil")
 	}
@@ -187,12 +217,11 @@ func addSubmission(submission *Submission) (uint, error) {
 		return 0, err
 	}
 
-	// writes the submission metadata to it's corresponding file
+	// opens a JSON file for the submission metadata, and writes a SubmissionData struct to it
 	dataFile, err := os.OpenFile(submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
 		return 0, err
 	}
-	// Write submission metadata to the created file
 	jsonString, err := json.Marshal(submission.MetaData)
 	if err != nil {
 		return 0, err
@@ -213,7 +242,8 @@ func addSubmission(submission *Submission) (uint, error) {
 // user with publisher or publisher-reviewer permissions
 //
 // Params:
-//	authors ([]GlobalUser) : the global user structs of the authors to add to the submission
+//	authors ([]GlobalUser) : the global user structs of the authors to add to the submission. Only
+// 		the GlobalUser.ID field must be set here
 //	submissionID (int) : the id of the submission to be added to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
@@ -231,7 +261,7 @@ func addAuthors(authors []GlobalUser, submissionID uint) error {
 				return fmt.Errorf("User must have publisher permissions, not: %d", user.UserType)
 			}
 
-			// generates the association between the two submission and author
+			// generates the association between the submission and author
 			submission := &Submission{}
 			submission.ID = submissionID
 			if err := tx.Model(submission).Association("Authors").Append(&GlobalUser{ID: author.ID}); err != nil {
@@ -249,7 +279,8 @@ func addAuthors(authors []GlobalUser, submissionID uint) error {
 // user with reviewer or publisher-reviewer permissions
 //
 // Params:
-//	reviewers ([]GlobalUser) : the global user structs of the reviewers to add to the submission
+//	reviewers ([]GlobalUser) : the global user structs of the reviewers to add to the submission.
+// 		Only GlobalUser.ID must be set here
 //	submissionID (uint) : the id of the submission to be added to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
@@ -316,14 +347,14 @@ func addTags(tags []string, submissionID uint) error {
 	return nil
 }
 
-// gets all authors which are written by a given user and returns them
+// gets all submissions which are written by a given user and returns them
 //
 // Params:
 // 	authorID (string) : the global id of the author as stored in the db
 // Return:
 // 	(map[int]string) : map of submission IDs to submission names
 // 	(error) : an error if something goes wrong, nil otherwise
-func getUserAuthoredSubmissions(authorID string) (map[uint]string, error) {
+func getAuthoredSubmissions(authorID string) (map[uint]string, error) {
 	// gets the author's submissions
 	var submissions []*Submission
 	if err := gormDb.Model(&GlobalUser{ID: authorID}).Association("AuthoredSubmissions").Find(&submissions); err != nil {
@@ -338,15 +369,15 @@ func getUserAuthoredSubmissions(authorID string) (map[uint]string, error) {
 }
 
 // gets all of the submissions which a given user is reviewing. Permissions
-// are not checked here, as any user without reviewer permissions will not
-// be listed as reviewer on any submissions
+// are not checked here, as permissions get checked upon addition of a reviewer
 //
 // Parameters:
 // 	reviewerID (string) : the global ID of the reviewer
 // Returns:
 // 	(map[int]string) : a map of form { <submission ID>:<submission name> }
-func getUserReviews(reviewerID string) (map[uint]string, error) {
-	// gets the author's submissions
+// 	(error) : an error if something goes wrong, nil otherwise
+func getReviewedSubmissions(reviewerID string) (map[uint]string, error) {
+	// queries the submissions <-> reviewers association where the GlobalUser.ID = reviewerID
 	var submissions []*Submission
 	if err := gormDb.Model(&GlobalUser{ID: reviewerID}).Association("ReviewedSubmissions").Find(&submissions); err != nil {
 		return nil, err
@@ -360,7 +391,8 @@ func getUserReviews(reviewerID string) (map[uint]string, error) {
 }
 
 // Get the submission struct corresponding to the id by querying the db and reading
-// the submissions meta-data file
+// the submissions meta-data file. Note that an array of file objects is gotten here,
+// but their content and metadata is not attached (this is queried via another function)
 //
 // Parameters:
 // 	submissionID (int) : the submission's unique id
@@ -407,7 +439,6 @@ func getSubmission(submissionID uint) (*Submission, error) {
 //	([]string) : of the author's names
 //	(error) : if something goes wrong during the query
 func getSubmissionAuthors(submissionID uint) ([]GlobalUser, error) {
-	// queries the database for the authors
 	var authors []GlobalUser
 	submission := &Submission{}
 	submission.ID = submissionID
@@ -426,7 +457,6 @@ func getSubmissionAuthors(submissionID uint) ([]GlobalUser, error) {
 //	([]string) : of the reviewer's IDs
 //	(error) : if something goes wrong during the query
 func getSubmissionReviewers(submissionID uint) ([]GlobalUser, error) {
-	// queries the database for the authors
 	var reviewers []GlobalUser
 	submission := &Submission{}
 	submission.ID = submissionID
@@ -438,7 +468,7 @@ func getSubmissionReviewers(submissionID uint) ([]GlobalUser, error) {
 }
 
 // Queries the database for categories (tags) associated with the given
-// submission
+// submission (i.e. python, c++, sorting algorithm, etc.)
 //
 // Parameters:
 // 	submissionID (int) : the submission to get the categories for
@@ -446,12 +476,12 @@ func getSubmissionReviewers(submissionID uint) ([]GlobalUser, error) {
 // 	([]string) : an array of the tags associated with the given submission
 // 	(error) : an error if one occurs while retrieving the tags
 func getSubmissionCategories(submissionID uint) ([]string, error) {
-	// queries the Categories table
+	// gets all tags with foreign key submission_id = submissionID
 	var categories []Category
 	if err := gormDb.Model(&Category{SubmissionID: submissionID}).Find(&categories).Error; err != nil {
 		return nil, err
 	}
-	// loops over the query results
+	// loops over the query results to build a string array of tags
 	tags := []string{}
 	for _, category := range categories {
 		tags = append(tags, category.Tag)
@@ -459,8 +489,9 @@ func getSubmissionCategories(submissionID uint) ([]string, error) {
 	return tags, nil
 }
 
-// Queries the database for files with the given submission ID
-// (i.e. files in the submission)
+// Queries the database for a submissions member files. Note that this
+// function does not access the filesystem, and therefore does not return
+// file content or metadata
 //
 // Params:
 //	submissionID (int) : the id of the submission to get the files of
@@ -468,7 +499,6 @@ func getSubmissionCategories(submissionID uint) ([]string, error) {
 //	([]File) : Array of files which are members of the given submission
 //	(error) : if something goes wrong during the query
 func getSubmissionFiles(submissionID uint) ([]File, error) {
-	// queries the database
 	var files []File
 	if err := gormDb.Where("files.submission_id = ?", submissionID).Find(&files).Error; err != nil {
 		return nil, err
@@ -476,7 +506,7 @@ func getSubmissionFiles(submissionID uint) ([]File, error) {
 	return files, nil
 }
 
-// This function gets a submission's meta-data from its file in the filesystem
+// This function gets a submission's meta-data from the filesystem
 //
 // Parameters:
 // 	submissionID (int) : the unique id of the submission
@@ -484,7 +514,7 @@ func getSubmissionFiles(submissionID uint) ([]File, error) {
 //	(*SubmissionData) : the submission's metadata if found
 // 	(error) : if anything goes wrong while retrieving the metadata
 func getSubmissionMetaData(submissionID uint) (*SubmissionData, error) {
-	// gets the submission name
+	// gets the submission name from the database
 	submission := &Submission{}
 	submission.ID = submissionID
 	if err := gormDb.Model(submission).Select("submissions.Name").First(&submission).Error; err != nil {
@@ -498,7 +528,7 @@ func getSubmissionMetaData(submissionID uint) (*SubmissionData, error) {
 		return nil, err
 	}
 
-	// marshalls the string of data into a struct
+	// marshalls the string of data into a struct to be returned
 	submissionData := &SubmissionData{}
 	if err := json.Unmarshal(dataString, submissionData); err != nil {
 		return nil, err
@@ -506,11 +536,11 @@ func getSubmissionMetaData(submissionID uint) (*SubmissionData, error) {
 	return submissionData, nil
 }
 
-// This function takes in a struct in the local submission format, and transforms
+// This function queries a submission in the local format from the db, and transforms
 // it into the supergroup compliant format
 //
 // Parameters:
-// 	submissionID (int) : the id of the submission to be converted to a supergroup-compliant
+// 	submissionID (int) : the id of the submission to be converted to the supergroup-compliant
 // 		format
 // Returns:
 // 	(*SupergroupSubmission) : a supergroup compliant submission struct

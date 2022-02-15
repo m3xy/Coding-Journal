@@ -84,9 +84,9 @@ type Server struct {
 type Submission struct {
 	gorm.Model
 	// name of the submission
-	Name string `gorm:"not null;size:128;index" json:"submissionName"`
+	Name string `gorm:"not null;size:128;index" json:"Name"`
 	// license which the code is published under
-	License string `gorm:"size:64" json:"license"`
+	License string `gorm:"size:64" json:"License"`
 	// an array of the submission's files
 	Files []File `json:"files,omitempty"`
 	// an array of the submissions's authors
@@ -96,7 +96,7 @@ type Submission struct {
 	// tags for organizing/grouping code submissions
 	Categories []string `gorm:"-" json:"categories,omitempty"`
 	// metadata about the submission
-	MetaData *SubmissionData `gorm:"-" json:"metadata,omitempty"`
+	MetaData *SubmissionData `gorm:"-" json:"MetaData,omitempty"`
 }
 
 // Supergroup compliant code submissions (never stored in db)
@@ -113,9 +113,9 @@ type SupergroupSubmission struct {
 // JSON data file. This struct is never stored in the db
 type SubmissionData struct {
 	// abstract for the submission, to be displayed upon opening of any given submission
-	Abstract string `json:"abstract"`
+	Abstract string `json:"Abstract"`
 	// reviewer comments on the overall submission
-	Reviews []*Comment `json:"reviews"`
+	Reviews []*Comment `json:"Reviews"`
 }
 
 // supergroup compliant structure for meta-data of the submission
@@ -136,15 +136,15 @@ type SupergroupSubmissionData struct {
 type File struct {
 	gorm.Model
 	// id of the submission this file is a part of
-	SubmissionID uint `json:"submissionID"`
+	SubmissionID uint `json:"SubmissionID"`
 	// relative path to the file from the root of the submission's file structure
-	Path string `json:"filePath" db:"filePath"`
+	Path string `json:"Path"`
 	// base name of the file with extension
-	Name string `json:"filename"`
+	Name string `json:"Name"`
 	// content of the file encoded as a Base64 string (non-db field)
-	Base64Value string `gorm:"-" json:"base64Value"`
+	Base64Value string `gorm:"-" json:"Base64Value"`
 	// structure to hold the data from the file's metadata file
-	MetaData *FileData `gorm:"-" json:"metadata"`
+	MetaData *FileData `gorm:"-" json:"MetaData"`
 }
 
 // Supergroup compliant file structure (never stored in db)
@@ -158,19 +158,19 @@ type SupergroupFile struct {
 // structure to hold json data from data files (never stored in db)
 type FileData struct {
 	// stores comments for the given code file
-	Comments []*Comment `json:"comments"`
+	Comments []*Comment `json:"Comments"`
 }
 
 // Structure for user comments on code (not written to db)
 type Comment struct {
 	// author of the comment as an id
-	AuthorID string `json:"author"`
+	AuthorID string `json:"Author"`
 	// time that the comment was recorded as a string
-	Time string `json:"time"`
+	CreatedAt string `json:"CreatedAt"`
 	// content of the comment as a string
-	Base64Value string `json:"base64Value"`
+	Base64Value string `json:"Base64Value"`
 	// replies TEMP: maybe don't allow nested replies?
-	Replies []*Comment `json:"replies"`
+	Replies []*Comment `json:"Replies"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
