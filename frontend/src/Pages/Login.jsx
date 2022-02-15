@@ -28,7 +28,6 @@ function Login() {
         }
         axiosInstance.post(loginEndpoint, data)
             .then((response) => {
-                console.log(response);
                 JwtService.setUser(response.data.access_token, response.data.refresh_token)
                 navigate('/');
             })
