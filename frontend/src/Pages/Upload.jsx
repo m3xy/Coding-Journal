@@ -8,7 +8,7 @@
 import React from "react";
 import DragAndDrop from "./DragAndDrop";
 import  axiosInstance from "../Web/axiosInstance";
-import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel} from "react-bootstrap";
+import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel, Container, Row, Col, InputGroup, FormControl} from "react-bootstrap";
 
 const  uploadEndpoint = '/upload'
 
@@ -18,14 +18,19 @@ class Upload extends React.Component {
         super(props);
 
         this.state = {
+            authors: [],
             files: [],
-            submissionName: ""
+            submissionName: "",
+            submissionAbstract: "",
+            tags: []
         };
 
         this.dropFiles = this.dropFiles.bind(this);
         this.handleSubmit = this.handleSubmit.bind(this);
         this.handleDrop = this.handleDrop.bind(this);
         this.setSubmissionName = this.setSubmissionName.bind(this);
+        this.setSubmissionAbstract = this.setSubmissionAbstract.bind(this);
+        this.tagsInput = React.createRef();
     }
 
     dropFiles(e) {
@@ -38,21 +43,27 @@ class Upload extends React.Component {
         })
     }
 
+    setSubmissionAbstract(e) {
+        this.setState({
+            submissionAbstract: e.target.value
+        })
+    }
+
     /**
-     * Sends a POST request to the go server to upload (submission) files
+     * Sends a POST request to the go server to upload a submission
      *
-     * @param {JSON} userId Submission files' Author's User ID
+     * @param {JSON} authors Submission files' Authors' User ID
      * @param {Array.<File>} files Submission files
      * @returns
      */
-    uploadFiles(userId, submissionName, files) {
+    uploadSubmission(authors, submissionName, submissionAbstract, files) {
 
         // if(userId === null) {
         //     console.log("not logged in!");
         //     return;
         // }
 
-        console.log(userId);
+        console.log(authors);
         // const authorID = JSON.parse(userId).userId;  //Extract author's userId
 
         
@@ -97,7 +108,7 @@ class Upload extends React.Component {
         Promise.all(filePromises)
                .then(() => {
                    let data = {
-                       author: userId,
+                       author: authors[0],
                        name: submissionName,
                        content: files[0]
                    }
@@ -152,13 +163,17 @@ class Upload extends React.Component {
         //    console.log(error);
         // });
         
-        this.uploadFiles(userId, this.state.submissionName, this.state.files);
+        this.state.authors.push(userId);
+        this.uploadSubmission(this.state.authors, this.state.submissionName, this.state.submissionAbstract, this.state.files);
 
         document.getElementById("formFile").files = new DataTransfer().files;
         document.getElementById("submissionName").value = "";
         this.setState({
+            authors: [],
             files: [],
-            submissionName: ""
+            submissionName: "",
+            submissionAbstract: "",
+            tags: []
         });
 
         console.log("Files submitted");
@@ -238,37 +253,76 @@ class Upload extends React.Component {
             );
         });
 
+        const tags = this.state.tags.map((tag, i) => {
+            return (
+                <Button variant="outline-secondary" size="sm" onClick={() => {
+                    this.setState({
+                        tags: this.state.tags.filter(value => value !== tag)
+                    })}
+                }>
+                    {tag}
+                </Button>
+            );
+        });
+
 		return (
-            <div className="col-md-6 offset-md-5">
+            <Container>
                 <br/>
+                <Row>
+                    <Col></Col>
+                    <Col xs={4}>
+                        <DragAndDrop handleDrop={this.handleDrop}>
+                            <Card>
+                                <Form onSubmit={this.handleSubmit}>
+                                    <Card.Header className="text-center"><h5>Upload Submission</h5></Card.Header>
+                                    <Row>
+                                        <Form.Group className="mb-3" controlId="submissionName">
+                                            <Form.Label>Submission name</Form.Label>
+                                            <Form.Control type="text" placeholder="My_Submission" required onChange={this.setSubmissionName}/>
+                                        </Form.Group>
+                                        <Form.Group className="mb-3" controlId="submissionAbstract">
+                                            <Form.Label>Submission abstract</Form.Label>
+                                            <Form.Control as="textarea" rows={3} placeholder="My Abstract" required onChange={this.setSubmissionAbstract}/>
+                                        </Form.Group>
+                                    </Row>
+                                    <Row>
+                                        <Form.Group controlId="formFile" className="mb-3">
+                                            <Form.Label>Submission files</Form.Label>
+                                            <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later */}
+                                        </Form.Group>
+                                        <Card.Body>
 
-                <Form onSubmit={this.handleSubmit}>
-                <DragAndDrop handleDrop={this.handleDrop}>
-                    <Card style={{ width: '18rem' }}>
-                    <Card.Header className="text-center"><h5>Upload Files</h5></Card.Header>
-                        <Form.Group controlId="formFile" className="mb-3">
-                            <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later */}
-                        </Form.Group>
-                        <Card.Body>
-
-                            {this.state.files.length > 0 ? (
-                                <ListGroup>{files}</ListGroup>
-                            ) : (
-                                <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><br/><br/></Card.Text>
-                            )}
-                        </Card.Body>
-
-                        <FloatingLabel controlId="submissionName" label="Submission name" className="mb-0">
-                            <Form.Control type="text" placeholder="My_Submission" required onChange={this.setSubmissionName}/>
-                        </FloatingLabel>
-                        
-                        <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload files</Button>{' '}</Card.Footer>
-                        
-                    </Card>
-                    </DragAndDrop>
-                </Form>
-                
-            </div>
+                                            {this.state.files.length > 0 ? (
+                                                <ListGroup>{files}</ListGroup>
+                                            ) : (
+                                                <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><br/><br/></Card.Text>
+                                            )}
+                                        </Card.Body>
+                                    </Row>
+                                    <Row>
+                                    <InputGroup className="mb-3">
+                                        <FormControl
+                                            placeholder="Add tags here"
+                                            aria-label="Tags"
+                                            aria-describedby="addTag"
+                                            ref = {this.tagsInput}
+                                        />
+                                        <Button variant="outline-secondary" id="addTag" onClick={ () => {if(this.state.tags.includes(this.tagsInput.current.value)) return; this.setState({tags:[ ...this.state.tags, this.tagsInput.current.value]}); this.tagsInput.current.value = ""} }>
+                                        Add
+                                        </Button>
+                                    </InputGroup>
+                                    <Col>
+                                        {tags}
+                                    </Col>
+                                    </Row>
+                                    <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload</Button>{' '}</Card.Footer>
+                                </Form>
+                                </Card>
+                        </DragAndDrop>
+                    </Col>
+                    <Col></Col>
+                </Row>
+            </Container>
         )
 	}
 }

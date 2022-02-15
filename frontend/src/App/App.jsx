@@ -29,6 +29,7 @@ function App() {
                     <Route path="/register" element = {<Register />} />
                     <Route path="/about" element = {<About />} />
                     <Route path="/code/:submissionId/:filePath" element = {<Code />} />
+                    <Route path="/code/:fileId" element = {<Code />} />
                     <Route path="/code" element = {<Code />} />
                     {/* optional URL params removed in react router v6*/}
                     <Route path="/comment" element = {<Comment />} />

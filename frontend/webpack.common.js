@@ -3,7 +3,6 @@ const Dotenv = require("dotenv-webpack");
 const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 
 module.exports = {
-    mode: "production",
     entry: ["regenerator-runtime/runtime.js", './src/index.jsx'],
     resolve: {
         extensions: [".js", ".jsx"],
