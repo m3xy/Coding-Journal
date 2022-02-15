@@ -22,7 +22,7 @@ axiosInstance.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error) =>  {
     var origRequest = error.config;
     if (origRequest.url !== "/token" && error.response) {
       if (error.response.status === 401 && !origRequest._retry) {

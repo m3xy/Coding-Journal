@@ -29,7 +29,7 @@ function Login() {
         axiosInstance.post(loginEndpoint, data)
             .then((response) => {
                 console.log(response);
-                JwtService.setUser(response.data.content.token, response.data.content.refresh_token)
+                JwtService.setUser(response.data.access_token, response.data.refresh_token)
                 navigate('/');
             })
             .catch((error) => {
@@ -67,16 +67,16 @@ function Login() {
                         <Form.Group className="mb-3" controlId="journal">
                             <Form.Label>Journal</Form.Label>
                             <Form.Select name="journal" onChange={(e) => setJournal(e.target.value)} default="11" required>
-                                <option value="">Select journal</option>
-                                <option value="2">Journal 2</option>
-                                <option value="5">Journal 5</option>
-                                <option value="8">Journal 8</option>
-                                <option value="11">Journal 11</option>
-                                <option value="13">Journal 13</option>
-                                <option value="17">Journal 17</option>
-                                <option value="20">Journal 20</option>
-                                <option value="23">Journal 23</option>
-                                <option value="26">Journal 26</option>
+                                <option value={0}>Select journal</option>
+                                <option value={2}>Journal 2</option>
+                                <option value={5}>Journal 5</option>
+                                <option value={8}>Journal 8</option>
+                                <option value={11}>Journal 11</option>
+                                <option value={13}>Journal 13</option>
+                                <option value={17}>Journal 17</option>
+                                <option value={20}>Journal 20</option>
+                                <option value={23}>Journal 23</option>
+                                <option value={26}>Journal 26</option>
                             </Form.Select>
                         </Form.Group>
                         <br />
