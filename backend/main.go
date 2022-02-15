@@ -107,8 +107,7 @@ func setupCORSsrv() *http.Server {
 	getJournalSubroute(journal)
 
 	// Users subroutes
-	users := router.PathPrefix(SUBROUTE_USERS).Subrouter()
-	getUserSubroutes(users)
+	getUserSubroutes(router)
 
 	// Submissions and files routes
 	submissions := router.PathPrefix("/").Subrouter()

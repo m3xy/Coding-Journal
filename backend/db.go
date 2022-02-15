@@ -47,8 +47,8 @@ type User struct {
 	GlobalUserID string `json:"-"`
 	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"isemail"`
 	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw"`
-	FirstName    string `validate:"nonzero,max=32" json:"FirstName"`
-	LastName     string `validate:"nonzero,max=32" json:"LastName"`
+	FirstName    string `validate:"nonzero,max=32" json:"firstName"`
+	LastName     string `validate:"nonzero,max=32" json:"lastName"`
 	UserType     int    `gorm:"default:4" json:"userType"`
 	PhoneNumber  string `json:"phoneNumber"`
 	Organization string `json:"organization"`
@@ -60,13 +60,13 @@ type User struct {
 
 // User global identification.
 type GlobalUser struct {
-	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"UserID"`
-	FullName            string       `json:"FullName"`
-	User                User         `json:"Profile,omitempty"`
+	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
+	FullName            string       `json:"fullName"`
+	User                User         `json:"profile,omitempty"`
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
 	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
 
-	CreatedAt time.Time      `json:"CreatedAt"`
+	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"-"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

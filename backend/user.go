@@ -10,13 +10,14 @@ import (
 )
 
 const (
-	SUBROUTE_USERS = "/users"
+	SUBROUTE_USER = "/user"
 	ENDPOINT_GET   = "/get"
 )
 
 func getUserSubroutes(r *mux.Router) {
-	r.HandleFunc(ENDPOINT_GET+"/{id}", getUserProfile).Methods(http.MethodGet)
-	r.HandleFunc("/{id}"+ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
+	users := r.PathPrefix(SUBROUTE_USER).Subrouter()
+	users.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
+	users.HandleFunc("/{id}"+ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
@@ -35,7 +36,7 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user details from user ID.
 	vars := mux.Vars(r)
 	user := &GlobalUser{ID: vars["id"]}
-	if res := gormDb.Preload("AuthoredSubmissions").Preload("ReviewedSubmissions").Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
+	if res := gormDb./*Preload("AuthoredSubmissions").Preload("ReviewedSubmissions").*/Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
