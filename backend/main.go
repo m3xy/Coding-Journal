@@ -89,7 +89,7 @@ func setupCORSsrv() *http.Server {
 
 	// sets up handler for CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
+		AllowedOrigins: []string{"http://0.0.0.0:23409", "http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
 		AllowedHeaders: []string{"content-type", SECURITY_TOKEN_KEY, "bearer_token", "refresh_token", "user"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PUT"},
 	})

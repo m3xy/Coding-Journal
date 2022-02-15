@@ -29,13 +29,14 @@ type JournalLogInResponse struct {
 type AuthLoginPostBody struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
-	GroupNumber int    `json:"groupNumber"`
+	GroupNumber int    `json:"groupNumber,string"`
 }
 
 // POST /journal/login body.
 type JournalLoginPostBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	GroupNumber string `json:"groupNumber"`
 }
 
 // --- JWT Claim types --- //
