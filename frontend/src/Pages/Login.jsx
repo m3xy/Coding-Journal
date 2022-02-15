@@ -1,17 +1,18 @@
 /**
  * Login.jsx
  * Author: 190019931
- * 
+ *
  * This file stores the info for rendering the Login page of our Journal
  */
 
 import React, { useState } from "react";
-import { Form, Button, Container, Row, Col} from "react-bootstrap";
+import { Form, Button, Container, Row, Col } from "react-bootstrap";
 import axiosInstance from "../Web/axiosInstance"
 import { useNavigate } from "react-router-dom"
-import 'regenerator-runtime/runtime'
+import JwtService from "../Web/jwt.service"
+// import 'regenerator-runtime/runtime'
 
-const loginEndpoint = '/glogin'
+const loginEndpoint = '/auth/login'
 
 function Login() {
     const [email, setEmail] = useState()
@@ -26,15 +27,15 @@ function Login() {
             groupNumber: journal
         }
         axiosInstance.post(loginEndpoint, data)
-                     .then((response) => {
-                         console.log(response);
-                         document.cookie = "userId=" + response.data["userId"] + "; SameSite=Lax";
-                         navigate('/');
-                     })
-                     .catch((error) => {
-                         console.log(error.config)
-                         console.log(error)
-                     });
+            .then((response) => {
+                console.log(response);
+                JwtService.setUser(response.data.content.token, response.data.content.refresh_token)
+                navigate('/');
+            })
+            .catch((error) => {
+                console.log(error.config)
+                console.log(error)
+            });
     }
 
     async function handleSubmit(e) {
@@ -42,30 +43,30 @@ function Login() {
         loginUser(email, password, journal)
     }
 
-    return(
+    return (
         <Container>
             <Row>
                 <Col></Col>
                 <Col>
-                    <br/>
+                    <br />
                     <h2>Login</h2>
                     <Form onSubmit={handleSubmit}>
                         <Form.Group className="mb-3" controlId="email">
                             <Form.Label>Email address</Form.Label>
-                        <Form.Control type="email" placeholder="Enter email" name="email" onChange={(e) => setEmail(e.target.value)} required/>
+                            <Form.Control type="email" placeholder="Enter email" name="email" onChange={(e) => setEmail(e.target.value)} required />
                             <Form.Text className="text-muted">
-                            We'll never share your email with anyone else.
+                                We'll never share your email with anyone else.
                             </Form.Text>
                         </Form.Group>
 
                         <Form.Group className="mb-3" controlId="password">
                             <Form.Label>Password</Form.Label>
-                        <Form.Control type="password" placeholder="Password" name="password" onChange={(e) => setPassword(e.target.value)} required/>
+                            <Form.Control type="password" placeholder="Password" name="password" onChange={(e) => setPassword(e.target.value)} required />
                         </Form.Group>
 
                         <Form.Group className="mb-3" controlId="journal">
                             <Form.Label>Journal</Form.Label>
-                        <Form.Select name="journal" onChange={(e) => setJournal(e.target.value)} default="11" required>
+                            <Form.Select name="journal" onChange={(e) => setJournal(e.target.value)} default="11" required>
                                 <option value="">Select journal</option>
                                 <option value="2">Journal 2</option>
                                 <option value="5">Journal 5</option>
