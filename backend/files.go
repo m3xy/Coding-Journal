@@ -32,8 +32,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -131,12 +129,21 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the fileID and authorID from the URL parameters
+	// gets the fileID, parentID, and authorID from the URL parameters
 	params := r.URL.Query()
 	authorID := params["authorID"][0]
+	// parentIDString := params["parentID"][0]
+	// parentID64, err := strconv.ParseUint(params["parentID"][0], 10, 32)
+	// if err != nil {
+	// 	log.Printf("[ERROR] ParentID: %s unable to be parsed", params["parentID"][0])
+	// 	w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
+	// 	return
+	// }
+	// parentID := uint(parentID64) 
+	// gets uint from uint64	
 	fileID64, err := strconv.ParseUint(params["fileID"][0], 10, 32)
 	if err != nil {
-		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"][0])
+		log.Printf("[ERROR] FileID: %s unable to be parsed", params["fileID"][0])
 		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
 		return
 	}
@@ -154,20 +161,29 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	// Insert data into Comment structure
 	comment := &Comment{
 		AuthorID:    authorID, // authors user id
-		CreatedAt:        fmt.Sprint(time.Now()),
+		FileID: 	fileID,
 		Base64Value: request[getJsonTag(&Comment{}, "Base64Value")].(string),
-		Replies:     nil, // replies are nil upon insertion
 	}
 
 	// adds the comment to the file, returns code OK if successful
-	if err = addComment(comment, fileID); err != nil {
+	commentID, err := addComment(comment)
+	if err != nil {
 		log.Printf("[ERROR] Comment creation failed: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	// writes the commentID to the response
+	respMap := make(map[string]uint)
+	respMap["ID"] = commentID
+	response, err := json.Marshal(respMap)
+	if err != nil {
+		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
-	w.WriteHeader(http.StatusOK)
+	w.Write(response)
 }
 
 // -----
@@ -208,108 +224,67 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 		return 0, err
 	}
 
-	// Add file to filesystem
+	// Add file to filesystem creating dirs if you do not exist
 	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), submission.Name, file.Path)
-	fileDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), DATA_DIR_NAME,
-		submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
-
-	// file paths without the file name (to create dirs if they don't exist yet)
 	fileDirPath := filepath.Dir(filePath)
-	fileDataDirPath := filepath.Dir(fileDataPath)
 
-	// creates all directories on the file's relative path in case any of them do not exist yet
+	// creates all directories on the file's relative path in case any of them do not exist yet, opens file, and writes content
 	if err := os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
-	} else if err := os.MkdirAll(fileDataDirPath, DIR_PERMISSIONS); err != nil {
-		return 0, err
 	}
-
-	// Create and open content file and it's corresponding data file
 	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
 	if err != nil {
 		return 0, err
 	}
-	dataFile, err := os.OpenFile(
-		fileDataPath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	if err != nil {
-		return 0, err
-	}
-
-	// write the file content
 	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-		return 0, err
-	}
-	// Writes given file's metadata
-	jsonString, err := json.Marshal(file.MetaData)
-	if err != nil {
-		return 0, err
-	}
-	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
 		return 0, err
 	}
 
 	// closes files
 	codeFile.Close()
-	dataFile.Close()
 
 	return file.ID, nil
 }
 
-// Add a comment to a given file. Currently this can only append comments
+// Add a root-level comment to a file
 //
 // Params:
 //	comment (*Comment) : The comment struct to add to the file
 //	fileID (uint) : the id of the file to add a comment to
 // Returns:
+//	(uint) : the id of the added comment
 //	(error) : an error if one occurs, nil otherwise
-func addComment(comment *Comment, fileID uint) error {
-	// error cases
+func addComment(comment *Comment) (uint, error) {
 	if comment == nil {
-		return errors.New("Comment cannot be nil")
+		return 0, errors.New("Comment cannot be nil")
 	}
+	// adds the comment to the comments table with foreign key fileId and parentID
+	if err := gormDb.Model(&Comment{}).Create(comment).Error; err != nil {
+		return 0, err
+	}
+	return comment.ID, nil
+}
 
-	// checks that the author of the comment is a registered user (either here or in another journal)
-	author := &GlobalUser{}
-	author.ID = comment.AuthorID
-	if err := gormDb.Model(author).Omit("*").First(author).Error; err != nil {
-		return err
+// adds a comment reply to the database. The only difference here is that
+// a parentID is included
+// 
+// Parameters:
+// 	comment (*Comment) : the comment struct to be added
+// 	parentID (uint) : 
+// Return:
+// 	(uint) : comment ID if the comment is added successfully
+// 	(error) : an error if one occurs
+func addCommentReply(comment *Comment, parentID uint) (uint, error) {
+	if comment == nil {
+		return 0, errors.New("Comment cannot be nil")
 	}
-
-	// gets data to build the file path
-	file := &File{}
-	submission := &Submission{}
-	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		// queries the file from the database
-		file.ID = fileID
-		if err := gormDb.Model(file).Select("files.name", "files.path", "files.submission_id").Find(file).Error; err != nil {
-			return err
-		}
-		// queries the submission name
-		submission.ID = file.SubmissionID
-		if err := gormDb.Model(submission).Select("submissions.name").Find(submission).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return err
+	// adds the comment to the comments table with foreign key fileId and parentID
+	parent := &Comment{}
+	parent.ID = parentID
+	if err := gormDb.Model(parent).Association("Comments").Append(comment); err != nil {
+		return 0, err
 	}
-	// builds the path to the metadata file
-	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(file.SubmissionID), DATA_DIR_NAME,
-		submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
-
-	// gets the file's metadata, and appends the new comment to it
-	fileData, err := getFileMetaData(fullDataPath)
-	if err != nil {
-		return err
-	}
-	// adds the new comment and writes to the metadata file
-	fileData.Comments = append(fileData.Comments, comment)
-	dataBytes, err := json.Marshal(fileData)
-	if err != nil {
-		return err
-	}
-	// if everything has gone correctly, the new data is written to the file
-	return ioutil.WriteFile(fullDataPath, dataBytes, FILE_PERMISSIONS)
+	return comment.ID, nil
 }
 
 // helper function to return a file object given its ID
@@ -340,16 +315,10 @@ func getFileData(fileID uint) (*File, error) {
 
 	// builds path to the file and it's corresponding data file using the queried submission name
 	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(file.SubmissionID), submission.Name, file.Path)
-	fullDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(file.SubmissionID), DATA_DIR_NAME,
-		submission.Name, strings.Replace(file.Path, filepath.Ext(file.Path), ".json", 1))
 
-	// gets file content and metadata
+	// gets file content
 	var err error
 	file.Base64Value, err = getFileContent(fullFilePath)
-	if err != nil {
-		return nil, err
-	}
-	file.MetaData, err = getFileMetaData(fullDataPath)
 	if err != nil {
 		return nil, err
 	}
@@ -369,28 +338,4 @@ func getFileContent(filePath string) (string, error) {
 	}
 	// if no error occurred, assigns file.Base64Value a value
 	return string(fileData), nil
-}
-
-// Get a file's metadata from filesystem, and returns a FileData
-// objects
-//
-// Params:
-//	dataPath (string) : a path to the data file containing a given file's meta-data
-//Returns:
-//  (*FileData) : the file's metadata
-//	(error) : if something goes wrong, nil otherwise
-func getFileMetaData(dataPath string) (*FileData, error) {
-	// reads the file contents into a json string
-	jsonData, err := ioutil.ReadFile(dataPath)
-	if err != nil {
-		return nil, err
-	}
-	// fileData is parsed from json into the FileData struct
-	fileData := &FileData{}
-	err = json.Unmarshal(jsonData, fileData)
-	if err != nil {
-		return nil, err
-	}
-	// if no error occurred, return metadata
-	return fileData, nil
 }

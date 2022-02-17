@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"bytes"
 
@@ -311,18 +310,18 @@ func TestAddSubmission(t *testing.T) {
 			assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err)
 			queriedFileContent := string(fileBytes)
 
-			// checks that a data file has been generated for the uploaded file
-			var fileData *FileData
-			fileDataPath := filepath.Join(
-				TEST_FILES_DIR,
-				fmt.Sprint(queriedSubmission.ID),
-				DATA_DIR_NAME,
-				queriedSubmission.Name,
-				strings.TrimSuffix(queriedFile.Path, filepath.Ext(queriedFile.Path))+".json",
-			)
-			dataString, err := ioutil.ReadFile(fileDataPath)
-			assert.NoError(t, err, "error reading submission data")
-			assert.NoError(t, json.Unmarshal(dataString, fileData), "error unmarshalling submission data")
+			// // checks that a data file has been generated for the uploaded file
+			// var fileData *FileData
+			// fileDataPath := filepath.Join(
+			// 	TEST_FILES_DIR,
+			// 	fmt.Sprint(queriedSubmission.ID),
+			// 	DATA_DIR_NAME,
+			// 	queriedSubmission.Name,
+			// 	strings.TrimSuffix(queriedFile.Path, filepath.Ext(queriedFile.Path))+".json",
+			// )
+			// dataString, err := ioutil.ReadFile(fileDataPath)
+			// assert.NoError(t, err, "error reading submission data")
+			// assert.NoError(t, json.Unmarshal(dataString, fileData), "error unmarshalling submission data")
 
 			// gets data about the file, and tests it for equality against the added file
 			_, err = os.Stat(fileDataPath)
@@ -331,7 +330,7 @@ func TestAddSubmission(t *testing.T) {
 			assert.Equal(t, file.Path, queriedFile.Path, "File Paths do not match")
 			assert.Equal(t, file.SubmissionID, queriedFile.SubmissionID, "File SubmissionIDs do not match")
 			assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly")
-			assert.ElementsMatch(t, file.MetaData.Comments, fileData.Comments, "File comments do not match")
+			assert.ElementsMatch(t, file.Comments, queriedFile.Comments, "File comments do not match")
 		}
 
 		// tests that the metadata is properly formatted

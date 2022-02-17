@@ -13,21 +13,17 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-	"time"
+	"bytes"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	// "gorm.io/gorm"
 )
 
 const (
@@ -53,28 +49,24 @@ func resourceServerSetup() *http.Server {
 // as to prevent adding a file with the same SubmissionID twice
 var testFiles []File = []File{
 	{SubmissionID: 0, Path: "testFile1.txt",
-		Name: "testFile1.txt", Base64Value: "hello world", MetaData: nil},
+		Name: "testFile1.txt", Base64Value: "hello world"},
 	{SubmissionID: 0, Path: "testFile2.txt",
-		Name: "testFile2.txt", Base64Value: "hello world", MetaData: nil},
+		Name: "testFile2.txt", Base64Value: "hello world"},
 }
 
 var testComments []*Comment = []*Comment{
 	{
 		AuthorID:    "",
-		CreatedAt:        fmt.Sprint(time.Now()),
 		Base64Value: "Hello World",
-		Replies:     []*Comment{},
+		// Comments:     []Comment{},
 	},
 	{
 		AuthorID:    "",
-		CreatedAt:        fmt.Sprint(time.Now()),
 		Base64Value: "Goodbye World",
-		Replies:     []*Comment{},
+		// Comments:     []Comment{},
 	},
 }
-var testFileData []*FileData = []*FileData{
-	{Comments: testComments},
-}
+
 
 // -----------
 // Router Function Tests
@@ -129,7 +121,7 @@ func TestGetFile(t *testing.T) {
 		file := &File{}
 		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&file), "Error decoding JSON in server response")
 
-		// tests that the file was retrieved with the correct information (no comments here so metadata is not checked)
+		// tests that the file was retrieved with the correct information 
 		assert.Equal(t, testFile.Path, file.Path, "file paths do not match")
 		assert.Equal(t, testFile.Name, file.Name, "file names do not match")
 		assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match")
@@ -181,9 +173,6 @@ func TestUploadUserComment(t *testing.T) {
 
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(map[string]interface{}{
-			// getJsonTag(&File{}, "SubmissionID"):	submissionID,
-			// getJsonTag(&File{}, "Path"):			testFile.Path,
-			// getJsonTag(&Comment{}, "AuthorID"):		testAuthor.ID,
 			getJsonTag(&Comment{}, "Base64Value"): testComment.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
@@ -199,21 +188,14 @@ func TestUploadUserComment(t *testing.T) {
 		defer resp.Body.Close()
 		assert.Equalf(t, resp.StatusCode, http.StatusOK, "HTTP request error: %d", resp.StatusCode)
 
-		// tests that the comment was added properly
-		fileDataPath := filepath.Join(
-			TEST_FILES_DIR,
-			fmt.Sprint(testSubmission.ID),
-			DATA_DIR_NAME,
-			testSubmission.Name,
-			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
-		)
-		codeData, err := getFileMetaData(fileDataPath)
-		assert.NoError(t, err, "Error occurred while retrieving file metadata")
+		// gets the comment from the db
+		addedComment := &Comment{}
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(addedComment), "Error decoding JSON in server response")
+		assert.NoError(t, gormDb.Model(addedComment).Find(addedComment).Error, "Could not query added comment")
 
-		// extracts the last comment (most recently added) from the comments and checks for equality with
-		// the passed in comment
-		addedComment := codeData.Comments[len(codeData.Comments)-1]
-		assert.Equal(t, testComment.AuthorID, addedComment.AuthorID, "Comment author ID is incorrect")
+		// compares the queried comment to that which was sent
+		assert.Equal(t, fileID, addedComment.FileID, "file IDs do not match")
+		assert.Equal(t, testComment.AuthorID, addedComment.AuthorID, "Comment author ID mismatch")
 		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
 
 		// clears environment
@@ -221,6 +203,7 @@ func TestUploadUserComment(t *testing.T) {
 		testEnd()
 	})
 }
+
 
 // -------------
 // Helper Function Tests
@@ -250,17 +233,7 @@ func TestAddFile(t *testing.T) {
 		assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err)
 		queriedFileContent := string(fileBytes)
 
-		// checks that a data file has been generated for the uploaded file
-		fileDataPath := filepath.Join(
-			TEST_FILES_DIR,
-			fmt.Sprint(submissionID),
-			DATA_DIR_NAME,
-			submission.Name,
-			strings.TrimSuffix(queriedFile.Path, filepath.Ext(queriedFile.Path))+".json",
-		)
-		// gets data about the file, and tests it for equality against the added file
-		_, err = os.Stat(fileDataPath)
-		assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
+		// asserts the file was added properly
 		assert.Equalf(t, submissionID, file.SubmissionID, "Submission ID mismatch: %d vs %d", submissionID, file.SubmissionID)
 		assert.Equalf(t, file.Path, queriedFile.Path, "File path mismatch:  %s vs %s", file.Path, queriedFile.Path)
 		assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly")
@@ -321,7 +294,6 @@ func TestAddFile(t *testing.T) {
 // Test Depends On:
 // 	- TestAddSubmission (in submissions_test.go)
 // 	- TestAddFile
-/*
 func TestAddComment(t *testing.T) {
 	// tests adding one valid comment. Uses the testAddComment() utility method
 	t.Run("Add One Comment", func(t *testing.T) {
@@ -341,9 +313,11 @@ func TestAddComment(t *testing.T) {
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
-		testSubmission.Files = []File{testFile}
-		testSubmissionID, err := addSubmission(&testSubmission)
+		submissionID, err := addSubmission(&testSubmission)
 		assert.NoErrorf(t, err, "failed to add submission: %v", err)
+
+		fileID, err := addFileTo(&testFile, submissionID)
+		assert.NoErrorf(t, err, "failed to add file to submission: %v", err)
 
 		// adds a test user to author a comment
 		commentAuthorID, err := registerUser(testAuthor)
@@ -351,34 +325,23 @@ func TestAddComment(t *testing.T) {
 		testComment.AuthorID = commentAuthorID
 
 		// adds a comment to the file
-		assert.NoError(t, addComment(testComment, testFile.ID), "failed to add comment to the submission")
+		testComment.FileID = fileID
+		commentID, err := addComment(testComment)
+		assert.NoError(t, err, "failed to add comment to the submission")
 
-		// reads the data file into a CodeDataFile struct
-		fileDataPath := filepath.Join(
-			TEST_FILES_DIR,
-			fmt.Sprint(testSubmissionID),
-			DATA_DIR_NAME,
-			testSubmission.Name,
-			strings.TrimSuffix(testFile.Path, filepath.Ext(testFile.Path))+".json",
-		)
-		fileBytes, err := ioutil.ReadFile(fileDataPath)
-		assert.NoErrorf(t, err, "failed to read data file: %v", err)
+		// gets the comment from the db
+		addedComment := &Comment{}
+		addedComment.ID = commentID
+		assert.NoError(t, gormDb.Model(addedComment).Find(addedComment).Error, "Could not query added comment")
 
-		// unmarshalls the file's meta-data to extract the added comment
-		codeData := &FileData{}
-		assert.NoError(t, json.Unmarshal(fileBytes, codeData), "failed to unmarshal code file data")
-
-		// extracts the last comment (most recently added) from the comments and checks for equality with
-		// the passed in comment
-		addedComment := codeData.Comments[len(codeData.Comments)-1]
-		assert.Equalf(t, testComment.AuthorID, addedComment.AuthorID,
-			"Comment author ID mismatch: %s vs %s", testComment.AuthorID, addedComment.AuthorID)
+		// compares the queried comment to that which was sent
+		assert.Equal(t, fileID, addedComment.FileID, "file IDs do not match")
+		assert.Equal(t, testComment.AuthorID, addedComment.AuthorID, "Comment author ID mismatch")
 		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
 
 		testEnd()
 	})
 }
-*/
 
 // Tests the ability of the backend helper functions to retrieve a file's data
 // Test Depends On:

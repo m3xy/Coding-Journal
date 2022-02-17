@@ -47,8 +47,8 @@ type User struct {
 	GlobalUserID string `json:"-"`
 	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"isemail"`
 	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw"`
-	FirstName    string `validate:"nonzero,max=32" json:"FirstName"`
-	LastName     string `validate:"nonzero,max=32" json:"LastName"`
+	FirstName    string `validate:"nonzero,max=32" json:"firstName"`
+	LastName     string `validate:"nonzero,max=32" json:"lastName"`
 	UserType     int    `gorm:"default:4" json:"userType"`
 	PhoneNumber  string `json:"phoneNumber"`
 	Organization string `json:"organization"`
@@ -60,8 +60,8 @@ type User struct {
 
 // User global identification.
 type GlobalUser struct {
-	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"UserID"`
-	FullName            string       `json:"FullName"`
+	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
+	FullName            string       `json:"fullName"`
 	User                User         `json:"Profile,omitempty"`
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
 	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
@@ -143,8 +143,8 @@ type File struct {
 	Name string `json:"Name"`
 	// content of the file encoded as a Base64 string (non-db field)
 	Base64Value string `gorm:"-" json:"Base64Value"`
-	// structure to hold the data from the file's metadata file
-	MetaData *FileData `gorm:"-" json:"MetaData"`
+	// structure to hold the user comments on the file
+	Comments []Comment `json:"comments"`
 }
 
 // Supergroup compliant file structure (never stored in db)
@@ -155,22 +155,16 @@ type SupergroupFile struct {
 	Base64Value string `json:"base64Value"`
 }
 
-// structure to hold json data from data files (never stored in db)
-type FileData struct {
-	// stores comments for the given code file
-	Comments []*Comment `json:"Comments"`
-}
-
 // Structure for user comments on code (not written to db)
 type Comment struct {
+	gorm.Model
 	// author of the comment as an id
 	AuthorID string `json:"Author"`
-	// time that the comment was recorded as a string
-	CreatedAt string `json:"CreatedAt"`
+	// file which the comment belongs to
+	FileID uint `json:"fileId"`
 	// content of the comment as a string
-	Base64Value string `json:"Base64Value"`
-	// replies TEMP: maybe don't allow nested replies?
-	Replies []*Comment `json:"Replies"`
+	Base64Value string `gorm:"type:mediumtext" json:"Base64Value"`
+	// Comments []Comment `gorm:"foreignKey:ParentID;references:ID" json:"comments"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
@@ -194,7 +188,7 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{})
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{}, &Comment{})
 	if err != nil {
 		goto ERR
 	}
@@ -215,7 +209,15 @@ func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Clear every table rows in the database.
 func gormClear(db *gorm.DB) error {
-	// deletes submissions w/ Authors/Reviewers Associations
+	// deletes files w/ associations 
+	var files []File
+	if err := db.Find(&files).Error; err != nil {
+		return err
+	}
+	for _, file := range files {
+		db.Select(clause.Associations).Unscoped().Delete(&file)
+	}
+	// deletes submissions w/ associations
 	var submissions []Submission
 	if err := db.Find(&submissions).Error; err != nil {
 		return err
@@ -224,7 +226,7 @@ func gormClear(db *gorm.DB) error {
 		db.Select(clause.Associations).Unscoped().Delete(&submission)
 	}
 	// Deletes main tables
-	tables := []interface{}{&File{}, &Category{}, &User{}, &GlobalUser{}, &Submission{}}
+	tables := []interface{}{&Comment{}, &File{}, &Category{}, &User{}, &GlobalUser{}, &Submission{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
 			Unscoped().Delete(table)
