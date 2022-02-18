@@ -5,6 +5,17 @@
     "start": "npm run start:dev",
     "start:dev": "webpack serve --hot --color --open --config webpack.dev.js"
   },
+  "eslintConfig": {
+    "extends": ["react-app", "react-app/jest"]
+  },
+  "prettier": {
+    "trailingComma": "none",
+    "tabWidth": 4,
+    "useTabs": true,
+    "bracketSameLine": true,
+    "semi": false,
+    "singleQuote": false
+  },
   "dependencies": {
     "axios": "^0.25.0",
     "bootstrap": "^5.1.3",
