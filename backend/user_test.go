@@ -18,8 +18,7 @@ const (
 // Set up server used for user testing.
 func userServerSetup() *http.Server {
 	router := mux.NewRouter()
-	users := router.PathPrefix(SUBROUTE_USERS).Subrouter()
-	users.HandleFunc("/{id}", getUserProfile)
+	getUserSubroutes(router)
 
 	return &http.Server{
 		Addr:    TEST_PORT_USERS,
@@ -43,7 +42,7 @@ func TestGetUserProfile(t *testing.T) {
 
 	t.Run("Valid user profiles", func(t *testing.T) {
 		for i, u := range globalUsers {
-			res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+u.ID, http.MethodGet, nil, TEST_PORT_USERS)
+			res, err := sendJsonRequest(SUBROUTE_USER+"/"+u.ID, http.MethodGet, nil, TEST_PORT_USERS)
 			assert.Nil(t, err, "Request should not error.")
 			assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
 
@@ -63,7 +62,7 @@ func TestGetUserProfile(t *testing.T) {
 
 	// Test invalid users.
 	t.Run("Invalid user profile", func(t *testing.T) {
-		res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+INVALID_ID, http.MethodGet, nil, TEST_PORT_USERS)
+		res, err := sendJsonRequest(SUBROUTE_USER+"/"+INVALID_ID, http.MethodGet, nil, TEST_PORT_USERS)
 		assert.Nil(t, err, "Request should not error.")
 		assert.Equalf(t, http.StatusNotFound, res.StatusCode, "Request should return status %d", http.StatusNotFound)
 	})

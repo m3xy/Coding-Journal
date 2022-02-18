@@ -44,9 +44,13 @@ const (
 )
 
 func getSubmissionsSubRoutes(r *mux.Router) {
-	r.HandleFunc(SUBROUTE_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
-
 	submissions := r.PathPrefix(ENDPOINT_SUBMISSIONS).Subrouter()
+	submission := r.PathPrefix(SUBROUTE_SUBMISSION).Subrouter()
+
+	// Submission routes:
+	// + /submission/{id} - Get given submission.
+	// + /submissions/create - Create a submission.
+	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 }
 

@@ -16,10 +16,13 @@ const (
 )
 
 func getUserSubroutes(r *mux.Router) {
-	user := r.PathPrefix(SUBROUTE_USER + "/{id}").Subrouter()
+	user := r.PathPrefix(SUBROUTE_USER).Subrouter()
 
-	user.HandleFunc("/", getUserProfile).Methods(http.MethodGet)
-	user.HandleFunc(ENDPOINT_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
+	// User routes:
+	// + GET /user/{id} - Get given user profile.
+	// + GET /user/{id}/submissions - Get given user's authored submissions.
+	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
+	user.HandleFunc("/{id}"+ENDPOINT_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {

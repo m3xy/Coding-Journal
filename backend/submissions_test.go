@@ -89,9 +89,8 @@ var testReviewers []User = []User{
 func submissionServerSetup() *http.Server {
 	router := mux.NewRouter()
 
-	router.HandleFunc(SUBROUTE_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
+	getSubmissionsSubRoutes(router)
 	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
-	router.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 
 	return &http.Server{
 		Addr:    TEST_PORT_SUBMISSION,
@@ -186,7 +185,7 @@ func TestUploadSubmission(t *testing.T) {
 		assert.NoError(t, err, "Error marshalling test submission to Json")
 
 		// creates a request to send to the test server
-		urlString := fmt.Sprintf("%s%s", ADDRESS_SUBMISSION, ENDPOINT_UPLOAD_SUBMISSION)
+		urlString := fmt.Sprintf("%s%s%s", ADDRESS_SUBMISSION, ENDPOINT_SUBMISSIONS, ENDPOINT_UPLOAD_SUBMISSION)
 		req, _ := http.NewRequest("POST", urlString, bytes.NewBuffer(reqBody))
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
 		assert.NoErrorf(t, err, "Error while sending Post request: %v", err)

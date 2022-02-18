@@ -13,6 +13,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,7 +21,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"testing"
-	"bytes"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -34,10 +34,9 @@ const (
 )
 
 // Set up server used for files testing.
-func resourceServerSetup() *http.Server {
+func fileServerSetup() *http.Server {
 	router := mux.NewRouter()
-	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet)
-	router.HandleFunc("/file/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	getFilesSubRoutes(router)
 
 	return &http.Server{
 		Addr:    TEST_PORT_FILES,
@@ -58,15 +57,14 @@ var testComments []*Comment = []*Comment{
 	{
 		AuthorID:    "",
 		Base64Value: "Hello World",
-		Comments:     []Comment{},
+		Comments:    []Comment{},
 	},
 	{
 		AuthorID:    "",
 		Base64Value: "Goodbye World",
-		Comments:     []Comment{},
+		Comments:    []Comment{},
 	},
 }
-
 
 // -----------
 // Router Function Tests
@@ -88,7 +86,7 @@ func TestGetFile(t *testing.T) {
 
 		// Set up server and configures filesystem/db
 		testInit()
-		srv := resourceServerSetup()
+		srv := fileServerSetup()
 		go srv.ListenAndServe()
 
 		// adds a submission to the database and filesystem
@@ -108,7 +106,8 @@ func TestGetFile(t *testing.T) {
 		assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Name, err)
 
 		// builds the request url inserting query parameters
-		urlString := fmt.Sprintf("%s%s?%s=%d", TEST_FILES_ADDRESS, ENDPOINT_FILE, "id", fileID)
+		urlString := fmt.Sprintf("%s%s/%d", TEST_FILES_ADDRESS, SUBROUTE_FILE, fileID)
+		fmt.Println(urlString)
 		req, err := http.NewRequest("GET", urlString, nil)
 
 		// send GET request
@@ -121,7 +120,7 @@ func TestGetFile(t *testing.T) {
 		file := &File{}
 		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&file), "Error decoding JSON in server response")
 
-		// tests that the file was retrieved with the correct information 
+		// tests that the file was retrieved with the correct information
 		assert.Equal(t, testFile.Path, file.Path, "file paths do not match")
 		assert.Equal(t, testFile.Name, file.Name, "file names do not match")
 		assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match")
@@ -151,7 +150,7 @@ func TestUploadUserComment(t *testing.T) {
 
 		// Set up server and configures filesystem/db
 		testInit()
-		srv := resourceServerSetup()
+		srv := fileServerSetup()
 		go srv.ListenAndServe()
 
 		// adds test values to the db and filesystem
@@ -173,13 +172,14 @@ func TestUploadUserComment(t *testing.T) {
 
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(&NewCommentPostBody{
-			AuthorID: authorID,
+			AuthorID:    authorID,
 			Base64Value: testComment.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s/file/%d%s", TEST_FILES_ADDRESS, fileID, ENDPOINT_NEWCOMMENT),
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s/%d%s", TEST_FILES_ADDRESS, SUBROUTE_FILE,
+			fileID, ENDPOINT_NEWCOMMENT),
 			bytes.NewBuffer(reqBody))
 		assert.NoErrorf(t, err, "Error creating request: %v", err)
 
@@ -215,7 +215,7 @@ func TestUploadUserComment(t *testing.T) {
 
 		// Set up server and configures filesystem/db
 		testInit()
-		srv := resourceServerSetup()
+		srv := fileServerSetup()
 		go srv.ListenAndServe()
 
 		// adds test values to the db and filesystem
@@ -244,14 +244,15 @@ func TestUploadUserComment(t *testing.T) {
 
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(&NewCommentPostBody{
-			AuthorID: authorID,
-			ParentID: &commentID,
+			AuthorID:    authorID,
+			ParentID:    &commentID,
 			Base64Value: testReply.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s/file/%d%s", TEST_FILES_ADDRESS, fileID, ENDPOINT_NEWCOMMENT),
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s/%d%s", TEST_FILES_ADDRESS, SUBROUTE_FILE,
+			fileID, ENDPOINT_NEWCOMMENT),
 			bytes.NewBuffer(reqBody))
 		assert.NoErrorf(t, err, "Error creating request: %v", err)
 
@@ -278,7 +279,6 @@ func TestUploadUserComment(t *testing.T) {
 		testEnd()
 	})
 }
-
 
 // -------------
 // Helper Function Tests

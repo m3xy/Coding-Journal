@@ -43,15 +43,24 @@ const (
 	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories
 	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
+	// Subroutes and endpoints for files
+	SUBROUTE_FILE       = "/file"
+	ENDPOINT_NEWFILE    = "/upload"
+	ENDPOINT_NEWCOMMENT = "/comment"
+
 	// File Mode Constants
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for submission files
 )
 
 func getFilesSubRoutes(r *mux.Router) {
-	files := r.PathPrefix("/").Subrouter()
-	files.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
-	files.HandleFunc("file/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files := r.PathPrefix(SUBROUTE_FILE).Subrouter()
+
+	// File subroutes:
+	// + GET /file/{id} - Get given file.
+	// + POST /file/{id}/comment - Post a new comment
+	files.HandleFunc("/{id}", getFile).Methods(http.MethodGet)
+	files.HandleFunc("/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // -----
@@ -88,10 +97,10 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// gets the fileID from the URL parameters as uint. Must unwrap from uint64
-	params := r.URL.Query()
-	fileID64, err := strconv.ParseUint(params["id"][0], 10, 32) // specifies width as 32
+	params := mux.Vars(r)
+	fileID64, err := strconv.ParseUint(params["id"], 10, 32) // specifies width as 32
 	if err != nil {
-		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"][0])
+		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"])
 		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
 		return
 	}
@@ -150,8 +159,8 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	// Insert data into Comment structure
 	comment := &Comment{
 		AuthorID:    requestBody.AuthorID, // authors user id
-		FileID: 	fileID,
-		ParentID: 	requestBody.ParentID, // nil if this is not a reply
+		FileID:      fileID,
+		ParentID:    requestBody.ParentID, // nil if this is not a reply
 		Base64Value: requestBody.Base64Value,
 	}
 
@@ -191,7 +200,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 // 	(int) : the id of the added file (0 if an error occurs)
 // 	(error) : if the operation fails
 func addFileTo(file *File, submissionID uint) (uint, error) {
-	// error cases 
+	// error cases
 	if file.Name == "" {
 		return 0, errors.New("File name must be set")
 	}

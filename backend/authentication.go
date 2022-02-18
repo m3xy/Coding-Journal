@@ -44,8 +44,13 @@ var JwtSecret string // JWT Secret variable.
 func getAuthSubRoutes(r *mux.Router) {
 	auth := r.PathPrefix(SUBROUTE_AUTH).Subrouter()
 
+	// Authentication routes:
+	// + POST /auth/login - Log in.
+	// + POST /auth/register - Register.
+	// + GET /auth/token  - Get new access token from a refresh token.
 	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
 	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_TOKEN, GetToken).Methods(http.MethodGet)
 
 	// Set up jwt secret
 	myEnv, err := godotenv.Read("secrets.env")

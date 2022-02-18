@@ -31,10 +31,7 @@ const (
 // Set up server used for authentication testing.
 func authServerSetup() *http.Server {
 	router := mux.NewRouter()
-
-	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
-	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
-	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
+	getAuthSubRoutes(router)
 
 	return &http.Server{
 		Addr:    TEST_PORT_AUTH,
