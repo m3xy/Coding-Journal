@@ -84,9 +84,9 @@ type Server struct {
 type Submission struct {
 	gorm.Model
 	// name of the submission
-	Name string `gorm:"not null;size:128;index" json:"Name"`
+	Name string `gorm:"not null;size:128;index" json:name"`
 	// license which the code is published under
-	License string `gorm:"size:64" json:"License"`
+	License string `gorm:"size:64" json:"license"`
 	// an array of the submission's files
 	Files []File `json:"files,omitempty"`
 	// an array of the submissions's authors
@@ -96,7 +96,7 @@ type Submission struct {
 	// tags for organizing/grouping code submissions
 	Categories []string `gorm:"-" json:"categories,omitempty"`
 	// metadata about the submission
-	MetaData *SubmissionData `gorm:"-" json:"MetaData,omitempty"`
+	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
 
 // Supergroup compliant code submissions (never stored in db)
@@ -113,9 +113,9 @@ type SupergroupSubmission struct {
 // JSON data file. This struct is never stored in the db
 type SubmissionData struct {
 	// abstract for the submission, to be displayed upon opening of any given submission
-	Abstract string `json:"Abstract"`
+	Abstract string `json:"abstract"`
 	// reviewer comments on the overall submission
-	Reviews []*Comment `json:"Reviews"`
+	Reviews []*Comment `json:"reviews"`
 }
 
 // supergroup compliant structure for meta-data of the submission
@@ -136,13 +136,13 @@ type SupergroupSubmissionData struct {
 type File struct {
 	gorm.Model
 	// id of the submission this file is a part of
-	SubmissionID uint `json:"SubmissionID"`
+	SubmissionID uint `json:"submissionId"`
 	// relative path to the file from the root of the submission's file structure
-	Path string `json:"Path"`
+	Path string `json:"path"`
 	// base name of the file with extension
-	Name string `json:"Name"`
+	Name string `json:"name"`
 	// content of the file encoded as a Base64 string (non-db field)
-	Base64Value string `gorm:"-" json:"Base64Value"`
+	Base64Value string `gorm:"-" json:"base64Value"`
 	// structure to hold the user comments on the file
 	Comments []Comment `json:"comments"`
 }
@@ -159,11 +159,11 @@ type SupergroupFile struct {
 type Comment struct {
 	gorm.Model
 	// author of the comment as an id
-	AuthorID string `json:"Author"`
+	AuthorID string `json:"author"`
 	// file which the comment belongs to
 	FileID uint `json:"fileId"`
 	// content of the comment as a string
-	Base64Value string `gorm:"type:mediumtext" json:"Base64Value"`
+	Base64Value string `gorm:"type:mediumtext" json:"base64Value"`
 	ParentID *uint `gorm:"default:NULL"` // pointer so it can be nil
 	Comments []Comment `gorm:"foreignKey:ParentID" json:"comments"`
 }
