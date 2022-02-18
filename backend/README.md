@@ -232,22 +232,22 @@ Uploading submissions from the local journal
 
 ```typescript
 interface Submission {
-    Name: string;
-    License: string;
-    Files: File[];
-    Authors: GlobalUser[];
-    Reviewers: GlobalUser[];
-    Categories: string[];
+    name: string;
+    license: string;
+    files: File[];
+    authors: GlobalUser[];
+    reviewers: GlobalUser[];
+    categories: string[];
 }
 
 interface File {
-    Path: string;
-    Name: string;
-    Base64Value: string; // base64 encoded content
+    path: string;
+    name: string;
+    base64Value: string; // base64 encoded content
 }
 
 interface GlobalUser {
-    ID: string
+    userId: string
 }
 ```
 
@@ -298,29 +298,69 @@ interface Submission {
     CreatedAt: DateTime;
     UpdatedAt: DateTime;
     DeletedAt: DateTime;
-    Name: string;
-    License: string;
-    Files: File[];
-    Authors: GlobalUser[];
-    Reviewers: GlobalUser[];
-    Categories: string[];
-    MetaData: SubmissionData;
+    name: string;
+    license: string;
+    files: File[];
+    authors: GlobalUser[];
+    reviewers: GlobalUser[];
+    categories: string[];
+    metaData: SubmissionData;
 }
 
 interface SubmissionData  {
-    Abstract: string;
-    Reviews: Comment[]
+    abstract: string;
+    reviews: Comment[]
 }
 
 interface File {
     ID: uint;
-    SubmissionID: uint;
-    Path: string;
-    Name: string;
+    submissionId: uint;
+    path: string;
+    name: string;
 }
 
 interface GlobalUser {
-    ID: string;
-    FullName: string;
+    userId: string;
+    fullName: string;
 }
 ```
+
+### User Comment Upload
+
+Uploads a user comment/comment reply to a given file
+
+1. Enpoint
+
+    The enpoint to upload submission is **POST** `/file/{id}/newcomment` where ID
+    is the submission ID as a uint
+
+2. Request
+
+    1. Headers - request needs no headers 
+
+    2. Body - Typescript object shown below
+
+```typescript
+interface NewCommentPostBody {
+	authorId: string
+	parentId: *uint // optionally set for replies
+	base64Value: string
+}
+```
+
+3. Response
+
+    1. Status
+
+        - 200 : Comment Added Successfully
+        - 400 : if the comment was not sent in the proper format
+        - 500 : if something else goes wrong in the server
+
+    2. Body - Typescript object shown below
+
+```typescript
+interface NewCommentResponse {
+    id: uint
+}
+```
+
