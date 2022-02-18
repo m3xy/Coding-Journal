@@ -132,15 +132,6 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	// gets the fileID, parentID, and authorID from the URL parameters
 	params := r.URL.Query()
 	authorID := params["authorID"][0]
-	// parentIDString := params["parentID"][0]
-	// parentID64, err := strconv.ParseUint(params["parentID"][0], 10, 32)
-	// if err != nil {
-	// 	log.Printf("[ERROR] ParentID: %s unable to be parsed", params["parentID"][0])
-	// 	w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
-	// 	return
-	// }
-	// parentID := uint(parentID64) 
-	// gets uint from uint64	
 	fileID64, err := strconv.ParseUint(params["fileID"][0], 10, 32)
 	if err != nil {
 		log.Printf("[ERROR] FileID: %s unable to be parsed", params["fileID"][0])
@@ -259,29 +250,9 @@ func addComment(comment *Comment) (uint, error) {
 		return 0, errors.New("Comment cannot be nil")
 	}
 	// adds the comment to the comments table with foreign key fileId and parentID
-	if err := gormDb.Model(&Comment{}).Create(comment).Error; err != nil {
-		return 0, err
-	}
-	return comment.ID, nil
-}
-
-// adds a comment reply to the database. The only difference here is that
-// a parentID is included
-// 
-// Parameters:
-// 	comment (*Comment) : the comment struct to be added
-// 	parentID (uint) : 
-// Return:
-// 	(uint) : comment ID if the comment is added successfully
-// 	(error) : an error if one occurs
-func addCommentReply(comment *Comment, parentID uint) (uint, error) {
-	if comment == nil {
-		return 0, errors.New("Comment cannot be nil")
-	}
-	// adds the comment to the comments table with foreign key fileId and parentID
-	parent := &Comment{}
-	parent.ID = parentID
-	if err := gormDb.Model(parent).Association("Comments").Append(comment); err != nil {
+	file := &File{}
+	file.ID = comment.FileID
+	if err := gormDb.Model(file).Association("Comments").Append(comment); err != nil {
 		return 0, err
 	}
 	return comment.ID, nil
@@ -303,6 +274,15 @@ func getFileData(fileID uint) (*File, error) {
 		if err := gormDb.Model(file).Find(file).Error; err != nil {
 			return err
 		}
+		// gets the file comments
+		comment := &Comment{}
+		comment.FileID = fileID
+		var comments []Comment
+		if err := gormDb.Model(comment).Preload("Comments").Where("comments.parent_id IS NULL").Find(&comments).Error; err != nil {
+			return err
+		}
+		file.Comments = comments
+
 		// queries the submission name
 		submission.ID = file.SubmissionID
 		if err := gormDb.Model(submission).Select("submissions.name").Find(submission).Error; err != nil {

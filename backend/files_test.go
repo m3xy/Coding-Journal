@@ -341,6 +341,66 @@ func TestAddComment(t *testing.T) {
 
 		testEnd()
 	})
+
+	// tests adding one valid comment. Uses the testAddComment() utility method
+	t.Run("Add Comment Reply", func(t *testing.T) {
+		testSubmission := testSubmissions[0] // test submission to add testFile to
+		testFile := testFiles[0]             // test file to add comments to
+		testAuthor := testAuthors[1]         // test author of comment
+		testComment := testComments[0]
+		testReply := testComments[1]
+
+		testInit()
+
+		// adds a submission for the test file to be added to
+		authorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+		reviewerID, err := registerUser(testReviewers[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "failed to add submission: %v", err)
+
+		fileID, err := addFileTo(&testFile, submissionID)
+		assert.NoErrorf(t, err, "failed to add file to submission: %v", err)
+
+		// adds a test user to author a comment
+		commentAuthorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "failed to add user to the database: %v", err)
+		testComment.AuthorID = commentAuthorID
+
+		// adds a comment to the file
+		testComment.FileID = fileID
+		commentID, err := addComment(testComment)
+		assert.NoError(t, err, "failed to add comment to the submission")
+
+		// adds a reply to the comment
+		testReply.FileID = fileID
+		testReply.ParentID = &commentID
+		_, err = addComment(testReply)
+		assert.NoError(t, err, "failed to add comment to the submission")
+
+		// gets the full file back
+		file, err := getFileData(fileID)
+		assert.NoError(t, err, "unable to retrieve file from db")
+		queriedComment := file.Comments[0]
+		queriedReply := file.Comments[0].Comments[0]
+
+		// checks for equality with comment structure
+		assert.Equal(t, fileID, queriedComment.FileID, "file IDs do not match")
+		assert.Equal(t, fileID, queriedReply.FileID, "file IDs do not match")
+		assert.Equal(t, testComment.AuthorID, queriedComment.AuthorID, "Comment author ID mismatch")
+		assert.Equal(t, testReply.AuthorID, queriedReply.AuthorID, "Reply author ID mismatch")
+		assert.Equal(t, testComment.Base64Value, queriedComment.Base64Value, "Comment content does not match")
+		assert.Equal(t, testReply.Base64Value, queriedReply.Base64Value, "Reply content does not match")
+		assert.Empty(t, testComment.ParentID, "ParentID for parent comment is not nil")
+		assert.Equal(t, queriedComment.ID, *queriedReply.ParentID, "ParentID of child comment does not match its parent's ID")
+
+		testEnd()
+	})
 }
 
 // Tests the ability of the backend helper functions to retrieve a file's data

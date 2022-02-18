@@ -164,7 +164,8 @@ type Comment struct {
 	FileID uint `json:"fileId"`
 	// content of the comment as a string
 	Base64Value string `gorm:"type:mediumtext" json:"Base64Value"`
-	// Comments []Comment `gorm:"foreignKey:ParentID;references:ID" json:"comments"`
+	ParentID *uint `gorm:"default:NULL"` // pointer so it can be nil
+	Comments []Comment `gorm:"foreignKey:ParentID" json:"comments"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
@@ -209,6 +210,14 @@ func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Clear every table rows in the database.
 func gormClear(db *gorm.DB) error {
+	// deletes comments w/ associations 
+	var comments []Comment
+	if err := db.Find(&comments).Error; err != nil {
+		return err
+	}
+	for _, comment := range comments {
+		db.Select(clause.Associations).Unscoped().Delete(&comment)
+	}
 	// deletes files w/ associations 
 	var files []File
 	if err := db.Find(&files).Error; err != nil {
