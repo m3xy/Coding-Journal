@@ -84,7 +84,7 @@ type Server struct {
 type Submission struct {
 	gorm.Model
 	// name of the submission
-	Name string `gorm:"not null;size:128;index" json:name"`
+	Name string `gorm:"not null;size:128;index" json:"name"`
 	// license which the code is published under
 	License string `gorm:"size:64" json:"license"`
 	// an array of the submission's files
@@ -163,9 +163,9 @@ type Comment struct {
 	// file which the comment belongs to
 	FileID uint `json:"fileId"`
 	// content of the comment as a string
-	Base64Value string `gorm:"type:mediumtext" json:"base64Value"`
-	ParentID *uint `gorm:"default:NULL"` // pointer so it can be nil
-	Comments []Comment `gorm:"foreignKey:ParentID" json:"comments"`
+	Base64Value string    `gorm:"type:mediumtext" json:"base64Value"`
+	ParentID    *uint     `gorm:"default:NULL"` // pointer so it can be nil
+	Comments    []Comment `gorm:"foreignKey:ParentID" json:"comments"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
@@ -210,7 +210,7 @@ func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Clear every table rows in the database.
 func gormClear(db *gorm.DB) error {
-	// deletes comments w/ associations 
+	// deletes comments w/ associations
 	var comments []Comment
 	if err := db.Find(&comments).Error; err != nil {
 		return err
@@ -218,7 +218,7 @@ func gormClear(db *gorm.DB) error {
 	for _, comment := range comments {
 		db.Select(clause.Associations).Unscoped().Delete(&comment)
 	}
-	// deletes files w/ associations 
+	// deletes files w/ associations
 	var files []File
 	if err := db.Find(&files).Error; err != nil {
 		return err
