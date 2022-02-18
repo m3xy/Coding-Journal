@@ -84,9 +84,9 @@ type Server struct {
 type Submission struct {
 	gorm.Model
 	// name of the submission
-	Name string `gorm:"not null;size:128;index" json:"Name"`
+	Name string `gorm:"not null;size:128;index" json:name"`
 	// license which the code is published under
-	License string `gorm:"size:64" json:"License"`
+	License string `gorm:"size:64" json:"license"`
 	// an array of the submission's files
 	Files []File `json:"files,omitempty"`
 	// an array of the submissions's authors
@@ -96,7 +96,7 @@ type Submission struct {
 	// tags for organizing/grouping code submissions
 	Categories []string `gorm:"-" json:"categories,omitempty"`
 	// metadata about the submission
-	MetaData *SubmissionData `gorm:"-" json:"MetaData,omitempty"`
+	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
 
 // Supergroup compliant code submissions (never stored in db)
@@ -113,9 +113,9 @@ type SupergroupSubmission struct {
 // JSON data file. This struct is never stored in the db
 type SubmissionData struct {
 	// abstract for the submission, to be displayed upon opening of any given submission
-	Abstract string `json:"Abstract"`
+	Abstract string `json:"abstract"`
 	// reviewer comments on the overall submission
-	Reviews []*Comment `json:"Reviews"`
+	Reviews []*Comment `json:"reviews"`
 }
 
 // supergroup compliant structure for meta-data of the submission
@@ -136,15 +136,15 @@ type SupergroupSubmissionData struct {
 type File struct {
 	gorm.Model
 	// id of the submission this file is a part of
-	SubmissionID uint `json:"SubmissionID"`
+	SubmissionID uint `json:"submissionId"`
 	// relative path to the file from the root of the submission's file structure
-	Path string `json:"Path"`
+	Path string `json:"path"`
 	// base name of the file with extension
-	Name string `json:"Name"`
+	Name string `json:"name"`
 	// content of the file encoded as a Base64 string (non-db field)
-	Base64Value string `gorm:"-" json:"Base64Value"`
-	// structure to hold the data from the file's metadata file
-	MetaData *FileData `gorm:"-" json:"MetaData"`
+	Base64Value string `gorm:"-" json:"base64Value"`
+	// structure to hold the user comments on the file
+	Comments []Comment `json:"comments"`
 }
 
 // Supergroup compliant file structure (never stored in db)
@@ -155,22 +155,17 @@ type SupergroupFile struct {
 	Base64Value string `json:"base64Value"`
 }
 
-// structure to hold json data from data files (never stored in db)
-type FileData struct {
-	// stores comments for the given code file
-	Comments []*Comment `json:"Comments"`
-}
-
 // Structure for user comments on code (not written to db)
 type Comment struct {
+	gorm.Model
 	// author of the comment as an id
-	AuthorID string `json:"Author"`
-	// time that the comment was recorded as a string
-	CreatedAt string `json:"CreatedAt"`
+	AuthorID string `json:"author"`
+	// file which the comment belongs to
+	FileID uint `json:"fileId"`
 	// content of the comment as a string
-	Base64Value string `json:"Base64Value"`
-	// replies TEMP: maybe don't allow nested replies?
-	Replies []*Comment `json:"Replies"`
+	Base64Value string `gorm:"type:mediumtext" json:"base64Value"`
+	ParentID *uint `gorm:"default:NULL"` // pointer so it can be nil
+	Comments []Comment `gorm:"foreignKey:ParentID" json:"comments"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
@@ -194,7 +189,7 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{})
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{}, &Comment{})
 	if err != nil {
 		goto ERR
 	}
@@ -215,7 +210,23 @@ func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Clear every table rows in the database.
 func gormClear(db *gorm.DB) error {
-	// deletes submissions w/ Authors/Reviewers Associations
+	// deletes comments w/ associations 
+	var comments []Comment
+	if err := db.Find(&comments).Error; err != nil {
+		return err
+	}
+	for _, comment := range comments {
+		db.Select(clause.Associations).Unscoped().Delete(&comment)
+	}
+	// deletes files w/ associations 
+	var files []File
+	if err := db.Find(&files).Error; err != nil {
+		return err
+	}
+	for _, file := range files {
+		db.Select(clause.Associations).Unscoped().Delete(&file)
+	}
+	// deletes submissions w/ associations
 	var submissions []Submission
 	if err := db.Find(&submissions).Error; err != nil {
 		return err
@@ -224,7 +235,7 @@ func gormClear(db *gorm.DB) error {
 		db.Select(clause.Associations).Unscoped().Delete(&submission)
 	}
 	// Deletes main tables
-	tables := []interface{}{&File{}, &Category{}, &User{}, &GlobalUser{}, &Submission{}}
+	tables := []interface{}{&Comment{}, &File{}, &Category{}, &User{}, &GlobalUser{}, &Submission{}}
 	for _, table := range tables {
 		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
 			Unscoped().Delete(table)

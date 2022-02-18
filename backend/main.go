@@ -28,12 +28,18 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
-	SUBROUTE_JOURNAL    = "/journal"
-	ENDPOINT_FILE       = "/submission/file"
-	ENDPOINT_NEWFILE    = "/upload"
-	ENDPOINT_USERINFO   = "/users"
-	ENDPOINT_NEWCOMMENT = "/submission/file/newcomment"
-	ENDPOINT_VALIDATE   = "/validate"
+	SUBROUTE_AUTH            = "/auth"
+	SUBROUTE_JOURNAL         = "/journal"
+	ENDPOINT_LOGIN           = "/login"
+	ENDPOINT_SIGNUP          = "/register"
+	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
+	ENDPOINT_SUBMISSION      = "/submission"
+	ENDPOINT_UPLOAD_SUBMISSION = "/submissions/create"
+	ENDPOINT_FILE            = "/submission/file"
+	ENDPOINT_NEWFILE         = "/upload"
+	ENDPOINT_USERINFO        = "/users"
+	ENDPOINT_NEWCOMMENT      = "/newcomment"
+	ENDPOINT_VALIDATE        = "/validate"
 )
 
 var prodLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{

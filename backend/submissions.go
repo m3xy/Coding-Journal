@@ -508,7 +508,9 @@ func getSubmissionCategories(submissionID uint) ([]string, error) {
 //	(error) : if something goes wrong during the query
 func getSubmissionFiles(submissionID uint) ([]File, error) {
 	var files []File
-	if err := gormDb.Where("files.submission_id = ?", submissionID).Find(&files).Error; err != nil {
+	file := &File{}
+	file.SubmissionID = submissionID
+	if err := gormDb.Model(file).Find(&files).Error; err != nil {
 		return nil, err
 	}
 	return files, nil
