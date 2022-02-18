@@ -10,6 +10,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,7 +20,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"bytes"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -90,8 +90,8 @@ var testReviewers []User = []User{
 func submissionServerSetup() *http.Server {
 	router := mux.NewRouter()
 
-	router.HandleFunc(ENDPOINT_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
-	router.HandleFunc("/{id}"+ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
+	router.HandleFunc(SUBROUTE_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
+	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 	router.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 
 	return &http.Server{
@@ -136,7 +136,9 @@ func TestGetAllSubmissions(t *testing.T) {
 		}
 
 		// builds and sends and http request to get the names and IDs of all submissions
-		req, err := http.NewRequest("GET", ADDRESS_SUBMISSION+"/"+authorID+ENDPOINT_ALL_SUBMISSIONS, nil)
+		//
+		urlString := fmt.Sprintf("%s%s/%s%s", ADDRESS_SUBMISSION, SUBROUTE_USER, authorID, ENDPOINT_SUBMISSIONS)
+		req, err := http.NewRequest("GET", urlString, nil)
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
 		assert.NoErrorf(t, err, "Error occurred while sending get request to the Go server: %v", err)
 		defer resp.Body.Close()
@@ -248,7 +250,7 @@ func TestRouteGetSubmission(t *testing.T) {
 
 		// creates a request to send to the test server
 		urlString := fmt.Sprintf("%s%s/%d", ADDRESS_SUBMISSION,
-			ENDPOINT_SUBMISSION, submissionID)
+			SUBROUTE_SUBMISSION, submissionID)
 		fmt.Println(urlString)
 		req, _ := http.NewRequest("GET", urlString, nil)
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)

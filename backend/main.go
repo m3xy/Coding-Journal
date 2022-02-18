@@ -28,18 +28,12 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
-	SUBROUTE_AUTH            = "/auth"
-	SUBROUTE_JOURNAL         = "/journal"
-	ENDPOINT_LOGIN           = "/login"
-	ENDPOINT_SIGNUP          = "/register"
-	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
-	ENDPOINT_SUBMISSION      = "/submission"
-	ENDPOINT_UPLOAD_SUBMISSION = "/submissions/create"
-	ENDPOINT_FILE            = "/submission/file"
-	ENDPOINT_NEWFILE         = "/upload"
-	ENDPOINT_USERINFO        = "/users"
-	ENDPOINT_NEWCOMMENT      = "/submission/file/newcomment"
-	ENDPOINT_VALIDATE        = "/validate"
+	SUBROUTE_JOURNAL    = "/journal"
+	ENDPOINT_FILE       = "/submission/file"
+	ENDPOINT_NEWFILE    = "/upload"
+	ENDPOINT_USERINFO   = "/users"
+	ENDPOINT_NEWCOMMENT = "/submission/file/newcomment"
+	ENDPOINT_VALIDATE   = "/validate"
 )
 
 var prodLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
@@ -95,23 +89,19 @@ func setupCORSsrv() *http.Server {
 	})
 
 	// Setup all routes.
-	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
 
 	// Auth subroutes
-	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
-	getAuthSubRoutes(auth)
+	getAuthSubRoutes(router)
 
 	// Journal subroutes
-	journal := router.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
-	getJournalSubroute(journal)
+	getJournalSubroute(router)
 
 	// Users subroutes
 	getUserSubroutes(router)
 
 	// Submissions and files routes
-	submissions := router.PathPrefix("/").Subrouter()
-	getSubmissionsSubRoutes(submissions)
+	getSubmissionsSubRoutes(router)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
