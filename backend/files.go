@@ -51,7 +51,7 @@ const (
 func getFilesSubRoutes(r *mux.Router) {
 	files := r.PathPrefix("/").Subrouter()
 	files.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
-	files.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("file/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // -----
@@ -82,7 +82,7 @@ func getFilesSubRoutes(r *mux.Router) {
 // 				author: int
 // 				CreatedAt: datetime string
 // 				base64Value: string
-// 				replies: object (same as comments)
+// 				comments: array of objects (same as comments)
 func getFile(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
@@ -124,39 +124,38 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 // 	401 : if the request does not have the proper security token
 // 	400 : if the comment was not sent in the proper format
 // 	500 : if something else goes wrong in the backend
-// Response Body: empty
+// Response Body: {ID: <comment ID>}
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the fileID, parentID, and authorID from the URL parameters
-	params := r.URL.Query()
-	authorID := params["authorID"][0]
-	fileID64, err := strconv.ParseUint(params["fileID"][0], 10, 32)
+	// gets the fileID from URL parameters
+	params := mux.Vars(r)
+	fileID64, err := strconv.ParseUint(params["id"], 10, 32)
 	if err != nil {
-		log.Printf("[ERROR] FileID: %s unable to be parsed", params["fileID"][0])
-		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
+		log.Printf("[ERROR] unable to parse file ID from URL: %s", params["id"])
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	fileID := uint(fileID64) // gets uint from uint64
+	fileID := uint(fileID64)
 
-	// parses the json request body into a map (should just contain base64 comment content)
-	var request map[string]interface{}
-	err = json.NewDecoder(r.Body).Decode(&request)
-	if err != nil {
-		log.Printf("[ERROR] JSON decoding failed: %v", err)
+	// decodes the request body
+	requestBody := &NewCommentPostBody{}
+	if err := json.NewDecoder(r.Body).Decode(requestBody); err != nil {
+		log.Printf("[ERROR] Request body decoding failed: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	// Insert data into Comment structure
 	comment := &Comment{
-		AuthorID:    authorID, // authors user id
+		AuthorID:    requestBody.AuthorID, // authors user id
 		FileID: 	fileID,
-		Base64Value: request[getJsonTag(&Comment{}, "Base64Value")].(string),
+		ParentID: 	requestBody.ParentID, // nil if this is not a reply
+		Base64Value: requestBody.Base64Value,
 	}
 
-	// adds the comment to the file, returns code OK if successful
+	// adds the comment to the file
 	commentID, err := addComment(comment)
 	if err != nil {
 		log.Printf("[ERROR] Comment creation failed: %v\n", err)
@@ -165,9 +164,8 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// writes the commentID to the response
-	respMap := make(map[string]uint)
-	respMap["ID"] = commentID
-	response, err := json.Marshal(respMap)
+	respBody := &NewCommentResponse{ID: commentID}
+	response, err := json.Marshal(respBody)
 	if err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -293,7 +291,7 @@ func getFileData(fileID uint) (*File, error) {
 		return nil, err
 	}
 
-	// builds path to the file and it's corresponding data file using the queried submission name
+	// builds path to the file using the queried submission name
 	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(file.SubmissionID), submission.Name, file.Path)
 
 	// gets file content

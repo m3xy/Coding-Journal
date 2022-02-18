@@ -37,7 +37,7 @@ const (
 func resourceServerSetup() *http.Server {
 	router := mux.NewRouter()
 	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet)
-	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	router.HandleFunc("/file/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 
 	return &http.Server{
 		Addr:    TEST_PORT_FILES,
@@ -58,12 +58,12 @@ var testComments []*Comment = []*Comment{
 	{
 		AuthorID:    "",
 		Base64Value: "Hello World",
-		// Comments:     []Comment{},
+		Comments:     []Comment{},
 	},
 	{
 		AuthorID:    "",
 		Base64Value: "Goodbye World",
-		// Comments:     []Comment{},
+		Comments:     []Comment{},
 	},
 }
 
@@ -160,11 +160,11 @@ func TestUploadUserComment(t *testing.T) {
 		testSubmission.Authors = []GlobalUser{{ID: subAuthorID}}
 
 		submissionID, err := addSubmission(&testSubmission)
-		assert.NoErrorf(t, err, "error occurred while adding testSubmission: %v", err)
+		assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err)
 
 		// adds the file to the submission
 		fileID, err := addFileTo(&testFile, submissionID)
-		assert.NoErrorf(t, err, "error occurred while adding testSubmission: %v", err)
+		assert.NoErrorf(t, err, "error occurred while adding test file: %v", err)
 
 		// registers the test author for the comment
 		authorID, err := registerUser(testAuthor)
@@ -172,21 +172,22 @@ func TestUploadUserComment(t *testing.T) {
 		testComment.AuthorID = authorID // sets test comment author
 
 		// formats the request body to send to the server to add a comment
-		reqBody, err := json.Marshal(map[string]interface{}{
-			getJsonTag(&Comment{}, "Base64Value"): testComment.Base64Value,
+		reqBody, err := json.Marshal(&NewCommentPostBody{
+			AuthorID: authorID,
+			Base64Value: testComment.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s?%s=%s&%s=%d", TEST_FILES_ADDRESS, ENDPOINT_NEWCOMMENT,
-			"authorID", authorID, "fileID", fileID), bytes.NewBuffer(reqBody))
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/file/%d%s", TEST_FILES_ADDRESS, fileID, ENDPOINT_NEWCOMMENT),
+			bytes.NewBuffer(reqBody))
 		assert.NoErrorf(t, err, "Error creating request: %v", err)
 
 		// sends a request to the server to post a user comment
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
 		assert.NoErrorf(t, err, "Error executing request: %v", err)
 		defer resp.Body.Close()
-		assert.Equalf(t, resp.StatusCode, http.StatusOK, "HTTP request error: %d", resp.StatusCode)
+		assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
 		// gets the comment from the db
 		addedComment := &Comment{}
@@ -197,6 +198,80 @@ func TestUploadUserComment(t *testing.T) {
 		assert.Equal(t, fileID, addedComment.FileID, "file IDs do not match")
 		assert.Equal(t, testComment.AuthorID, addedComment.AuthorID, "Comment author ID mismatch")
 		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
+
+		// clears environment
+		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
+		testEnd()
+	})
+
+	// upload a single user comment to a valid file in a valid submission
+	t.Run("Upload Single Comment Reply", func(t *testing.T) {
+		// the test values added to the db and filesystem (saved here so it can be easily changed)
+		testFile := testFiles[0]
+		testSubmission := testSubmissions[0]
+		testAuthor := testAuthors[1] // author of the comment
+		testComment := testComments[0]
+		testReply := testComments[1]
+
+		// Set up server and configures filesystem/db
+		testInit()
+		srv := resourceServerSetup()
+		go srv.ListenAndServe()
+
+		// adds test values to the db and filesystem
+		subAuthorID, err := registerUser(testAuthors[0])
+		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+		testSubmission.Authors = []GlobalUser{{ID: subAuthorID}}
+
+		submissionID, err := addSubmission(&testSubmission)
+		assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err)
+
+		// adds the file to the submission
+		fileID, err := addFileTo(&testFile, submissionID)
+		assert.NoErrorf(t, err, "error occurred while adding test file: %v", err)
+		testComment.FileID = fileID
+		testReply.FileID = fileID
+
+		// registers the test author for the comment
+		authorID, err := registerUser(testAuthor)
+		assert.NoErrorf(t, err, "error occurred while adding testAuthor: %v", err)
+		testComment.AuthorID = authorID // sets test comment author
+		testReply.AuthorID = authorID
+
+		// adds the initial comment without using the server
+		commentID, err := addComment(testComment)
+		assert.NoError(t, err, "error occurred while adding parent comment")
+
+		// formats the request body to send to the server to add a comment
+		reqBody, err := json.Marshal(&NewCommentPostBody{
+			AuthorID: authorID,
+			ParentID: &commentID,
+			Base64Value: testReply.Base64Value,
+		})
+		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
+
+		// formats and executes the request
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/file/%d%s", TEST_FILES_ADDRESS, fileID, ENDPOINT_NEWCOMMENT),
+			bytes.NewBuffer(reqBody))
+		assert.NoErrorf(t, err, "Error creating request: %v", err)
+
+		// sends a request to the server to post a user comment
+		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
+		assert.NoErrorf(t, err, "Error executing request: %v", err)
+		defer resp.Body.Close()
+		assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
+
+		// gets the added comment via its file to verify the parent -> child structure is correct
+		file, err := getFileData(fileID)
+		assert.NoError(t, err, "error retrieving test file")
+		assert.Equal(t, 1, len(file.Comments), "comment array is incorrect length. Child comment returned on top level of comment tree structure")
+		addedReply := file.Comments[0].Comments[0]
+
+		// compares the queried comment to that which was sent
+		assert.Equal(t, fileID, addedReply.FileID, "file IDs do not match")
+		assert.Equal(t, testReply.AuthorID, addedReply.AuthorID, "Comment author ID mismatch")
+		assert.Equal(t, commentID, *addedReply.ParentID, "Parent ID mismatch")
+		assert.Equal(t, testReply.Base64Value, addedReply.Base64Value, "Comment content does not match")
 
 		// clears environment
 		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
@@ -386,6 +461,7 @@ func TestAddComment(t *testing.T) {
 		// gets the full file back
 		file, err := getFileData(fileID)
 		assert.NoError(t, err, "unable to retrieve file from db")
+		assert.Equal(t, 1, len(file.Comments), "comment array is incorrect length. Child comment returned on top level of comment tree structure")
 		queriedComment := file.Comments[0]
 		queriedReply := file.Comments[0].Comments[0]
 

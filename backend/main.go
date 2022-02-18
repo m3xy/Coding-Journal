@@ -38,7 +38,7 @@ const (
 	ENDPOINT_FILE            = "/submission/file"
 	ENDPOINT_NEWFILE         = "/upload"
 	ENDPOINT_USERINFO        = "/users"
-	ENDPOINT_NEWCOMMENT      = "/submission/file/newcomment"
+	ENDPOINT_NEWCOMMENT      = "/newcomment"
 	ENDPOINT_VALIDATE        = "/validate"
 )
 
