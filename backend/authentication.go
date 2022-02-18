@@ -31,14 +31,21 @@ const (
 	A_NUMS        = "a-zA-Z0-9"
 	CLAIM_BEARER  = "bearer"
 	CLAIM_REFRESH = "refresh"
+
+	ENDPOINT_TOKEN  = "/token"
+	SUBROUTE_AUTH   = "/auth"
+	ENDPOINT_LOGIN  = "/login"
+	ENDPOINT_SIGNUP = "/register"
 )
 
 var JwtSecret string // JWT Secret variable.
 
 // Subrouter
 func getAuthSubRoutes(r *mux.Router) {
-	r.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
-	r.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	auth := r.PathPrefix(SUBROUTE_AUTH).Subrouter()
+
+	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
 
 	// Set up jwt secret
 	myEnv, err := godotenv.Read("secrets.env")
@@ -65,35 +72,35 @@ func PostAuthLogIn(w http.ResponseWriter, r *http.Request) {
 	var credentials AuthLoginPostBody
 	var encodable interface{}
 	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
-		if err := json.NewEncoder(w).Encode(&StandardResponse{
+		encodable = StandardResponse{
 			Message: "Email or password incorrectly formed!",
 			Error:   true,
-		}); err != nil {
-			log.Printf("[ERROR] JSON Encoding error: %v", err)
 		}
 		log.Printf("[WARN] Request body not correctly formed: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
+	} else {
+		// Get access token from controller.
+		response, status := ControllerAuthLogin(credentials)
+		switch {
+		case status == http.StatusInternalServerError:
+			encodable = StandardResponse{Message: "Internal Server Error", Error: true}
+			break
+		case status == http.StatusUnauthorized:
+			encodable = StandardResponse{Message: "Email or password incorrect!", Error: true}
+			break
+		case status == http.StatusOK:
+			encodable = response
+		}
+
+		// Send response
+		w.WriteHeader(status)
 	}
 
-	// Get access token from controller.
-	response, status := ControllerAuthLogin(credentials)
-	switch {
-	case status == http.StatusInternalServerError:
-		encodable = &StandardResponse{Message: "Internal Server Error", Error: true}
-		break
-	case status == http.StatusUnauthorized:
-		encodable = &StandardResponse{Message: "Email or password incorrect!", Error: true}
-		break
-	case status == http.StatusOK:
-		encodable = response
-	}
-
-	// Send response
-	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(encodable); err != nil {
 		log.Printf("[ERROR] Response encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+
 }
 
 // Controller for the Auth Login POST method.
@@ -146,7 +153,7 @@ func GetForeignUserID(credentials AuthLoginPostBody) (string, error) {
 		ID string `json:"userId"`
 	}
 	if resp, err := func() (*http.Response, error) {
-		if body, err := json.Marshal(JournalLoginPostBody{credentials.Email, credentials.Password}); err != nil {
+		if body, err := json.Marshal(JournalLoginPostBody{Email: credentials.Email, Password: credentials.Password}); err != nil {
 			log.Printf("[ERROR] JSON body encoding failed: %v", err)
 			return nil, err
 		} else if req, err := http.NewRequest(http.MethodPost, retServer.Url+ENDPOINT_LOGIN, bytes.NewBuffer(body)); err != nil {
@@ -198,7 +205,42 @@ func GetLocalUserID(credentials JournalLoginPostBody) (string, int) {
   Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
 */
 func GetToken(w http.ResponseWriter, r *http.Request) {
+	refreshToken := r.Header.Get("refresh_token")
+	var body interface{}
 
+	// Validate refresh token, and create new tokens.
+	if ok, user := validateWebToken(refreshToken, "refresh"); !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		body = StandardResponse{
+			Message: "Given refresh token is invalid!",
+			Error:   true,
+		}
+	} else if token, err := createToken(user, "bearer"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		body = StandardResponse{
+			Message: "Access token creation failed!",
+			Error:   true,
+		}
+	} else if newRefresh, err := createToken(user, "refresh"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		body = StandardResponse{
+			Message: "Refresh token creation failed!",
+			Error:   true,
+		}
+	} else {
+		body = AuthLogInResponse{
+			AccessToken:  token,
+			RefreshToken: newRefresh,
+			Expires:      3600,
+			RedirectUrl:  "",
+		}
+	}
+
+	// Send response
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("[ERROR] Response parsing failed: %v", err)
+	}
 }
 
 // Validate the user's access token.
@@ -256,26 +298,43 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
+	var message string
 	user := &User{}
 	if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
+		message = "Registration failed - Wrong fields provided."
 		goto ERROR
 	}
 	if validator.Validate(*user) != nil {
 		log.Printf("[WARN] Invalid password format received.")
+		message = "Registration failed - invalid password"
 		goto ERROR
 	}
 
 	if _, err := registerUser(*user); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
+		message = "Registration failed - " + err.Error()
 		goto ERROR
 	}
+
+	//
 	log.Printf("[INFO] User signup from %s successful.", r.RemoteAddr)
-	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(StandardResponse{
+		Message: "Registration successful!",
+		Error:   false,
+	}); err != nil {
+		log.Printf("[ERROR] JSON encoding failed: %v", err)
+	}
 	return
 
 ERROR:
 	w.WriteHeader(http.StatusBadRequest)
+	if err := json.NewEncoder(w).Encode(StandardResponse{
+		Message: message,
+		Error:   true,
+	}); err != nil {
+		log.Printf("[ERROR] JSON encoding failed: %v", err)
+	}
 	return
 }
 

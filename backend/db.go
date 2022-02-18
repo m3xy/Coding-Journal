@@ -62,11 +62,11 @@ type User struct {
 type GlobalUser struct {
 	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
 	FullName            string       `json:"fullName"`
-	User                User         `json:"Profile,omitempty"`
+	User                User         `json:"profile,omitempty"`
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
 	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
 
-	CreatedAt time.Time      `json:"CreatedAt"`
+	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"-"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

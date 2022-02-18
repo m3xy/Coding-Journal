@@ -12,8 +12,10 @@ import (
 // Authors: 190014935
 
 func getJournalSubroute(r *mux.Router) {
-	r.Use(journalMiddleWare)
-	r.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+	journal := r.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
+
+	journal.Use(journalMiddleWare)
+	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // Validate if given security token works.

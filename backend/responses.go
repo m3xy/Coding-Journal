@@ -34,13 +34,14 @@ type NewCommentResponse struct {
 type AuthLoginPostBody struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
-	GroupNumber int    `json:"groupNumber"`
+	GroupNumber int    `json:"groupNumber,string"`
 }
 
 // POST /journal/login body.
 type JournalLoginPostBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	GroupNumber string `json:"groupNumber"`
 }
 
 // POST /file/{id}/newcomment body. {id} in the URL is the file id

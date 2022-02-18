@@ -89,30 +89,25 @@ func setupCORSsrv() *http.Server {
 
 	// sets up handler for CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
+		AllowedOrigins: []string{"http://0.0.0.0:23409", "http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
 		AllowedHeaders: []string{"content-type", SECURITY_TOKEN_KEY, "bearer_token", "refresh_token", "user"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PUT"},
 	})
 
 	// Setup all routes.
-	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
 
 	// Auth subroutes
-	auth := router.PathPrefix(SUBROUTE_AUTH).Subrouter()
-	getAuthSubRoutes(auth)
+	getAuthSubRoutes(router)
 
 	// Journal subroutes
-	journal := router.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
-	getJournalSubroute(journal)
+	getJournalSubroute(router)
 
 	// Users subroutes
-	users := router.PathPrefix(SUBROUTE_USERS).Subrouter()
-	getUserSubroutes(users)
+	getUserSubroutes(router)
 
 	// Submissions and files routes
-	submissions := router.PathPrefix("/").Subrouter()
-	getSubmissionsSubRoutes(submissions)
+	getSubmissionsSubRoutes(router)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{

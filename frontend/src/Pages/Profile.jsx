@@ -9,18 +9,13 @@ import React, { useState, useEffect } from "react";
 import { Tabs, Tab, ListGroup } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../Web/axiosInstance";
+import JwtService from "../Web/jwt.service";
 
-const profileEndpoint = '/users';
+const profileEndpoint = '/user';
 
 function getUserID() {
-	let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
-	for (let i = 0; i < cookies.length; i++) {    //For each cookie,
-		let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-		if (cookie[0].trim() == "userId") {       //  If userId key exists, extract the userId value
-			return cookie[1].trim();
-		}
-	}
-	return null;
+	let user = JwtService.getUserID();
+	return user;
 }
 
 function Profile() {
@@ -46,13 +41,13 @@ function Profile() {
 		axiosInstance.get(profileEndpoint + "/" + getUserID())
 			.then((response) => {
 				console.log(response.data);
-				setFirstname(response.data.firstname)
-				setLastname(response.data.lastname)
-				setUsertype(response.data.usertype)
-				setEmail(response.data.email)
-				setPhoneNumber(response.data.phonenumber)
-				setOrganization(response.data.organization)
-				setSubmissions(response.data.submissions)
+				setFirstname(response.data.profile.firstName)
+				setLastname(response.data.profile.lastName)
+				setUsertype(response.data.profile.userType)
+				setEmail(response.data.profile.email)
+				setPhoneNumber(response.data.profile.phoneNumber)
+				setOrganization(response.data.profile.organization)
+				// setSubmissions(response.data.submissions)
 			})
 			.catch(() => {
 				return (<div></div>)

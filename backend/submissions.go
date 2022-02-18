@@ -26,20 +26,28 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
-	"io/ioutil"
-	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
+const (
+	ENDPOINT_UPLOAD_SUBMISSION = "/create"
+	SUBROUTE_SUBMISSION        = "/submission"
+	ENDPOINT_SUBMISSIONS       = "/submissions"
+)
+
 func getSubmissionsSubRoutes(r *mux.Router) {
-	r.HandleFunc(ENDPOINT_SUBMISSION, RouteGetSubmission).Methods(http.MethodGet)
-	r.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc(SUBROUTE_SUBMISSION+"/{id}", RouteGetSubmission).Methods(http.MethodGet)
+
+	submissions := r.PathPrefix(ENDPOINT_SUBMISSIONS).Subrouter()
+	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ------
