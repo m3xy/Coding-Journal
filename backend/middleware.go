@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 )
 
@@ -25,22 +24,15 @@ func journalMiddleWare(next http.Handler) http.Handler {
 func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if ok, id := validateWebToken(r.Header.Get("Authorization"), CLAIM_BEARER); !ok {
-			goto FAILURE
+			next.ServeHTTP(w, r)
 		} else {
 			if !isUnique(gormDb, &GlobalUser{}, "id", id) {
 				ctx := context.WithValue(r.Context(), "userId", id)
 				next.ServeHTTP(w, r.WithContext(ctx))
 			} else {
-				goto FAILURE
+				next.ServeHTTP(w, r)
 			}
 		}
-
 		return
-	FAILURE:
-		_ = json.NewEncoder(w).Encode(StandardResponse{
-			Message: "User is not logged in!",
-			Error:   true,
-		})
-		w.WriteHeader(http.StatusUnauthorized)
 	})
 }

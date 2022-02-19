@@ -55,6 +55,7 @@ const (
 
 func getFilesSubRoutes(r *mux.Router) {
 	files := r.PathPrefix(SUBROUTE_FILE).Subrouter()
+	files.Use(jwtMiddleware)
 
 	// File subroutes:
 	// + GET /file/{id} - Get given file.
@@ -138,50 +139,46 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
-	// gets the fileID from URL parameters
-	params := mux.Vars(r)
-	fileID64, err := strconv.ParseUint(params["id"], 10, 32)
+	// Initialise message, response, and parameters.
+	var message string
+	var encodable interface{}
+	req := &NewCommentPostBody{}
+
+	// Check function parameters in path and body.
+	fileID64, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 32)
 	if err != nil {
-		log.Printf("[ERROR] unable to parse file ID from URL: %s", params["id"])
+		message = "File ID given is not a number."
 		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	fileID := uint(fileID64)
-
-	// decodes the request body
-	requestBody := &NewCommentPostBody{}
-	if err := json.NewDecoder(r.Body).Decode(requestBody); err != nil {
-		log.Printf("[ERROR] Request body decoding failed: %v", err)
+		goto RETURN
+	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		message = "Request format is invalid."
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		goto RETURN
 	}
 
-	// Insert data into Comment structure
-	comment := &Comment{
-		AuthorID:    requestBody.AuthorID, // authors user id
-		FileID:      fileID,
-		ParentID:    requestBody.ParentID, // nil if this is not a reply
-		Base64Value: requestBody.Base64Value,
-	}
-
-	// adds the comment to the file
-	commentID, err := addComment(comment)
-	if err != nil {
-		log.Printf("[ERROR] Comment creation failed: %v\n", err)
+	// Get author ID from request, and add comment.
+	if commentID, err := addComment(&Comment{
+		AuthorID: r.Context().Value("userId").(string), FileID: uint(fileID64),
+		ParentID: req.ParentID, Base64Value: req.Base64Value,
+	}); err != nil {
+		message = "Comment creation failed."
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+	} else {
+		encodable = NewCommentResponse{ID: commentID}
+		goto RETURN
 	}
 
-	// writes the commentID to the response
-	respBody := &NewCommentResponse{ID: commentID}
-	response, err := json.Marshal(respBody)
-	if err != nil {
+RETURN:
+	// Encode response - set as error if empty
+	if encodable != nil {
+		encodable = StandardResponse{Message: message, Error: true}
+	} else if err := json.NewEncoder(w).Encode(encodable); err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+	} else {
+		log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
 	}
-	log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
-	w.Write(response)
+	return
 }
 
 // -----
@@ -253,8 +250,11 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 //	(uint) : the id of the added comment
 //	(error) : an error if one occurs, nil otherwise
 func addComment(comment *Comment) (uint, error) {
+	// Check parameters.
 	if comment == nil {
 		return 0, errors.New("Comment cannot be nil")
+	} else if comment.AuthorID == "" {
+		return 0, errors.New("The author must exist.")
 	}
 	// adds the comment to the comments table with foreign key fileId and parentID
 	file := &File{}

@@ -39,15 +39,14 @@ type AuthLoginPostBody struct {
 
 // POST /journal/login body.
 type JournalLoginPostBody struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
 	GroupNumber string `json:"groupNumber"`
 }
 
 // POST /file/{id}/newcomment body. {id} in the URL is the file id
 type NewCommentPostBody struct {
-	AuthorID string `json:"authorId"`
-	ParentID *uint `json:"parentId,omitempty"` // optionally set for replies
+	ParentID    *uint  `json:"parentId,omitempty"` // optionally set for replies
 	Base64Value string `json:"base64Value"`
 }
 
