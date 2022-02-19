@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -109,19 +110,20 @@ func submissionServerSetup() *http.Server {
 // 	- TestAddSubmission
 // 	- TestGetAuthoredSubmissions
 func TestGetAllSubmissions(t *testing.T) {
+	// Set up server and test environment
+	testInit()
+	defer testEnd()
+	srv := submissionServerSetup()
+	go srv.ListenAndServe()
+
+	// registers authors and reviewers of the submissions (same for all submissions here)
+	authorID, err := registerUser(testAuthors[0])
+	assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+	reviewerID, err := registerUser(testReviewers[0])
+	assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+
 	// tests that multiple valid submissions can be uploaded, then retrieved from the database
 	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
-		// Set up server and test environment
-		testInit()
-		srv := submissionServerSetup()
-		go srv.ListenAndServe()
-
-		// registers authors and reviewers of the submissions (same for all submissions here)
-		authorID, err := registerUser(testAuthors[0])
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-
-		reviewerID, err := registerUser(testReviewers[0])
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 
 		// adds all of the submissions and stores their ids and names
 		sentSubmissions := make(map[uint]string) // variable to hold the id: submission name mappings which are sent to the db
@@ -134,7 +136,6 @@ func TestGetAllSubmissions(t *testing.T) {
 		}
 
 		// builds and sends and http request to get the names and IDs of all submissions
-		//
 		urlString := fmt.Sprintf("%s%s/%s%s", ADDRESS_SUBMISSION, SUBROUTE_USER, authorID, ENDPOINT_SUBMISSIONS)
 		req, err := http.NewRequest("GET", urlString, nil)
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
@@ -149,66 +150,95 @@ func TestGetAllSubmissions(t *testing.T) {
 			assert.Equalf(t, v, sentSubmissions[k],
 				"Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
 		}
-
-		// clears test env and shuts down the test server
-		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-		testEnd()
 	})
 }
 
 // Tests that submissions.go can upload submissions properly
 func TestUploadSubmission(t *testing.T) {
+	// Set up server and configures filesystem/db
+	testInit()
+	defer testEnd()
+
+	// Set testing variables for tests.
+	testSubmission := testSubmissions[0]
+	testFile := testFiles[0]
+	testSubmission.Files = []File{testFile}
+	testAuthor := testAuthors[0]
+	testReviewer := testReviewers[0]
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_SUBMISSIONS+ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission)
+	route := ENDPOINT_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
+
+	// registers author and reviewer
+	authorID, err := registerUser(testAuthor)
+	if !assert.NoErrorf(t, err, "Error registering author in the db: %v", err) {
+		return
+	}
+	testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+	reviewerID, err := registerUser(testReviewer)
+	if !assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err) {
+		return
+	}
+	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
 	// tests that a single valid submission with one reviewer and one author can be retrieved
 	t.Run("Upload Single Valid Submission", func(t *testing.T) {
-		testSubmission := testSubmissions[0]
-		testFile := testFiles[0]
-		testSubmission.Files = []File{testFile}
-		testAuthor := testAuthors[0]
-		testReviewer := testReviewers[0]
-
-		// Set up server and configures filesystem/db
-		testInit()
-		srv := submissionServerSetup()
-		go srv.ListenAndServe()
-
-		// registers author and reviewer
-		authorID, err := registerUser(testAuthor)
-		assert.NoErrorf(t, err, "Error registering author in the db: %v", err)
-		testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-		reviewerID, err := registerUser(testReviewer)
-		assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err)
-		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
 		// constructs the request body
 		reqBody, err := json.Marshal(testSubmission)
-		assert.NoError(t, err, "Error marshalling test submission to Json")
+		if !assert.NoError(t, err, "Error marshalling test submission to Json") {
+			return
+		}
 
 		// creates a request to send to the test server
-		urlString := fmt.Sprintf("%s%s%s", ADDRESS_SUBMISSION, ENDPOINT_SUBMISSIONS, ENDPOINT_UPLOAD_SUBMISSION)
-		req, _ := http.NewRequest("POST", urlString, bytes.NewBuffer(reqBody))
-		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
-		assert.NoErrorf(t, err, "Error while sending Post request: %v", err)
+		req, w := httptest.NewRequest("POST", route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+		router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", authorID)))
+		resp := w.Result()
 		defer resp.Body.Close()
-		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
+		if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from request: %d", resp.StatusCode) {
+			return
+		}
 
 		// gets the added submission back
 		respBody := &Submission{}
 		err = json.NewDecoder(resp.Body).Decode(&respBody)
 		uploadedSubmission, err := getSubmission(respBody.ID)
-		assert.NoError(t, err, "Error retrieving uploaded submission")
+		if !assert.NoError(t, err, "Error retrieving uploaded submission") {
+			return
+		}
 
 		// tests that the returned submission matches the passed in data
-		assert.Equal(t, respBody.ID, uploadedSubmission.ID, "Submission IDs do not match")
-		assert.Equal(t, testSubmission.Name, uploadedSubmission.Name, "Submission Names do not match.")
-		assert.Equal(t, authorID, uploadedSubmission.Authors[0].ID, "Author IDs do not match")
-		assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, uploadedSubmission.Authors[0].FullName, "Author Names not match")
-		assert.Equal(t, reviewerID, uploadedSubmission.Reviewers[0].ID, "Reviewer IDs not match")
-		assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, uploadedSubmission.Reviewers[0].FullName, "Reviewer Names not match")
+		switch {
+		case !assert.Equal(t, respBody.ID, uploadedSubmission.ID, "Submission IDs do not match"):
+		case !assert.Equal(t, testSubmission.Name, uploadedSubmission.Name, "Submission Names do not match."):
+		case !assert.Equal(t, authorID, uploadedSubmission.Authors[0].ID, "Author IDs do not match"):
+		case !assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, uploadedSubmission.Authors[0].FullName,
+			"Author Names not match"):
+		case !assert.Equal(t, reviewerID, uploadedSubmission.Reviewers[0].ID, "Reviewer IDs not match"):
+		case !assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, uploadedSubmission.Reviewers[0].FullName,
+			"Reviewer Names not match"):
+			return
+		}
+	})
 
-		// clears test env and shuts down the test server
-		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-		testEnd()
+	t.Run("Upload unauthenticated", func(t *testing.T) {
+		// constructs the request body
+		reqBody, err := json.Marshal(testSubmission)
+		if !assert.NoError(t, err, "Error marshalling test submission to Json") {
+			return
+		}
+
+		// Make request without userId context.
+		req, w := httptest.NewRequest("POST", route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+		if !assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Request should return code 401 but got: %d", resp.StatusCode) {
+			return
+		}
+
 	})
 }
 

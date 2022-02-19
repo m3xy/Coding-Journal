@@ -46,6 +46,7 @@ const (
 func getSubmissionsSubRoutes(r *mux.Router) {
 	submissions := r.PathPrefix(ENDPOINT_SUBMISSIONS).Subrouter()
 	submission := r.PathPrefix(SUBROUTE_SUBMISSION).Subrouter()
+	submissions.Use(jwtMiddleware)
 
 	// Submission routes:
 	// + /submission/{id} - Get given submission.
@@ -106,35 +107,49 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
+	resp := UploadSubmissionResponse{}
+
 	// parses the Json request body into a submission struct
-	submission := &Submission{}
-	err := json.NewDecoder(r.Body).Decode(submission)
-	if err != nil {
-		log.Printf("[ERROR] JSON decoding failed: %v", err)
+	submission := Submission{}
+	if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
+		log.Printf("[WARN] JSON decoding failed: %v", err)
+		resp.Message = "Incorrect submission fields."
+		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		goto RETURN
+	}
+
+	// Get user authentication
+	if r.Context().Value("userId") == nil {
+		resp.Message = "The client is unauthorized from making this query."
+		resp.Error = true
+		w.WriteHeader(http.StatusUnauthorized)
+		goto RETURN
 	}
 
 	// adds the parsed submission to the DB and filesystem
-	submissionID, err := addSubmission(submission)
-	if err != nil {
-		log.Printf("[ERROR] error adding submission: %v", err)
+	if submissionID, err := addSubmission(&submission); err != nil {
+		log.Printf("[ERROR] Submission creation failed: %v", err)
+		resp.Message = "Submission creation failed."
+		resp.Error = true
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+		goto RETURN
+	} else {
+		resp.SubmissionID = submissionID
 	}
 
-	// formats and sends the response
-	respSub := &Submission{}
-	respSub.ID = submissionID
-	response, err := json.Marshal(respSub)
-	if err != nil {
+RETURN: // Encode and send response.
+	if !resp.Error {
+		resp.Message = "Submission creation successful!"
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	} else {
+		log.Print("[INFO] uploadSubmission request successful\n")
+		return
 	}
-	log.Print("[INFO] uploadSubmission request successful\n")
-	w.Write(response)
-	return
 }
 
 // Send submission data to the frontend for display. ID included for file

@@ -50,8 +50,8 @@ type User struct {
 	FirstName    string `validate:"nonzero,max=32" json:"firstName"`
 	LastName     string `validate:"nonzero,max=32" json:"lastName"`
 	UserType     int    `gorm:"default:4" json:"userType"`
-	PhoneNumber  string `json:"phoneNumber"`
-	Organization string `json:"organization"`
+	PhoneNumber  string `json:"phoneNumber,omitempty"`
+	Organization string `json:"organization,omitempty"`
 
 	CreatedAt time.Time      `json:",omitempty"`
 	UpdatedAt time.Time      `json:"-"`
@@ -61,7 +61,7 @@ type User struct {
 // User global identification.
 type GlobalUser struct {
 	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
-	FullName            string       `json:"fullName"`
+	FullName            string       `json:"fullName,omitempty"`
 	User                User         `json:"profile,omitempty"`
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
 	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
@@ -144,7 +144,7 @@ type File struct {
 	// content of the file encoded as a Base64 string (non-db field)
 	Base64Value string `gorm:"-" json:"base64Value"`
 	// structure to hold the user comments on the file
-	Comments []Comment `json:"comments"`
+	Comments []Comment `json:"comments,omitempty"`
 }
 
 // Supergroup compliant file structure (never stored in db)
@@ -164,8 +164,8 @@ type Comment struct {
 	FileID uint `json:"fileId"`
 	// content of the comment as a string
 	Base64Value string    `gorm:"type:mediumtext" json:"base64Value"`
-	ParentID    *uint     `gorm:"default:NULL"` // pointer so it can be nil
-	Comments    []Comment `gorm:"foreignKey:ParentID" json:"comments"`
+	ParentID    *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
+	Comments    []Comment `gorm:"foreignKey:ParentID" json:"comments,omitempty"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)

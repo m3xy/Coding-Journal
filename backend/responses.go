@@ -28,6 +28,12 @@ type NewCommentResponse struct {
 	ID uint `json:"id"`
 }
 
+// POST /submissions/create
+type UploadSubmissionResponse struct {
+	StandardResponse
+	SubmissionID uint `json:"ID"`
+}
+
 // --- Request bodies --- //
 
 // POST /auth/login body.

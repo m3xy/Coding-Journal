@@ -81,6 +81,8 @@ var testComments []*Comment = []*Comment{
 func TestGetFile(t *testing.T) {
 	// Set up server and configures filesystem/db
 	testInit()
+	defer testEnd()
+
 	srv := fileServerSetup()
 	go srv.ListenAndServe()
 
@@ -117,8 +119,6 @@ func TestGetFile(t *testing.T) {
 		urlString := fmt.Sprintf("%s%s/%d", TEST_FILES_ADDRESS, SUBROUTE_FILE, fileID)
 		fmt.Println(urlString)
 		req, err := http.NewRequest("GET", urlString, nil)
-
-		// send GET request
 		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
 		if !assert.NoErrorf(t, err, "Error occurred in request: %v", err) {
 			return
@@ -144,8 +144,6 @@ func TestGetFile(t *testing.T) {
 		}
 
 	})
-	assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
-	testEnd()
 }
 
 // Tests the basic ability of the CodeFiles module to add a comment to a file
@@ -158,6 +156,7 @@ func TestGetFile(t *testing.T) {
 func TestUploadUserComment(t *testing.T) {
 	// Set up server and configures filesystem/db
 	testInit()
+	defer testEnd()
 	srv := fileServerSetup()
 	go srv.ListenAndServe()
 
@@ -272,7 +271,6 @@ func TestUploadUserComment(t *testing.T) {
 		// clears environment
 		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
 	})
-	testEnd()
 }
 
 // -------------
@@ -282,6 +280,7 @@ func TestUploadUserComment(t *testing.T) {
 // tests the functionality to upload files from the backend (no use of HTTP requests in this test)
 func TestAddFile(t *testing.T) {
 	testInit()
+	defer testEnd()
 
 	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
@@ -356,7 +355,6 @@ func TestAddFile(t *testing.T) {
 		_, err := addFileTo(&testFiles[0], submissionID+1) // invalid submission ID
 		assert.Error(t, err, "No error occurred when attempting to add a file to an invalid submission")
 	})
-	testEnd()
 }
 
 // tests the ability of the backend to add comments to a given file.
@@ -365,6 +363,7 @@ func TestAddFile(t *testing.T) {
 // 	- TestAddFile
 func TestAddComment(t *testing.T) {
 	testInit()
+	defer testEnd()
 
 	testSubmission := testSubmissions[0] // test submission to add testFile to
 	testFile := testFiles[0]             // test file to add comments to
@@ -472,8 +471,6 @@ func TestAddComment(t *testing.T) {
 			return
 		}
 	})
-
-	testEnd()
 }
 
 // Tests the ability of the backend helper functions to retrieve a file's data
@@ -481,6 +478,7 @@ func TestAddComment(t *testing.T) {
 // 	- TestAddSubmission (in submissions_test.go)
 func TestGetFileData(t *testing.T) {
 	testInit()
+	defer testEnd()
 
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem.
 	testSubmission := testSubmissions[0] // test submission to be added to db and filesystem.
@@ -526,6 +524,4 @@ func TestGetFileData(t *testing.T) {
 			return
 		}
 	})
-
-	testEnd()
 }
