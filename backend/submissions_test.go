@@ -498,7 +498,7 @@ func TestAddAuthor(t *testing.T) {
 		// registers the author as a user and then to the given submission as an author
 		authorID, err := registerUser(author)
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.NoErrorf(t, addAuthors([]GlobalUser{{ID: authorID}}, submissionID), "Error adding the author to the db: %v", err)
+		assert.NoErrorf(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Error adding the author to the db: %v", err)
 
 		// queries the authors table in the database for author IDs which match that returned from registerUser()
 		var authors []GlobalUser
@@ -543,7 +543,7 @@ func TestAddAuthor(t *testing.T) {
 		// registers the author as a user and then to the given submission as an author
 		authorID, err := registerUser(testAuthor)
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.Error(t, addAuthors([]GlobalUser{{ID: authorID}}, submissionID), "Author without publisher permissions registered")
+		assert.Error(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Author without publisher permissions registered")
 
 		testEnd()
 	})
@@ -554,7 +554,7 @@ func TestAddAuthor(t *testing.T) {
 		testSubmission := testSubmissions[0]
 		authorID := "u881jafjka" // non-user fake id
 		submissionID := testAddSubmission(&testSubmission)
-		assert.Error(t, addAuthors([]GlobalUser{{ID: authorID}}, submissionID), "Non-user added as author")
+		assert.Error(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Non-user added as author")
 		testEnd()
 	})
 }
@@ -574,7 +574,7 @@ func TestAddReviewer(t *testing.T) {
 		// registers the reviewer as a user and then to the given submission as an reviewer
 		reviewerID, err := registerUser(reviewer)
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
-		assert.NoErrorf(t, addReviewers([]GlobalUser{{ID: reviewerID}}, submissionID), "Error adding the reviewer to the db: %v", err)
+		assert.NoErrorf(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Error adding the reviewer to the db: %v", err)
 
 		// queries the reviewers table in the database for reviewer IDs which match that returned from registerUser()
 		var reviewers []GlobalUser
@@ -617,7 +617,7 @@ func TestAddReviewer(t *testing.T) {
 		// registers the reviewer as a user and then to the given submission as an reviewer
 		reviewerID, err := registerUser(testReviewer)
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
-		assert.Error(t, addReviewers([]GlobalUser{{ID: reviewerID}}, submissionID), "Reviewer without reviewer permissions registered")
+		assert.Error(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Reviewer without reviewer permissions registered")
 		testEnd()
 	})
 
@@ -627,7 +627,7 @@ func TestAddReviewer(t *testing.T) {
 		testSubmission := testSubmissions[0]
 		reviewerID := "u881jafjka" // non-user fake id
 		submissionID := testAddSubmission(&testSubmission)
-		assert.Error(t, addReviewers([]GlobalUser{{ID: reviewerID}}, submissionID), "Non-user added as reviewer")
+		assert.Error(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Non-user added as reviewer")
 		testEnd()
 	})
 }
@@ -653,7 +653,7 @@ func TestAddTags(t *testing.T) {
 		submissionID := testAddSubmission(&testSubmission)
 
 		// adds a tag to the submission
-		addTags([]string{testTag}, submissionID)
+		addTags(gormDb, []string{testTag}, submissionID)
 
 		// queries the db to make sure the tag was added properly
 		cat := &Category{}
@@ -671,8 +671,8 @@ func TestAddTags(t *testing.T) {
 		submissionID := testAddSubmission(&testSubmission)
 
 		// adds a tag to the submission twice (second prints to log as it violates a key constraint)
-		assert.NoError(t, addTags([]string{testTag}, submissionID), "adding first tag caused an error")
-		assert.Error(t, addTags([]string{testTag}, submissionID), "attempting to add duplicate tag does not return an error")
+		assert.NoError(t, addTags(gormDb, []string{testTag}, submissionID), "adding first tag caused an error")
+		assert.Error(t, addTags(gormDb, []string{testTag}, submissionID), "attempting to add duplicate tag does not return an error")
 
 		testEnd()
 	})
@@ -689,8 +689,8 @@ func TestAddTags(t *testing.T) {
 		submissionID2 := testAddSubmission(&testSubmission2)
 
 		// adds the tags
-		assert.NoError(t, addTags([]string{testTag}, submissionID1), "Error occurred while adding 1st tag")
-		assert.NoError(t, addTags([]string{testTag}, submissionID2), "Error occurred while adding 2nd tag")
+		assert.NoError(t, addTags(gormDb, []string{testTag}, submissionID1), "Error occurred while adding 1st tag")
+		assert.NoError(t, addTags(gormDb, []string{testTag}, submissionID2), "Error occurred while adding 2nd tag")
 
 		// queries the db to make sure the tags were added properly
 		cat := &Category{}
@@ -708,7 +708,7 @@ func TestAddTags(t *testing.T) {
 		submissionID := testAddSubmission(&testSubmission)
 
 		// adds an invalid tag to an existing submission
-		assert.Error(t, addTags([]string{""}, submissionID), "empty tag was able ot be added")
+		assert.Error(t, addTags(gormDb, []string{""}, submissionID), "empty tag was able ot be added")
 
 		testEnd()
 	})
@@ -716,7 +716,7 @@ func TestAddTags(t *testing.T) {
 	// add tag to non-existant project (foreign key constraint fails in db)
 	t.Run("Add Tag Invalid Project", func(t *testing.T) {
 		testInit()
-		assert.Error(t, addTags([]string{"INVALID_PROJECT"}, 10), "Error not thrown when tag added to a non-existant submission")
+		assert.Error(t, addTags(gormDb, []string{"INVALID_PROJECT"}, 10), "Error not thrown when tag added to a non-existant submission")
 		testEnd()
 	})
 }

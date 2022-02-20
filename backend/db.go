@@ -59,11 +59,12 @@ type User struct {
 
 // User global identification.
 type GlobalUser struct {
-	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
-	FullName            string       `json:"fullName,omitempty"`
-	User                User         `json:"profile,omitempty"`
-	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
-	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
+	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
+	FullName string `json:"fullName,omitempty" validate:"required,max=118"`
+	User     User   `json:"profile,omitempty" validate:"dive"`
+
+	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-" validate:"dive"`
+	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-" validate:"dive"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"-"`
@@ -83,13 +84,13 @@ type Server struct {
 type Submission struct {
 	gorm.Model
 	// name of the submission
-	Name string `gorm:"not null;size:128;index" json:"name"`
+	Name string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
 	// license which the code is published under
-	License string `gorm:"size:64" json:"license"`
+	License string `gorm:"size:64" json:"license" validate:"max=118"`
 	// an array of the submission's files
-	Files []File `json:"files,omitempty"`
+	Files []File `json:"files,omitempty" validate:"dive"`
 	// an array of the submissions's authors
-	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty"`
+	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty" validate:"required,dive"`
 	// an array of the submission's reviewers
 	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
 	// tags for organizing/grouping code submissions

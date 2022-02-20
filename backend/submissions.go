@@ -208,29 +208,22 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 //	(error) : if the operation fails
 func addSubmission(submission *Submission) (uint, error) {
 	// error cases
-	if submission == nil {
-		return 0, errors.New("Submission cannot be nil")
-	} else if submission.Name == "" {
-		return 0, errors.New("Submission.Name must be set to a valid string")
-	} else if submission.Authors == nil || len(submission.Authors) == 0 {
-		return 0, errors.New("Authors array cannot be nil or length 0")
-	} else if submission.Reviewers == nil {
-		return 0, errors.New("Reviewers array cannot be nil")
-	}
+	validate.Struct(submission)
 
 	// adds the submission to the db, automatically setting submission.ID
-	if err := gormDb.Omit("submissions.authors", "submissions.reviewers", "submissions.files").Create(submission).Error; err != nil {
-		return 0, err
-	}
-	// adds authors and reviewers (done explicitly to allow for checking permissions)
-	if err := addAuthors(submission.Authors, submission.ID); err != nil {
-		return 0, err
-	}
-	if err := addReviewers(submission.Reviewers, submission.ID); err != nil {
-		return 0, err
-	}
-	// adds the tags to the Categories table
-	if err := addTags(submission.Categories, submission.ID); err != nil {
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		if err := gormDb.Omit("submissions.authors", "submissions.reviewers", "submissions.files").Create(submission).Error; err != nil {
+			return err
+		} else if err := addAuthors(tx, submission.Authors, submission.ID); err != nil {
+			return err
+		} else if err := addReviewers(tx, submission.Reviewers, submission.ID); err != nil {
+			return err
+		} else if err := addTags(tx, submission.Categories, submission.ID); err != nil {
+			return err
+		} else {
+			return nil
+		}
+	}); err != nil {
 		return 0, err
 	}
 
@@ -274,12 +267,12 @@ func addSubmission(submission *Submission) (uint, error) {
 //	submissionID (int) : the id of the submission to be added to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
-func addAuthors(authors []GlobalUser, submissionID uint) error {
+func addAuthors(tx *gorm.DB, authors []GlobalUser, submissionID uint) error {
 	var user User
 	for _, author := range authors {
-		if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Transaction(func(tx *gorm.DB) error {
 			// checks the user's permissions
-			if err := tx.Model(&User{}).Select("users.user_type").Where(
+			if err := tx.Model(&User{}).Where(
 				"users.global_user_id = ?", author.ID).Find(&user).Error; err != nil {
 				return err
 			}
@@ -311,10 +304,10 @@ func addAuthors(authors []GlobalUser, submissionID uint) error {
 //	submissionID (uint) : the id of the submission to be added to
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
-func addReviewers(reviewers []GlobalUser, submissionID uint) error {
+func addReviewers(tx *gorm.DB, reviewers []GlobalUser, submissionID uint) error {
 	var user User
 	for _, reviewer := range reviewers {
-		if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Transaction(func(tx *gorm.DB) error {
 			// checks the user's permissions
 			if err := tx.Model(&User{}).Select("users.user_type").Where(
 				"users.global_user_id = ?", reviewer.ID).Find(&user).Error; err != nil {
@@ -346,7 +339,7 @@ func addReviewers(reviewers []GlobalUser, submissionID uint) error {
 // 	submissionID (int) : the unique ID of the submission to add tags to
 // Returns:
 // 	(error) : an error if one occurs, nil otherwise
-func addTags(tags []string, submissionID uint) error {
+func addTags(tx *gorm.DB, tags []string, submissionID uint) error {
 	// builds a list of category structs to be inserted
 	categories := []*Category{}
 	for _, tag := range tags {
@@ -356,7 +349,7 @@ func addTags(tags []string, submissionID uint) error {
 		categories = append(categories, &Category{Tag: tag, SubmissionID: submissionID})
 	}
 	// inserts the tags using a transaction
-	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+	if err := tx.Transaction(func(tx *gorm.DB) error {
 		// checks that the submission exists
 		submission := &Submission{}
 		submission.ID = submissionID
