@@ -1,18 +1,16 @@
 package main
 
 import (
-	"errors"
 	"log"
-	"net"
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"fmt"
 	"os"
 
+	"github.com/go-playground/validator/v10"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
@@ -40,15 +38,16 @@ var DB_PARAMS map[string]string = map[string]string{
 	"interpolateParams": "true",
 	"parseTime":         "true",
 }
+var validate *validator.Validate
 
 // User profile and personal information.
 type User struct {
 	ID           uint   `gorm:"primaryKey" json:"-"`
 	GlobalUserID string `json:"-"`
-	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"isemail"`
-	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw"`
-	FirstName    string `validate:"nonzero,max=32" json:"firstName"`
-	LastName     string `validate:"nonzero,max=32" json:"lastName"`
+	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"email,required"`
+	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw,required"`
+	FirstName    string `json:"firstName" validate:"required,max=32"`
+	LastName     string `json:"lastName" validate:"required,max=32"`
 	UserType     int    `gorm:"default:4" json:"userType"`
 	PhoneNumber  string `json:"phoneNumber,omitempty"`
 	Organization string `json:"organization,omitempty"`
@@ -193,6 +192,10 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
+
+	// Set up validation
+	validate = validator.New()
+	validate.RegisterValidation("ispw", ispw)
 	return db, nil
 
 ERR:
@@ -282,31 +285,13 @@ func getDbParams(paramMap map[string]string) string {
 
 // -- Validation
 
-func isemail(v interface{}, param string) error {
-	st := reflect.ValueOf(v)
-	if st.Kind() != reflect.String {
-		return errors.New("Email must be a string.")
-	}
-	matcher := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
-	if !matcher.MatchString(st.String()) {
-		return errors.New("Wrong email format")
-	}
-	parts := strings.Split(st.String(), "@")
-	mx, err := net.LookupMX(parts[1])
-	if err != nil || len(mx) == 0 {
-		return errors.New("Email server invalid!")
-	}
-	return nil
-}
-
 // Checks if a password contains upper case, lower case, numbers, and special characters.
-func ispw(v interface{}, param string) error {
-	st := reflect.ValueOf(v)
-	if st.Kind() != reflect.String {
-		return errors.New("Value must be string!")
+func ispw(fl validator.FieldLevel) bool {
+	if fl.Field().String() == "invalid" {
+		return false
 	} else {
 		// Set password and character number.
-		pw := st.String()
+		pw := fl.Field().String()
 		restrictions := []string{"[a-z]", // Must contain lowercase.
 			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
 			"[A-Z]",                               // Must contain uppercase.
@@ -315,10 +300,10 @@ func ispw(v interface{}, param string) error {
 		for _, restriction := range restrictions {
 			matcher := regexp.MustCompile(restriction)
 			if !matcher.MatchString(pw) {
-				return errors.New("Restriction not matched!")
+				return false
 			}
 		}
-		return nil
+		return true
 	}
 }
 

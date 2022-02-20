@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/validator.v2"
 )
 
 const (
@@ -66,11 +66,14 @@ func TestPwComp(t *testing.T) {
 }
 
 func TestPw(t *testing.T) {
-	validator.SetValidationFunc("ispw", ispw)
-	validator.SetValidationFunc("isemail", isemail)
+	if validate == nil {
+		validate = validator.New()
+		validate.RegisterValidation("ispw", ispw)
+	}
+
 	t.Run("Passwords valid", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			if err := validator.Validate(testUsers[i]); err != nil {
+			if err := validate.Struct(testUsers[i]); err != nil {
 				fmt.Printf("%v\n", err)
 				assert.Nilf(t, err, "%s Should be valid!", testUsers[i].Password)
 			}
@@ -78,7 +81,7 @@ func TestPw(t *testing.T) {
 	})
 	t.Run("Passwords invalid", func(t *testing.T) {
 		for i := 0; i < len(wrongCredsUsers); i++ {
-			assert.NotNilf(t, validator.Validate(wrongCredsUsers[i]), "%s should be illegal!", wrongCredsUsers[i].Password)
+			assert.NotNilf(t, validate.Struct(wrongCredsUsers[i]), "%s should be illegal!", wrongCredsUsers[i].Password)
 		}
 	})
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"gopkg.in/validator.v2"
 	"gorm.io/gorm"
 )
 
@@ -310,7 +309,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		message = "Registration failed - Wrong fields provided."
 		goto ERROR
 	}
-	if validator.Validate(*user) != nil {
+	if validate.Struct(*user) != nil {
 		log.Printf("[WARN] Invalid password format received.")
 		message = "Registration failed - invalid password"
 		goto ERROR
