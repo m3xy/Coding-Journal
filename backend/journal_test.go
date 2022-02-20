@@ -76,7 +76,7 @@ func TestJournalLogIn(t *testing.T) {
 	// Populate database with valid users.
 	trialUsers := getGlobalCopies(testUsers)
 	for i := range trialUsers {
-		trialUsers[i].ID, _ = registerUser(trialUsers[i].User)
+		trialUsers[i].ID, _ = registerUser(trialUsers[i].User, USERTYPE_REVIEWER_PUBLISHER)
 	}
 
 	// Test valid logins

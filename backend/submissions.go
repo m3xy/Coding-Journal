@@ -232,8 +232,7 @@ func addSubmission(submission *Submission) (uint, error) {
 	submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME, submission.Name)
 	if err := os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
-	}
-	if err := os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
+	} else if err := os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
 		return 0, err
 	}
 
@@ -242,14 +241,10 @@ func addSubmission(submission *Submission) (uint, error) {
 	if err != nil {
 		return 0, err
 	}
-	jsonString, err := json.Marshal(submission.MetaData)
-	if err != nil {
+	defer dataFile.Close()
+	if err := json.NewEncoder(dataFile).Encode(submission.MetaData); err != nil {
 		return 0, err
 	}
-	if _, err = dataFile.Write([]byte(jsonString)); err != nil {
-		return 0, err
-	}
-	dataFile.Close()
 
 	// Adds each member file to the filesystem and database
 	for _, file := range submission.Files {
@@ -268,31 +263,14 @@ func addSubmission(submission *Submission) (uint, error) {
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
 func addAuthors(tx *gorm.DB, authors []GlobalUser, submissionID uint) error {
-	var user User
-	for _, author := range authors {
-		if err := tx.Transaction(func(tx *gorm.DB) error {
-			// checks the user's permissions
-			if err := tx.Model(&User{}).Where(
-				"users.global_user_id = ?", author.ID).Find(&user).Error; err != nil {
-				return err
-			}
-			// throws an error if the author is not registered as an author
-			if user.UserType != USERTYPE_PUBLISHER && user.UserType != USERTYPE_REVIEWER_PUBLISHER {
-				return fmt.Errorf("User must have publisher permissions, not: %d", user.UserType)
-			}
-
-			// generates the association between the submission and author
-			submission := &Submission{}
-			submission.ID = submissionID
-			if err := tx.Model(submission).Association("Authors").Append(&GlobalUser{ID: author.ID}); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
+	// Check if there is at least 1 author.
+	switch {
+	case authors == nil:
+		return errors.New("There must be at least 1 author")
+	case len(authors) == 0:
+		return errors.New("There must be at least 1 author")
 	}
-	return nil
+	return appendUsers(tx, authors, []int{USERTYPE_PUBLISHER, USERTYPE_REVIEWER_PUBLISHER}, "Authors", submissionID)
 }
 
 // Add an array of reviewers to the given submission provided the id given corresponds to a valid
@@ -305,31 +283,33 @@ func addAuthors(tx *gorm.DB, authors []GlobalUser, submissionID uint) error {
 // Returns:
 //	(error) : an error if one occurs, nil otherwise
 func addReviewers(tx *gorm.DB, reviewers []GlobalUser, submissionID uint) error {
-	var user User
-	for _, reviewer := range reviewers {
-		if err := tx.Transaction(func(tx *gorm.DB) error {
-			// checks the user's permissions
-			if err := tx.Model(&User{}).Select("users.user_type").Where(
-				"users.global_user_id = ?", reviewer.ID).Find(&user).Error; err != nil {
-				return err
-			}
-			// throws an error if the author is not registered as an author
-			if user.UserType != USERTYPE_REVIEWER && user.UserType != USERTYPE_REVIEWER_PUBLISHER {
-				return fmt.Errorf("User must have reviewer permissions, not: %d", user.UserType)
-			}
+	return appendUsers(tx, reviewers, []int{USERTYPE_REVIEWER, USERTYPE_REVIEWER_PUBLISHER}, "Reviewers", submissionID)
+}
 
-			// generates the association between the two submission and author
-			submission := &Submission{}
-			submission.ID = submissionID
-			if err := tx.Model(submission).Association("Reviewers").Append(&GlobalUser{ID: reviewer.ID}); err != nil {
-				return err
+// Append users to submission at given association, with given priviledge restrictions.
+func appendUsers(tx *gorm.DB, users []GlobalUser, priviledges []int, association string, submissionID uint) error {
+	// No required appends. Skip.
+	if users == nil {
+		return nil
+	}
+	// Return transaction for user append with priviledge check
+	return tx.Transaction(func(tx *gorm.DB) error {
+		// For each user - find by ID and priviledges.
+		for _, user := range users {
+			if res := tx.Where("user_type IN ?", priviledges).Limit(1).Find(&user, "ID = ?", user.ID); res.Error != nil {
+				return res.Error
+			} else if res.RowsAffected == 0 {
+				return fmt.Errorf("User %s either doesn't exist or doesn't have required permissiosn.", user.ID)
 			}
-			return nil
-		}); err != nil {
+		}
+		// Append checked users into the submission's association.
+		submission := &Submission{}
+		submission.ID = submissionID
+		if err := tx.Model(submission).Association(association).Append(users); err != nil {
 			return err
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // function to add tags for a given submission
@@ -340,13 +320,21 @@ func addReviewers(tx *gorm.DB, reviewers []GlobalUser, submissionID uint) error 
 // Returns:
 // 	(error) : an error if one occurs, nil otherwise
 func addTags(tx *gorm.DB, tags []string, submissionID uint) error {
+	// Skip if no tags given.
+	switch {
+	case tags == nil:
+		return nil
+	case len(tags) == 0:
+		return nil
+	}
+
 	// builds a list of category structs to be inserted
-	categories := []*Category{}
+	categories := []Category{}
 	for _, tag := range tags {
 		if tag == "" {
 			return errors.New("Tag cannot be an empty string")
 		}
-		categories = append(categories, &Category{Tag: tag, SubmissionID: submissionID})
+		categories = append(categories, Category{Tag: tag, SubmissionID: submissionID})
 	}
 	// inserts the tags using a transaction
 	if err := tx.Transaction(func(tx *gorm.DB) error {
@@ -357,7 +345,7 @@ func addTags(tx *gorm.DB, tags []string, submissionID uint) error {
 			return err
 		}
 		// inserts the array of categories
-		if err := gormDb.Model(&Category{}).Create(categories).Error; err != nil {
+		if err := gormDb.Model(&Category{}).Create(&categories).Error; err != nil {
 			return err
 		}
 		return nil

@@ -37,7 +37,7 @@ func TestGetUserProfile(t *testing.T) {
 	// Populate database for testing and test valid user.
 	globalUsers := make([]GlobalUser, len(testUsers))
 	for i := range testUsers {
-		globalUsers[i].ID, _ = registerUser(testUsers[i])
+		globalUsers[i].ID, _ = registerUser(testUsers[i], USERTYPE_USER)
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {

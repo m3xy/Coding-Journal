@@ -30,15 +30,18 @@ const (
 
 var testUsers []User = []User{
 	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", FirstName: "test",
-		LastName: "test", PhoneNumber: "0574349206", UserType: USERTYPE_USER},
+		LastName: "test", PhoneNumber: "0574349206"},
 	{Email: "john.doe@hello.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg", UserType: USERTYPE_USER},
+		LastName: "Doe", Organization: "TestOrg"},
 	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe", UserType: USERTYPE_PUBLISHER},
+		LastName: "Doe"},
 }
 
 var testObjects []GlobalUser = []GlobalUser{
-	{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"},
+	{ID: "1", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "2", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "3", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "4", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
 var wrongCredsUsers []User = []User{
@@ -97,7 +100,7 @@ func getUserCopies(uc []User) []User {
 func getGlobalCopies(gc []User) []GlobalUser {
 	res := make([]GlobalUser, len(gc))
 	for i, u := range gc {
-		res[i] = GlobalUser{User: u.getCopy()}
+		res[i] = GlobalUser{User: u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
 	}
 	return res
 

@@ -67,23 +67,23 @@ var testSubmissionMetaData = []*SubmissionData{
 }
 var testAuthors []User = []User{
 	{Email: "paul@test.com", Password: "123456aB$", FirstName: "paul",
-		LastName: "test", PhoneNumber: "0574349206", UserType: USERTYPE_PUBLISHER},
+		LastName: "test", PhoneNumber: "0574349206"},
 	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg", UserType: USERTYPE_USER},
+		LastName: "Doe", Organization: "TestOrg"},
 	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe", UserType: USERTYPE_REVIEWER},
+		LastName: "Doe"},
 	{Email: "author3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
+		LastName: "Doe"},
 }
 var testReviewers []User = []User{
 	{Email: "dave@test.com", Password: "123456aB$", FirstName: "dave",
-		LastName: "smith", PhoneNumber: "0574349206", UserType: USERTYPE_REVIEWER},
+		LastName: "smith", PhoneNumber: "0574349206"},
 	{Email: "Geoff@test.com", Password: "dlbjDs2!", FirstName: "Geoff",
-		LastName: "Williams", Organization: "TestOrg", UserType: USERTYPE_USER},
+		LastName: "Williams", Organization: "TestOrg"},
 	{Email: "reviewer2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe", UserType: USERTYPE_PUBLISHER},
+		LastName: "Doe"},
 	{Email: "reviewer3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
+		LastName: "Doe"},
 }
 
 // Set up server used for submissions testing.
@@ -168,7 +168,7 @@ func TestUploadSubmission(t *testing.T) {
 	var err error
 	globalAuthors := make([]GlobalUser, len(testAuthors))
 	for i, user := range testAuthors {
-		if globalAuthors[i].ID, err = registerUser(user); err != nil {
+		if globalAuthors[i].ID, err = registerUser(user, USERTYPE_PUBLISHER); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return
 		}
@@ -176,7 +176,7 @@ func TestUploadSubmission(t *testing.T) {
 	}
 	globalReviewers := make([]GlobalUser, len(testReviewers))
 	for i, user := range testReviewers {
-		if globalReviewers[i].ID, err = registerUser(user); err != nil {
+		if globalReviewers[i].ID, err = registerUser(user, USERTYPE_REVIEWER); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return
 		}
@@ -319,11 +319,11 @@ func TestRouteGetSubmission(t *testing.T) {
 		go srv.ListenAndServe()
 
 		// registers author and reviewer
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error registering author in the db: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-		reviewerID, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err)
 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
@@ -431,9 +431,9 @@ func TestAddSubmission(t *testing.T) {
 	t.Run("Add One Submission", func(t *testing.T) {
 		testInit()
 		submission := testSubmissions[0]
-		authorID, err := registerUser(testAuthors[0])
+		authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error while registering author: %v", err)
-		reviewerID, err := registerUser(testReviewers[0])
+		reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error while registering reviewer: %v", err)
 		submission.Authors = []GlobalUser{{ID: authorID}}
 		submission.Reviewers = []GlobalUser{{ID: reviewerID}}
@@ -445,9 +445,9 @@ func TestAddSubmission(t *testing.T) {
 	t.Run("Add Multiple Submissions", func(t *testing.T) {
 		testInit()
 		submissions := testSubmissions[0:2] // list of submissions to add to the db
-		authorID, err := registerUser(testAuthors[0])
+		authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error while registering author: %v", err)
-		reviewerID, err := registerUser(testReviewers[0])
+		reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error while registering reviewer: %v", err)
 		for _, submission := range submissions {
 			submission.Authors = []GlobalUser{{ID: authorID}}
@@ -496,7 +496,7 @@ func TestAddAuthor(t *testing.T) {
 	// utility function which tests that an author can be added to a valid submission properly
 	testAddAuthor := func(submissionID uint, author User) {
 		// registers the author as a user and then to the given submission as an author
-		authorID, err := registerUser(author)
+		authorID, err := registerUser(author, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
 		assert.NoErrorf(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Error adding the author to the db: %v", err)
 
@@ -541,9 +541,9 @@ func TestAddAuthor(t *testing.T) {
 		submissionID := testAddSubmission(&testSubmission)
 
 		// registers the author as a user and then to the given submission as an author
-		authorID, err := registerUser(testAuthor)
+		badAuthorID, err := registerUser(testAuthor, USERTYPE_USER)
 		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.Error(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Author without publisher permissions registered")
+		assert.Error(t, addAuthors(gormDb, []GlobalUser{{ID: badAuthorID}}, submissionID), "Author without publisher permissions registered")
 
 		testEnd()
 	})
@@ -572,7 +572,7 @@ func TestAddReviewer(t *testing.T) {
 	// utility function which tests that an reviewer can be added to a valid submission properly
 	testAddReviewer := func(submissionID uint, reviewer User) {
 		// registers the reviewer as a user and then to the given submission as an reviewer
-		reviewerID, err := registerUser(reviewer)
+		reviewerID, err := registerUser(reviewer, USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
 		assert.NoErrorf(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Error adding the reviewer to the db: %v", err)
 
@@ -615,7 +615,7 @@ func TestAddReviewer(t *testing.T) {
 		submissionID := testAddSubmission(&testSubmission)
 
 		// registers the reviewer as a user and then to the given submission as an reviewer
-		reviewerID, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer, USERTYPE_USER)
 		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
 		assert.Error(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Reviewer without reviewer permissions registered")
 		testEnd()
@@ -736,16 +736,16 @@ func TestGetAuthoredSubmissions(t *testing.T) {
 		testInit()
 
 		// adds two test users to the db as authors
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission1.Authors = []GlobalUser{{ID: authorID}}
 
-		nonauthorID, err := registerUser(testNonAuthor) // author of the submission we are not interested in
+		nonauthorID, err := registerUser(testNonAuthor, USERTYPE_PUBLISHER) // author of the submission we are not interested in
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission2.Authors = []GlobalUser{{ID: nonauthorID}}
 
 		// adds dummy reviewers
-		reviewerID, err := registerUser(testReviewers[0])
+		reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerID}}
 		testSubmission2.Reviewers = []GlobalUser{{ID: reviewerID}}
@@ -786,16 +786,16 @@ func TestGetReviewedSubmissions(t *testing.T) {
 		testInit()
 
 		// adds two test users to the db as authors
-		reviewerID, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerID}}
 
-		nonreviewerID, err := registerUser(testNonReviewer) // author of the submission we are not interested in
+		nonreviewerID, err := registerUser(testNonReviewer, USERTYPE_REVIEWER) // author of the submission we are not interested in
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission2.Reviewers = []GlobalUser{{ID: nonreviewerID}}
 
 		// adds dummy authors
-		authorID, err := registerUser(testAuthors[0])
+		authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission1.Authors = []GlobalUser{{ID: authorID}}
 		testSubmission2.Authors = []GlobalUser{{ID: authorID}}
@@ -836,11 +836,11 @@ func TestGetSubmission(t *testing.T) {
 		// sets up test environment, and adds a submission with one file to the db and filesystem
 		testInit()
 
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-		reviewerID, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
@@ -915,7 +915,7 @@ func TestGetSubmissionAuthors(t *testing.T) {
 
 		// sets up the test environment, and uploads a test submission
 		testInit()
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
@@ -947,11 +947,11 @@ func TestGetSubmissionReviewers(t *testing.T) {
 
 		// sets up the test environment, and uploads a test submission
 		testInit()
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-		reviewerID, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
@@ -982,7 +982,7 @@ func TestGetSubmissionCategories(t *testing.T) {
 
 		// sets up the test environment, and uploads a test submission
 		testInit()
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
@@ -1007,7 +1007,7 @@ func TestGetSubmissionFiles(t *testing.T) {
 
 		// sets up the test environment, and uploads a test submission
 		testInit()
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
@@ -1042,7 +1042,7 @@ func TestGetSubmissionMetaData(t *testing.T) {
 
 		// sets up the test environment, and uploads a test submission
 		testInit()
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
@@ -1081,11 +1081,11 @@ func TestLocalToGlobal(t *testing.T) {
 		testReviewer := testReviewers[0]
 
 		// registers authors and reviewers, and adds them to the test submission
-		authorID, err := registerUser(testAuthor)
+		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-		reviewerID, err := registerUser(testReviewer)
+		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
 		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 

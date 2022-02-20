@@ -90,13 +90,13 @@ func TestGetFile(t *testing.T) {
 	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	// adds a submission to the database and filesystem
-	authorID, err := registerUser(testAuthors[0])
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-	reviewerID, err := registerUser(testReviewers[0])
+	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -168,7 +168,7 @@ func TestUploadUserComment(t *testing.T) {
 	testReply := testComments[1]
 
 	// Register submission author.
-	subAuthorID, err := registerUser(testAuthors[0])
+	subAuthorID, err := registerUser(testAuthors[0], USERTYPE_USER)
 	if assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -183,7 +183,7 @@ func TestUploadUserComment(t *testing.T) {
 	}
 
 	// Register comment author and it's bearer token.
-	authorID, err := registerUser(testAuthor)
+	authorID, err := registerUser(testAuthor, USERTYPE_USER)
 	if assert.NoErrorf(t, err, "error occurred while adding testAuthor: %v", err) {
 		return
 	}
@@ -285,13 +285,13 @@ func TestAddFile(t *testing.T) {
 	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
 
-	authorID, err := registerUser(testAuthors[0])
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-	reviewerID, err := registerUser(testReviewers[0])
+	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -372,14 +372,14 @@ func TestAddComment(t *testing.T) {
 	testReply := testComments[1]
 
 	// adds a submission for the test file to be added to
-	authorID, err := registerUser(testAuthors[0])
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
 	// Add reviewer to a submission.
-	reviewerID, err := registerUser(testReviewers[0])
+	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -398,7 +398,7 @@ func TestAddComment(t *testing.T) {
 	}
 
 	// adds a test user to author a comment
-	commentAuthorID, err := registerUser(testAuthor)
+	commentAuthorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "failed to add user to the database: %v", err) {
 		return
 	}
@@ -488,13 +488,13 @@ func TestGetFileData(t *testing.T) {
 	// configures the test submission fields
 	testSubmission.Files = []File{testFile}
 
-	authorID, err := registerUser(testAuthor)
+	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-	reviewerID, err := registerUser(testReviewer)
+	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}

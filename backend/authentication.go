@@ -315,7 +315,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		goto ERROR
 	}
 
-	if _, err := registerUser(*user); err != nil {
+	if _, err := registerUser(*user, USERTYPE_USER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		message = "Registration failed - " + err.Error()
 		goto ERROR
@@ -343,11 +343,12 @@ ERROR:
 }
 
 // Register a user to the database. Returns user global ID.
-func registerUser(user User) (string, error) {
+func registerUser(user User, UserType int) (string, error) {
 	// Hash password and store new credentials to database.
 	user.Password = string(hashPw(user.Password))
 
 	registeredUser := GlobalUser{
+		UserType: UserType,
 		FullName: user.FirstName + " " + user.LastName,
 		User:     user,
 	}
