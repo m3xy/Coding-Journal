@@ -70,9 +70,9 @@ var testAuthors []User = []User{
 		LastName: "test", PhoneNumber: "0574349206", UserType: USERTYPE_PUBLISHER},
 	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
 		LastName: "Doe", Organization: "TestOrg", UserType: USERTYPE_USER},
-	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
+	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
 		LastName: "Doe", UserType: USERTYPE_REVIEWER},
-	{Email: "adam.doe@test.net", Password: "dlbjDs2!", FirstName: "Adam",
+	{Email: "author3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
 		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 var testReviewers []User = []User{
@@ -80,9 +80,9 @@ var testReviewers []User = []User{
 		LastName: "smith", PhoneNumber: "0574349206", UserType: USERTYPE_REVIEWER},
 	{Email: "Geoff@test.com", Password: "dlbjDs2!", FirstName: "Geoff",
 		LastName: "Williams", Organization: "TestOrg", UserType: USERTYPE_USER},
-	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
+	{Email: "reviewer2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
 		LastName: "Doe", UserType: USERTYPE_PUBLISHER},
-	{Email: "adam.doe@test.net", Password: "dlbjDs2!", FirstName: "Adam",
+	{Email: "reviewer3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
 		LastName: "Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
@@ -109,7 +109,7 @@ func submissionServerSetup() *http.Server {
 // Test Depends On:
 // 	- TestAddSubmission
 // 	- TestGetAuthoredSubmissions
-func TestGetAllSubmissions(t *testing.T) {
+/* func TestGetAllSubmissions(t *testing.T) {
 	// Set up server and test environment
 	testInit()
 	defer testEnd()
@@ -151,7 +151,7 @@ func TestGetAllSubmissions(t *testing.T) {
 				"Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
 		}
 	})
-}
+} */
 
 // Tests that submissions.go can upload submissions properly
 func TestUploadSubmission(t *testing.T) {
@@ -159,85 +159,141 @@ func TestUploadSubmission(t *testing.T) {
 	testInit()
 	defer testEnd()
 
-	// Set testing variables for tests.
-	testSubmission := testSubmissions[0]
-	testFile := testFiles[0]
-	testSubmission.Files = []File{testFile}
-	testAuthor := testAuthors[0]
-	testReviewer := testReviewers[0]
-
 	// Create mux router
 	router := mux.NewRouter()
 	router.HandleFunc(ENDPOINT_SUBMISSIONS+ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission)
 	route := ENDPOINT_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
 
-	// registers author and reviewer
-	authorID, err := registerUser(testAuthor)
-	if !assert.NoErrorf(t, err, "Error registering author in the db: %v", err) {
-		return
-	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
+	// Fill database with users.
+	var err error
+	globalAuthors := make([]GlobalUser, len(testAuthors))
+	for i, user := range testAuthors {
+		if globalAuthors[i].ID, err = registerUser(user); err != nil {
+			t.Errorf("User registration failed: %v", err)
+			return
+		}
 
-	reviewerID, err := registerUser(testReviewer)
-	if !assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err) {
-		return
 	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	globalReviewers := make([]GlobalUser, len(testReviewers))
+	for i, user := range testReviewers {
+		if globalReviewers[i].ID, err = registerUser(user); err != nil {
+			t.Errorf("User registration failed: %v", err)
+			return
+		}
+
+	}
 
 	// tests that a single valid submission with one reviewer and one author can be retrieved
-	t.Run("Upload Single Valid Submission", func(t *testing.T) {
-		// constructs the request body
-		reqBody, err := json.Marshal(testSubmission)
-		if !assert.NoError(t, err, "Error marshalling test submission to Json") {
-			return
+	t.Run("Upload valid submissions", func(t *testing.T) {
+		testValidUpload := func(submission Submission, t *testing.T) bool {
+			// Get body marshal then send request.
+			reqBody, err := json.Marshal(submission)
+			if !assert.NoErrorf(t, err, "Marshalling should not error, but got: %v", err) {
+				return false
+			}
+			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", globalAuthors[0].ID)))
+			resp := w.Result()
+
+			// Check success and response.
+			var respBody UploadSubmissionResponse
+			if err := json.NewDecoder(resp.Body).Decode(&respBody); !assert.NoError(t, err, "Response in invalid format!") {
+				return false
+			} else if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response should succeed, but got: %d - %s", resp.StatusCode, respBody.Message) {
+				return false
+			} else if !assert.NotEqual(t, "", respBody.SubmissionID, "Returned ID should not be nil!") {
+				return false
+			}
+			return true
 		}
 
-		// creates a request to send to the test server
-		req, w := httptest.NewRequest("POST", route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-		router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", authorID)))
-		resp := w.Result()
-		defer resp.Body.Close()
-		if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from request: %d", resp.StatusCode) {
-			return
-		}
-
-		// gets the added submission back
-		respBody := &Submission{}
-		err = json.NewDecoder(resp.Body).Decode(&respBody)
-		uploadedSubmission, err := getSubmission(respBody.ID)
-		if !assert.NoError(t, err, "Error retrieving uploaded submission") {
-			return
-		}
-
-		// tests that the returned submission matches the passed in data
-		switch {
-		case !assert.Equal(t, respBody.ID, uploadedSubmission.ID, "Submission IDs do not match"):
-		case !assert.Equal(t, testSubmission.Name, uploadedSubmission.Name, "Submission Names do not match."):
-		case !assert.Equal(t, authorID, uploadedSubmission.Authors[0].ID, "Author IDs do not match"):
-		case !assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, uploadedSubmission.Authors[0].FullName,
-			"Author Names not match"):
-		case !assert.Equal(t, reviewerID, uploadedSubmission.Reviewers[0].ID, "Reviewer IDs not match"):
-		case !assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, uploadedSubmission.Reviewers[0].FullName,
-			"Reviewer Names not match"):
-			return
-		}
+		t.Run("Simple submission", func(t *testing.T) {
+			// Valid submission - Minimum amount of information.
+			testSubmission := Submission{Name: "Test", Authors: []GlobalUser{globalAuthors[0]}}
+			testValidUpload(testSubmission, t)
+		})
+		t.Run("With metadata", func(t *testing.T) {
+			testSubmission := Submission{
+				Name: "Test", License: "Test",
+				Authors: []GlobalUser{globalAuthors[0]},
+				MetaData: &SubmissionData{
+					Abstract: "Test",
+				},
+			}
+			testValidUpload(testSubmission, t)
+		})
+		t.Run("With reviews", func(t *testing.T) {
+			testSubmission := Submission{
+				Name: "Test", License: "Test",
+				Authors: []GlobalUser{globalAuthors[0]},
+				MetaData: &SubmissionData{
+					Reviews: []*Comment{{Base64Value: "dGVzdA"}},
+				},
+			}
+			testValidUpload(testSubmission, t)
+		})
+		t.Run("With files", func(t *testing.T) {
+			testSubmission := Submission{
+				Name: "Test", License: "Test",
+				Authors: []GlobalUser{globalAuthors[0]},
+				Files:   []File{{Name: "Test", Path: "Test"}, {Name: "Test", Path: "TestDir/Test"}},
+			}
+			testValidUpload(testSubmission, t)
+		})
+		t.Run("With multiple authors", func(t *testing.T) {
+			// Valid submission - Minimum amount of information.
+			testSubmission := Submission{
+				Name: "Test", License: "MIT",
+				Authors: []GlobalUser{globalAuthors[0], globalAuthors[1]},
+			}
+			testValidUpload(testSubmission, t)
+		})
+		t.Run("With reviewer(s)", func(t *testing.T) {
+			// Valid submission - Minimum amount of information.
+			testSubmission := Submission{
+				Name: "Test", License: "MIT",
+				Authors:   []GlobalUser{globalAuthors[0]},
+				Reviewers: globalReviewers,
+			}
+			testValidUpload(testSubmission, t)
+		})
 	})
 
-	t.Run("Upload unauthenticated", func(t *testing.T) {
-		// constructs the request body
-		reqBody, err := json.Marshal(testSubmission)
-		if !assert.NoError(t, err, "Error marshalling test submission to Json") {
-			return
+	t.Run("Invalid uploads", func(t *testing.T) {
+
+		testInvalidUpload := func(submission Submission, status int, authed bool, t *testing.T) bool {
+			// Get body marshal then send request.
+			reqBody, err := json.Marshal(submission)
+			if !assert.NoErrorf(t, err, "Marshalling should not error, but got: %v", err) {
+				return false
+			}
+			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			if authed {
+				router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", globalAuthors[0].ID)))
+			} else {
+				router.ServeHTTP(w, req)
+			}
+			resp := w.Result()
+
+			return assert.Equalf(t, status, resp.StatusCode, "Should return code %d but got %d", status, resp.StatusCode)
 		}
 
-		// Make request without userId context.
-		req, w := httptest.NewRequest("POST", route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-		router.ServeHTTP(w, req)
-		resp := w.Result()
-		defer resp.Body.Close()
-		if !assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Request should return code 401 but got: %d", resp.StatusCode) {
-			return
-		}
+		t.Run("No authors", func(t *testing.T) {
+			testSubmission := Submission{
+				Name: "Test", License: "MIT",
+			}
+			testInvalidUpload(testSubmission, http.StatusBadRequest, true, t)
+		})
+		t.Run("Unregistered author", func(t *testing.T) {
+			testSubmission := Submission{
+				Name: "Test", License: "MIT",
+				Authors: []GlobalUser{{ID: "-"}},
+			}
+			testInvalidUpload(testSubmission, http.StatusUnauthorized, true, t)
+		})
+		t.Run("No name", func(t *testing.T) {
+
+		})
 
 	})
 }
