@@ -33,8 +33,10 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -43,6 +45,7 @@ const (
 	ENDPOINT_SUBMISSIONS       = "/submissions"
 )
 
+// Describe mux routing for submission-based endpoints.
 func getSubmissionsSubRoutes(r *mux.Router) {
 	submissions := r.PathPrefix(ENDPOINT_SUBMISSIONS).Subrouter()
 	submission := r.PathPrefix(SUBROUTE_SUBMISSION).Subrouter()
@@ -105,50 +108,95 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 // in backend/README.md
 func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadSubmission request received from %v", r.RemoteAddr)
-	w.Header().Set("Content-Type", "application/json")
-
-	resp := UploadSubmissionResponse{}
 
 	// parses the Json request body into a submission struct
-	submission := Submission{}
-	if err := json.NewDecoder(r.Body).Decode(&submission); err != nil {
-		log.Printf("[WARN] JSON decoding failed: %v", err)
+	resp := UploadSubmissionResponse{}
+	reqBody := UploadSubmissionBody{}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		resp.Message = "Incorrect submission fields."
 		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
-		goto RETURN
-	}
-
-	// Get user authentication
-	if r.Context().Value("userId") == nil {
+	} else if r.Context().Value("userId") == nil {
+		// User is not validated - error out.
 		resp.Message = "The client is unauthorized from making this query."
 		resp.Error = true
 		w.WriteHeader(http.StatusUnauthorized)
-		goto RETURN
-	}
+	} else if submissionID, err := ControllerUploadSubmission(reqBody); err != nil {
 
-	// adds the parsed submission to the DB and filesystem
-	if submissionID, err := addSubmission(&submission); err != nil {
-		log.Printf("[ERROR] Submission creation failed: %v", err)
-		resp.Message = "Submission creation failed."
+		// Respond according to the error type returned.
+		switch err.(type) {
+		case validator.ValidationErrors:
+			resp.Message = fmt.Sprintf("Bad fields inserted - %v", err.(validator.ValidationErrors).Error())
+			w.WriteHeader(http.StatusBadRequest)
+		case *WrongPermissionsError:
+			resp.Message = fmt.Sprintf("User %s does not have valid permissions.", err.(*WrongPermissionsError).userID)
+			w.WriteHeader(http.StatusUnauthorized)
+		case *BadUserError:
+			resp.Message = fmt.Sprintf("User %s does not exist in the system.", err.(*BadUserError).userID)
+			w.WriteHeader(http.StatusUnauthorized)
+		default:
+			resp.Message = "Internal server error - Undisclosed."
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		resp.Error = true
-		w.WriteHeader(http.StatusInternalServerError)
-		goto RETURN
 	} else {
+		resp.Message = "Submission creation successful!"
 		resp.SubmissionID = submissionID
 	}
 
-RETURN: // Encode and send response.
-	if !resp.Error {
-		resp.Message = "Submission creation successful!"
-	}
+	// Return response body after function successful.
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else {
+	} else if !resp.Error {
 		log.Print("[INFO] uploadSubmission request successful\n")
-		return
+	}
+}
+
+// Decode a validated submission upload body into a submission model.
+func ValidateAndDecodeSubmission(body UploadSubmissionBody) (*Submission, error) {
+	// Get arrays of authors, reviewers and categories from a submission upload body.
+	if err := validate.Struct(body); err != nil {
+		return nil, err
+	}
+
+	// Get array of author and reviewer users from body.
+	authors, reviewers := []GlobalUser{}, []GlobalUser{}
+	for _, author := range body.Authors {
+		authors = append(authors, GlobalUser{ID: author})
+	}
+	for _, reviewer := range body.Reviewers {
+		reviewers = append(reviewers, GlobalUser{ID: reviewer})
+	}
+
+	return &Submission{
+		Name: body.Name, License: body.License,
+		Files: body.Files, Categories: body.Tags,
+		Authors: authors, Reviewers: reviewers,
+		MetaData: &SubmissionData{
+			Abstract: "test abstract",
+		},
+	}, nil
+
+}
+
+// Controller for the upload submission POST request.
+func ControllerUploadSubmission(body UploadSubmissionBody) (uint, error) {
+	if submission, err := ValidateAndDecodeSubmission(body); err != nil {
+		// Deal with validation errors - print all failed fields.
+		if errors, ok := err.(validator.ValidationErrors); ok {
+			log.Printf("[WARN] Given submission is invalid! ")
+			return 0, errors
+		} else {
+			// Validation process failed.
+			log.Printf("[ERROR] Validation failure! ")
+			return 0, err
+		}
+	} else if submissionID, err := addSubmission(submission); err != nil {
+		return 0, err
+	} else {
+		return submissionID, nil
 	}
 }
 
@@ -164,32 +212,38 @@ RETURN: // Encode and send response.
 func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
+
 	// gets the submission ID from the URL parameters
 	params := mux.Vars(r)
+	var encodable interface{}
+
+	// Check path, execute controller, check errors.
 	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
 	if err != nil {
-		log.Printf("[ERROR] Submission ID: %s unable to be parsed", params["id"])
+		encodable = StandardResponse{Message: "Given ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
+	} else if submission, err := getSubmission(uint(submissionID64)); err != nil {
+		switch err.(type) {
+		case *NoSubmissionError: // The given submission doesn't exist
+			encodable = StandardResponse{Message: err.(*NoSubmissionError).Error(), Error: true}
+			w.WriteHeader(http.StatusNotFound)
+		default: // Unexpected error - error out as server error.
+			log.Printf("[ERROR] could not retrieve submission data properly: %v", err)
+			encodable = StandardResponse{Message: "Internal server error - could not retrieve submission.", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
+	} else {
+		encodable = submission
 	}
-	submissionID := uint(submissionID64)
 
-	// gets the submission struct
-	submission, err := getSubmission(submissionID)
-	if err != nil {
-		log.Printf("[ERROR] could not retrieve submission data properly: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 	// writes JSON data for the submission to the HTTP connection
-	response, err := json.Marshal(submission)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(encodable); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	log.Print("[INFO] success\n")
-	w.Write(response)
 	return
 }
 
@@ -207,12 +261,9 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 //	(int) : the id of the added submission
 //	(error) : if the operation fails
 func addSubmission(submission *Submission) (uint, error) {
-	// error cases
-	validate.Struct(submission)
-
 	// adds the submission to the db, automatically setting submission.ID
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		if err := gormDb.Omit("submissions.authors", "submissions.reviewers", "submissions.files").Create(submission).Error; err != nil {
+		if err := tx.Omit(clause.Associations).Create(submission).Error; err != nil {
 			return err
 		} else if err := addAuthors(tx, submission.Authors, submission.ID); err != nil {
 			return err
@@ -297,13 +348,17 @@ func appendUsers(tx *gorm.DB, users []GlobalUser, priviledges []int, association
 			if res := tx.Where("user_type IN ?", priviledges).Limit(1).Find(&user, "ID = ?", user.ID); res.Error != nil {
 				return res.Error
 			} else if res.RowsAffected == 0 {
-				return fmt.Errorf("User %s either doesn't exist or doesn't have required permissiosn.", user.ID)
+				if isUnique(tx, &GlobalUser{}, "ID", user.ID) {
+					return &BadUserError{userID: user.ID} // ID unique - user not registered.
+				} else {
+					return &WrongPermissionsError{userID: user.ID} // User registered - permissions false.
+				}
 			}
 		}
 		// Append checked users into the submission's association.
-		submission := &Submission{}
+		submission := Submission{}
 		submission.ID = submissionID
-		if err := tx.Model(submission).Association(association).Append(users); err != nil {
+		if err := tx.Model(&submission).Association(association).Append(users); err != nil {
 			return err
 		}
 		return nil
@@ -406,71 +461,29 @@ func getReviewedSubmissions(reviewerID string) (map[uint]string, error) {
 // 	(*Submission) : the data of the submission
 // 	(error) : an error if one occurs
 func getSubmission(submissionID uint) (*Submission, error) {
-	var err error
-	// retrieves the submission from the db
+	// Get data contained inside the database.
 	submission := &Submission{}
-	submission.ID = submissionID
-	if err = gormDb.Find(submission).Error; err != nil {
-		return nil, err
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		var err error
+		if res := tx.Preload("Authors").Preload("Files").Preload("Reviewers").Find(submission, submissionID); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected == 0 {
+			return &NoSubmissionError{ID: submissionID}
+		}
+		if submission.Categories, err = getSubmissionCategories(tx, submissionID); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return &Submission{}, err
 	}
+
 	// gets the data which is not stored in the submissions table of the database
-	submission.Authors, err = getSubmissionAuthors(submissionID)
-	if err != nil {
-		return nil, err
-	}
-	submission.Reviewers, err = getSubmissionReviewers(submissionID)
-	if err != nil {
-		return nil, err
-	}
-	submission.Categories, err = getSubmissionCategories(submissionID)
-	if err != nil {
-		return nil, err
-	}
-	submission.Files, err = getSubmissionFiles(submissionID)
-	if err != nil {
-		return nil, err
-	}
-	submission.MetaData, err = getSubmissionMetaData(submissionID)
-	if err != nil {
+	var err error
+	if submission.MetaData, err = getSubmissionMetaData(submissionID); err != nil {
 		return nil, err
 	}
 	return submission, nil
-}
-
-// Query the authors of a given submission from the database
-//
-// Params:
-//	submissionID (int) : the id of the submission to get authors of
-// Returns:
-//	([]string) : of the author's names
-//	(error) : if something goes wrong during the query
-func getSubmissionAuthors(submissionID uint) ([]GlobalUser, error) {
-	var authors []GlobalUser
-	submission := &Submission{}
-	submission.ID = submissionID
-	if err := gormDb.Model(submission).Select(
-		"global_users.id", "global_users.full_name").Association("Authors").Find(&authors); err != nil {
-		return nil, err
-	}
-	return authors, nil
-}
-
-// Query the reviewers of a given submission from the database
-//
-// Params:
-//	submissionID (int) : the id of the submission to get reviewers of
-// Returns:
-//	([]string) : of the reviewer's IDs
-//	(error) : if something goes wrong during the query
-func getSubmissionReviewers(submissionID uint) ([]GlobalUser, error) {
-	var reviewers []GlobalUser
-	submission := &Submission{}
-	submission.ID = submissionID
-	if err := gormDb.Model(submission).Select(
-		"global_users.id", "global_users.full_name").Association("Reviewers").Find(&reviewers); err != nil {
-		return nil, err
-	}
-	return reviewers, nil
 }
 
 // Queries the database for categories (tags) associated with the given
@@ -481,10 +494,10 @@ func getSubmissionReviewers(submissionID uint) ([]GlobalUser, error) {
 // Returns:
 // 	([]string) : an array of the tags associated with the given submission
 // 	(error) : an error if one occurs while retrieving the tags
-func getSubmissionCategories(submissionID uint) ([]string, error) {
+func getSubmissionCategories(tx *gorm.DB, submissionID uint) ([]string, error) {
 	// gets all tags with foreign key submission_id = submissionID
 	var categories []Category
-	if err := gormDb.Model(&Category{SubmissionID: submissionID}).Find(&categories).Error; err != nil {
+	if err := tx.Model(&Category{SubmissionID: submissionID}).Find(&categories).Error; err != nil {
 		return nil, err
 	}
 	// loops over the query results to build a string array of tags

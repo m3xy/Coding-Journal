@@ -56,6 +56,17 @@ type NewCommentPostBody struct {
 	Base64Value string `json:"base64Value"`
 }
 
+// POST /submissions/create body
+type UploadSubmissionBody struct {
+	Name      string   `json:"name" validate:"required"`
+	License   string   `json:"license" `
+	Abstract  string   `json:"abstract"`
+	Tags      []string `json:"tags"`
+	Authors   []string `json:"authors" validate:"required"`
+	Reviewers []string `json:"reviewers"`
+	Files     []File   `json:"files"`
+}
+
 // --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`

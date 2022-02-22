@@ -61,7 +61,7 @@ type GlobalUser struct {
 	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
 	FullName string `json:"fullName,omitempty" validate:"required,max=118"`
 	UserType int    `gorm:"default:4" json:"userType"`
-	User     User   `json:"profile,omitempty" validate:"dive"`
+	User     User   `json:"profile,omitempty"`
 
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-" validate:"dive"`
 	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-" validate:"dive"`
