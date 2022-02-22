@@ -265,9 +265,7 @@ func addSubmission(submission *Submission) (uint, error) {
 func addAuthors(tx *gorm.DB, authors []GlobalUser, submissionID uint) error {
 	// Check if there is at least 1 author.
 	switch {
-	case authors == nil:
-		return errors.New("There must be at least 1 author")
-	case len(authors) == 0:
+	case authors == nil, len(authors) == 0:
 		return errors.New("There must be at least 1 author")
 	}
 	return appendUsers(tx, authors, []int{USERTYPE_PUBLISHER, USERTYPE_REVIEWER_PUBLISHER}, "Authors", submissionID)
@@ -341,11 +339,11 @@ func addTags(tx *gorm.DB, tags []string, submissionID uint) error {
 		// checks that the submission exists
 		submission := &Submission{}
 		submission.ID = submissionID
-		if err := gormDb.Model(submission).First(submission).Error; err != nil {
+		if err := tx.Model(submission).First(submission).Error; err != nil {
 			return err
 		}
 		// inserts the array of categories
-		if err := gormDb.Model(&Category{}).Create(&categories).Error; err != nil {
+		if err := tx.Model(&Category{}).Create(&categories).Error; err != nil {
 			return err
 		}
 		return nil

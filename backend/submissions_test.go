@@ -99,59 +99,32 @@ func submissionServerSetup() *http.Server {
 	}
 }
 
+// Initialise mock data in the database for use later on in the testing.
+func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
+	// Fill database with users.
+	var err error
+	globalAuthors := make([]GlobalUser, len(testAuthors))
+	for i, user := range testAuthors {
+		if globalAuthors[i].ID, err = registerUser(user, USERTYPE_PUBLISHER); err != nil {
+			t.Errorf("User registration failed: %v", err)
+			return nil, nil, err
+		}
+
+	}
+	globalReviewers := make([]GlobalUser, len(testReviewers))
+	for i, user := range testReviewers {
+		if globalReviewers[i].ID, err = registerUser(user, USERTYPE_REVIEWER); err != nil {
+			t.Errorf("User registration failed: %v", err)
+			return nil, nil, err
+		}
+
+	}
+	return globalAuthors, globalReviewers, nil
+}
+
 // ------------
 // Router Function Tests
 // ------------
-
-// Tests the ability of the getAllSubmissions() function to get all submission ids and names from the db
-// at once
-//
-// Test Depends On:
-// 	- TestAddSubmission
-// 	- TestGetAuthoredSubmissions
-/* func TestGetAllSubmissions(t *testing.T) {
-	// Set up server and test environment
-	testInit()
-	defer testEnd()
-	srv := submissionServerSetup()
-	go srv.ListenAndServe()
-
-	// registers authors and reviewers of the submissions (same for all submissions here)
-	authorID, err := registerUser(testAuthors[0])
-	assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-	reviewerID, err := registerUser(testReviewers[0])
-	assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-
-	// tests that multiple valid submissions can be uploaded, then retrieved from the database
-	t.Run("Get Multiple Valid submissions", func(t *testing.T) {
-
-		// adds all of the submissions and stores their ids and names
-		sentSubmissions := make(map[uint]string) // variable to hold the id: submission name mappings which are sent to the db
-		for _, sub := range testSubmissions[0:2] {
-			sub.Authors = []GlobalUser{{ID: authorID}}
-			sub.Reviewers = []GlobalUser{{ID: reviewerID}}
-			submissionID, err := addSubmission(&sub)
-			assert.NoErrorf(t, err, "Error adding submission %s: %v", sub.Name, err)
-			sentSubmissions[submissionID] = sub.Name
-		}
-
-		// builds and sends and http request to get the names and IDs of all submissions
-		urlString := fmt.Sprintf("%s%s/%s%s", ADDRESS_SUBMISSION, SUBROUTE_USER, authorID, ENDPOINT_SUBMISSIONS)
-		req, err := http.NewRequest("GET", urlString, nil)
-		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
-		assert.NoErrorf(t, err, "Error occurred while sending get request to the Go server: %v", err)
-		defer resp.Body.Close()
-		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
-
-		// checks the returned list of submissions for equality with the sent list
-		returnedSubmissions := make(map[uint]string)
-		json.NewDecoder(resp.Body).Decode(&returnedSubmissions)
-		for k, v := range returnedSubmissions {
-			assert.Equalf(t, v, sentSubmissions[k],
-				"Submissions of ids: %d do not have matching names. Given: %s, Returned: %s ", k, sentSubmissions[k], v)
-		}
-	})
-} */
 
 // Tests that submissions.go can upload submissions properly
 func TestUploadSubmission(t *testing.T) {
@@ -164,26 +137,12 @@ func TestUploadSubmission(t *testing.T) {
 	router.HandleFunc(ENDPOINT_SUBMISSIONS+ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission)
 	route := ENDPOINT_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
 
-	// Fill database with users.
-	var err error
-	globalAuthors := make([]GlobalUser, len(testAuthors))
-	for i, user := range testAuthors {
-		if globalAuthors[i].ID, err = registerUser(user, USERTYPE_PUBLISHER); err != nil {
-			t.Errorf("User registration failed: %v", err)
-			return
-		}
-
-	}
-	globalReviewers := make([]GlobalUser, len(testReviewers))
-	for i, user := range testReviewers {
-		if globalReviewers[i].ID, err = registerUser(user, USERTYPE_REVIEWER); err != nil {
-			t.Errorf("User registration failed: %v", err)
-			return
-		}
-
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
+		return
 	}
 
-	// tests that a single valid submission with one reviewer and one author can be retrieved
+	// Check all cases in which an uploaded submission is valid.
 	t.Run("Upload valid submissions", func(t *testing.T) {
 		testValidUpload := func(submission Submission, t *testing.T) bool {
 			// Get body marshal then send request.
@@ -259,8 +218,10 @@ func TestUploadSubmission(t *testing.T) {
 		})
 	})
 
+	// Check all invalid upload cases.
 	t.Run("Invalid uploads", func(t *testing.T) {
 
+		// Function to check if a request returns valid error.
 		testInvalidUpload := func(submission Submission, status int, authed bool, t *testing.T) bool {
 			// Get body marshal then send request.
 			reqBody, err := json.Marshal(submission)
@@ -278,22 +239,30 @@ func TestUploadSubmission(t *testing.T) {
 			return assert.Equalf(t, status, resp.StatusCode, "Should return code %d but got %d", status, resp.StatusCode)
 		}
 
+		// Suite of cases in which submission upload should fail.
 		t.Run("No authors", func(t *testing.T) {
 			testSubmission := Submission{
 				Name: "Test", License: "MIT",
 			}
 			testInvalidUpload(testSubmission, http.StatusBadRequest, true, t)
-		})
+		}) // Return: 400
 		t.Run("Unregistered author", func(t *testing.T) {
 			testSubmission := Submission{
 				Name: "Test", License: "MIT",
 				Authors: []GlobalUser{{ID: "-"}},
 			}
 			testInvalidUpload(testSubmission, http.StatusUnauthorized, true, t)
-		})
+		}) // Return: 401
 		t.Run("No name", func(t *testing.T) {
-
-		})
+			testSubmission := Submission{
+				Authors: []GlobalUser{globalAuthors[0]},
+			}
+			testInvalidUpload(testSubmission, http.StatusBadRequest, true, t)
+		}) // Return: 400
+		t.Run("Unauthenticated user", func(t *testing.T) {
+			testSubmission := Submission{Name: "Test", Authors: []GlobalUser{globalAuthors[0]}}
+			testInvalidUpload(testSubmission, http.StatusUnauthorized, false, t)
+		}) // Return: 401
 
 	})
 }
@@ -306,57 +275,59 @@ func TestUploadSubmission(t *testing.T) {
 // 	- TestAddReviewers()
 // 	- TestAddAuthors()
 func TestRouteGetSubmission(t *testing.T) {
+	// Set up server and test environment
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_SUBMISSION+"/{id}", RouteGetSubmission)
+
+	// Initialise users and created submissions.
+	globalAuthors, _, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+	submission := Submission{
+		Name:    "Test",
+		Authors: []GlobalUser{globalAuthors[0]},
+		MetaData: &SubmissionData{
+			Abstract: "Test",
+		},
+	}
+	id, err := addSubmission(&submission)
+	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+		return
+	}
+
 	// tests that a single valid submission with one reviewer and one author can be retrieved
 	t.Run("Get Valid Submission", func(t *testing.T) {
-		testFile := testFiles[0]             // defines the file to use for the test here so that it can be easily changed
-		testSubmission := testSubmissions[0] // defines the submission to use for the test here so that it can be easily changed
-		testAuthor := testAuthors[0]         // defines the author of the submission
-		testReviewer := testReviewers[0]     // defines the reviewer of the submission
+		// Create submission, then send request.
+		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
+		r, w := httptest.NewRequest(http.MethodPost, url, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+		resp := w.Result()
 
-		// Set up server and test environment
-		testInit()
-		srv := submissionServerSetup()
-		go srv.ListenAndServe()
+		// Read result and check success.
+		var respBody Submission
+		if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "Should succeed, but got error %d", resp.StatusCode) {
+			return
+		} else if err := json.NewDecoder(resp.Body).Decode(&respBody); !assert.NoError(t, err, "Response schema is invalid.") {
+			return
+		}
+		switch {
+		case !assert.Equal(t, id, respBody.ID, "Returned submission should be the same as the one created."),
+			!assert.Equal(t, submission.MetaData.Abstract, respBody.MetaData.Abstract, "Metadata should be included in the result."):
+			return
+		}
+	})
 
-		// registers author and reviewer
-		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error registering author in the db: %v", err)
-		testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-		assert.NoErrorf(t, err, "Error registering reviewer in the db: %v", err)
-		testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
-		// uploads the test submission and adds a file to it
-		testSubmission.Files = []File{testFile}
-		submissionID, err := addSubmission(&testSubmission)
-		assert.NoErrorf(t, err, "Error adding submission %v", err)
-
-		// creates a request to send to the test server
-		urlString := fmt.Sprintf("%s%s/%d", ADDRESS_SUBMISSION,
-			SUBROUTE_SUBMISSION, submissionID)
-		fmt.Println(urlString)
-		req, _ := http.NewRequest("GET", urlString, nil)
-		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
-		assert.NoErrorf(t, err, "Error while sending Get request: %v", err)
-		defer resp.Body.Close()
-		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Non-OK status returned from GET request: %d", resp.StatusCode)
-
-		// decodes the json response into a Submission struct
-		submission := &Submission{}
-		assert.NoErrorf(t, json.NewDecoder(resp.Body).Decode(submission), "Error while decoding server response: %v", err)
-
-		// tests that the returned submission matches the passed in data
-		assert.Equal(t, testSubmission.ID, submission.ID, "Submission IDs do not match")
-		assert.Equal(t, testSubmission.Name, submission.Name, "Submission Names do not match.")
-		assert.Equal(t, authorID, submission.Authors[0].ID, "Author IDs do not match")
-		assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, submission.Authors[0].FullName, "Author Names not match")
-		assert.Equal(t, reviewerID, submission.Reviewers[0].ID, "Reviewer IDs not match")
-		assert.Equal(t, testReviewer.FirstName+" "+testReviewer.LastName, submission.Reviewers[0].FullName, "Reviewer Names not match")
-
-		// clears test env and shuts down the test server
-		assert.NoError(t, srv.Shutdown(context.Background()), "failed to shut down server")
-		testEnd()
+	t.Run("Get non-existant Submission", func(t *testing.T) {
+		// Send request with submission ID that has no submission mapped to it.
+		r, w := httptest.NewRequest(http.MethodPost, SUBROUTE_SUBMISSION+"/-", nil), httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+		resp := w.Result()
+		assert.Equalf(t, http.StatusNotFound, resp.StatusCode, "Request should return nothing, but instead got %d", resp.StatusCode)
 	})
 }
 
@@ -366,6 +337,32 @@ func TestRouteGetSubmission(t *testing.T) {
 
 // test the addSubmission() function in submissions.go
 func TestAddSubmission(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	// Get authors and reviewers
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+
+	// Define full testing submission
+	FULL_SUBMISSION := Submission{
+		Name: "Test", License: "Test", // Basic fields
+		Authors:   globalAuthors,   // Check for authors
+		Reviewers: globalReviewers, // Check for reviewers
+		Files: []File{
+			{Name: "test.txt", Path: "test.txt", Base64Value: "test"}, // Check correct file paths.
+			{Name: "test.txt", Path: "test/test.txt", Base64Value: "test"},
+		},
+		MetaData: &SubmissionData{
+			Abstract: "test", // Check that metadata is correctly stored.
+			Reviews: []*Comment{
+				{AuthorID: globalReviewers[0].ID, Base64Value: "test"},
+			},
+		},
+	}
+
 	// Utility function to be re-used for testing adding submissions to the db
 	testAddSubmission := func(testSub *Submission) {
 		// adds the submission to the db and filesystem
@@ -382,42 +379,38 @@ func TestAddSubmission(t *testing.T) {
 		submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionID))
 		fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, testSub.Name+".json")
 		dataString, err := ioutil.ReadFile(fileDataPath)
-		assert.NoError(t, err, "error reading submission data")
-		assert.NoError(t, json.Unmarshal(dataString, submissionData), "error unmarshalling submission data")
+		switch {
+		case !assert.NoError(t, err, "error reading submission data"),
+			assert.NoError(t, json.Unmarshal(dataString, submissionData), "error unmarshalling submission data"):
+			return
+		}
 
 		// for each file in the submission, checks that it was added to the filesystem and database properly
 		for _, file := range testSub.Files {
 			// retrieve the file
 			queriedFile := &File{}
-			err = gormDb.Model(&File{}).First(queriedFile, file.ID).Error
-			assert.NoError(t, err, "Error retrieving file: %v", err)
+			if err := gormDb.Model(&File{}).First(queriedFile, file.ID).Error; !assert.NoError(t, err, "Error retrieving file: %v", err) {
+				return
+			}
 
 			// gets the file content from the filesystem
 			fileBytes, err := ioutil.ReadFile(queriedFile.Path)
-			assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err)
+			if !assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err) {
+				return
+			}
 			queriedFileContent := string(fileBytes)
-
-			// // checks that a data file has been generated for the uploaded file
-			// var fileData *FileData
-			// fileDataPath := filepath.Join(
-			// 	TEST_FILES_DIR,
-			// 	fmt.Sprint(queriedSubmission.ID),
-			// 	DATA_DIR_NAME,
-			// 	queriedSubmission.Name,
-			// 	strings.TrimSuffix(queriedFile.Path, filepath.Ext(queriedFile.Path))+".json",
-			// )
-			// dataString, err := ioutil.ReadFile(fileDataPath)
-			// assert.NoError(t, err, "error reading submission data")
-			// assert.NoError(t, json.Unmarshal(dataString, fileData), "error unmarshalling submission data")
 
 			// gets data about the file, and tests it for equality against the added file
 			_, err = os.Stat(fileDataPath)
-			assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload")
-			assert.Equal(t, file.Name, queriedFile.Name, "File names do not match")
-			assert.Equal(t, file.Path, queriedFile.Path, "File Paths do not match")
-			assert.Equal(t, file.SubmissionID, queriedFile.SubmissionID, "File SubmissionIDs do not match")
-			assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly")
-			assert.ElementsMatch(t, file.Comments, queriedFile.Comments, "File comments do not match")
+			switch {
+			case !assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload"),
+				!assert.Equal(t, file.Name, queriedFile.Name, "File names do not match"),
+				!assert.Equal(t, file.Path, queriedFile.Path, "File Paths do not match"),
+				!assert.Equal(t, file.SubmissionID, queriedFile.SubmissionID, "File SubmissionIDs do not match"),
+				!assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly"),
+				!assert.ElementsMatch(t, file.Comments, queriedFile.Comments, "File comments do not match"):
+				return
+			}
 		}
 
 		// tests that the metadata is properly formatted
@@ -426,210 +419,22 @@ func TestAddSubmission(t *testing.T) {
 			submissionData.Abstract, testSub.MetaData.Abstract)
 		assert.ElementsMatch(t, submissionData.Reviews, testSub.MetaData.Reviews, "Submission Reviews do not match")
 	}
-
-	// tests that a single valid submission can be added to the db and filesystem properly
-	t.Run("Add One Submission", func(t *testing.T) {
-		testInit()
-		submission := testSubmissions[0]
-		authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error while registering author: %v", err)
-		reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-		assert.NoErrorf(t, err, "Error while registering reviewer: %v", err)
-		submission.Authors = []GlobalUser{{ID: authorID}}
-		submission.Reviewers = []GlobalUser{{ID: reviewerID}}
-		testAddSubmission(&submission)
-		testEnd()
-	})
-
 	// tests that multiple submissions can be added in a row properly
-	t.Run("Add Multiple Submissions", func(t *testing.T) {
-		testInit()
-		submissions := testSubmissions[0:2] // list of submissions to add to the db
-		authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error while registering author: %v", err)
-		reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-		assert.NoErrorf(t, err, "Error while registering reviewer: %v", err)
-		for _, submission := range submissions {
-			submission.Authors = []GlobalUser{{ID: authorID}}
-			submission.Reviewers = []GlobalUser{{ID: reviewerID}}
-			testAddSubmission(&submission)
-		}
-		testEnd()
+	t.Run("Add Full Submission", func(t *testing.T) {
+		testAddSubmission(&FULL_SUBMISSION)
 	})
 
 	// tests that trying to add a nil submission to the db and filesystem will result in an error
 	t.Run("Add Nil Submission", func(t *testing.T) {
-		testInit()
 		_, err := addSubmission(nil)
 		assert.Error(t, err, "No error occurred while uploading nil submission")
-		testEnd()
-	})
-
-	// tests that a submission with some fields as nil will not be added
-	t.Run("Add Submission No Authors", func(t *testing.T) {
-		testInit()
-		testSubmission := testSubmissions[0]
-
-		// nil author array
-		testSubmission.Authors = nil
-		_, err := addSubmission(&testSubmission)
-		assert.Error(t, err, "No error occurred while uploading nil Author array")
-
-		// empty author array
-		testSubmission.Authors = []GlobalUser{}
-		_, err = addSubmission(&testSubmission)
-		assert.Error(t, err, "No error occurred while uploading empty Author array")
-		testEnd()
-	})
-}
-
-// tests the ability of the submissions.go module to add authors to projects
-// Test Depends on:
-// 	- TestAddSubmission
-func TestAddAuthor(t *testing.T) {
-	// utility function to add submissions just to the database (not filesystem), without checking for correctness
-	testAddSubmission := func(submission *Submission) uint {
-		assert.NoError(t, gormDb.Create(submission).Error, "Error creating submission")
-		return submission.ID
-	}
-
-	// utility function which tests that an author can be added to a valid submission properly
-	testAddAuthor := func(submissionID uint, author User) {
-		// registers the author as a user and then to the given submission as an author
-		authorID, err := registerUser(author, USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.NoErrorf(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Error adding the author to the db: %v", err)
-
-		// queries the authors table in the database for author IDs which match that returned from registerUser()
-		var authors []GlobalUser
-		submission := &Submission{}
-		submission.ID = submissionID
-		err = gormDb.Model(submission).Select("global_users.id", "global_users.full_name").Association("Authors").Find(&authors)
-		assert.NoErrorf(t, err, "Error querying submission Authors: %v", err)
-
-		// checks author details for equality with those which were queried
-		authorIDs := []string{}
-		authorNames := []string{}
-		for _, author := range authors {
-			authorIDs = append(authorIDs, author.ID)
-			authorNames = append(authorNames, author.FullName)
-		}
-		assert.Contains(t, authorIDs, authorID, "author id not in the queried array")
-		assert.Contains(t, authorNames, author.FirstName+" "+author.LastName, "author id not in the queried array")
-	}
-
-	// tests adding one author to a valid project
-	t.Run("Adding One Author", func(t *testing.T) {
-		testInit()
-		// defines test submission and author to use for this test, and uploads the submission
-		testSubmission := testSubmissions[0]
-		testAuthor := testAuthors[0]
-		submissionID := testAddSubmission(&testSubmission)
-
-		// uses the utility function to add the author, and test that it was done properly
-		testAddAuthor(submissionID, testAuthor)
-		testEnd()
-	})
-
-	// attemps to add an author without the correct permissions, if addAuthor succeeds, an error is thrown
-	t.Run("Add Invalid Author", func(t *testing.T) {
-		testInit()
-		testSubmission := testSubmissions[0]
-		testAuthor := testAuthors[1] // user without publisher permissions
-
-		// uploads a test submission
-		submissionID := testAddSubmission(&testSubmission)
-
-		// registers the author as a user and then to the given submission as an author
-		badAuthorID, err := registerUser(testAuthor, USERTYPE_USER)
-		assert.NoErrorf(t, err, "Error in author registration: %v", err)
-		assert.Error(t, addAuthors(gormDb, []GlobalUser{{ID: badAuthorID}}, submissionID), "Author without publisher permissions registered")
-
-		testEnd()
-	})
-
-	// tests that a user must be registered with the db before being and author
-	t.Run("Add Non-User Author", func(t *testing.T) {
-		testInit()
-		testSubmission := testSubmissions[0]
-		authorID := "u881jafjka" // non-user fake id
-		submissionID := testAddSubmission(&testSubmission)
-		assert.Error(t, addAuthors(gormDb, []GlobalUser{{ID: authorID}}, submissionID), "Non-user added as author")
-		testEnd()
 	})
 }
 
 // tests the ability of the submissions.go module to add reviewers to submissions
 // Test Depends on:
 // 	- TestAddSubmission
-func TestAddReviewer(t *testing.T) {
-	// utility function to add submissions just to the database (not filesystem), without checking for correctness
-	testAddSubmission := func(submission *Submission) uint {
-		assert.NoError(t, gormDb.Create(submission).Error, "Error creating submission")
-		return submission.ID
-	}
-
-	// utility function which tests that an reviewer can be added to a valid submission properly
-	testAddReviewer := func(submissionID uint, reviewer User) {
-		// registers the reviewer as a user and then to the given submission as an reviewer
-		reviewerID, err := registerUser(reviewer, USERTYPE_REVIEWER)
-		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
-		assert.NoErrorf(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Error adding the reviewer to the db: %v", err)
-
-		// queries the reviewers table in the database for reviewer IDs which match that returned from registerUser()
-		var reviewers []GlobalUser
-		submission := &Submission{}
-		submission.ID = submissionID
-		err = gormDb.Model(submission).Select("global_users.id", "global_users.full_name").Association("Reviewers").Find(&reviewers)
-		assert.NoErrorf(t, err, "Error querying submission Reviewers: %v", err)
-
-		// checks reviewer details for equality with those which were queried
-		reviewerIDs := []string{}
-		reviewerNames := []string{}
-		for _, reviewer := range reviewers {
-			reviewerIDs = append(reviewerIDs, reviewer.ID)
-			reviewerNames = append(reviewerNames, reviewer.FullName)
-		}
-		assert.Contains(t, reviewerIDs, reviewerID, "reviewer id not in the queried array")
-		assert.Contains(t, reviewerNames, reviewer.FirstName+" "+reviewer.LastName, "reviewer id not in the queried array")
-	}
-
-	// tests adding one reviewer to a valid project
-	t.Run("Adding One Reviewer", func(t *testing.T) {
-		testInit()
-		// defines test submission and reviewer to use for this test, and uploads the submission
-		testSubmission := testSubmissions[0]
-		testReviewer := testReviewers[0]
-		submissionID := testAddSubmission(&testSubmission)
-
-		// uses the utility function to add the reviewer, and test that it was done properly
-		testAddReviewer(submissionID, testReviewer)
-		testEnd()
-	})
-
-	// attemps to add an reviewer without the correct permissions, if addReviewer succeeds, an error is thrown
-	t.Run("Add Invalid Reviewer", func(t *testing.T) {
-		testInit()
-		testSubmission := testSubmissions[0]
-		testReviewer := testReviewers[1] // user without publisher permissions
-		submissionID := testAddSubmission(&testSubmission)
-
-		// registers the reviewer as a user and then to the given submission as an reviewer
-		reviewerID, err := registerUser(testReviewer, USERTYPE_USER)
-		assert.NoErrorf(t, err, "Error in reviewer registration: %v", err)
-		assert.Error(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Reviewer without reviewer permissions registered")
-		testEnd()
-	})
-
-	// tests that a user must be registered with the db before being and reviewer
-	t.Run("Add Non-User Reviewer", func(t *testing.T) {
-		testInit()
-		testSubmission := testSubmissions[0]
-		reviewerID := "u881jafjka" // non-user fake id
-		submissionID := testAddSubmission(&testSubmission)
-		assert.Error(t, addReviewers(gormDb, []GlobalUser{{ID: reviewerID}}, submissionID), "Non-user added as reviewer")
-		testEnd()
-	})
+func TestAppendUsers(t *testing.T) {
 }
 
 // This function tests the addTags function
