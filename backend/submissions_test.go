@@ -316,7 +316,7 @@ func TestAddSubmission(t *testing.T) {
 	// Utility function to be re-used for testing adding submissions to the db
 	testAddSubmission := func(testSub *Submission) {
 		// adds the submission to the db and filesystem
-		submissionID, err := addSubmission(testSub)
+		_, err := addSubmission(testSub)
 		assert.NoErrorf(t, err, "Error adding submission: %v", err)
 
 		// retrieve the submission
@@ -326,8 +326,8 @@ func TestAddSubmission(t *testing.T) {
 
 		// checks that the filesystem has a proper corresponding entry and metadata file
 		submissionData := &SubmissionData{}
-		submissionDirPath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionID))
-		fileDataPath := filepath.Join(submissionDirPath, DATA_DIR_NAME, testSub.Name+".json")
+		submissionDirPath := getSubmissionDirectoryPath(*testSub)
+		fileDataPath := filepath.Join(submissionDirPath, "data.json")
 		dataString, err := ioutil.ReadFile(fileDataPath)
 		switch {
 		case !assert.NoError(t, err, "error reading submission data"),
@@ -381,7 +381,7 @@ func TestAddSubmission(t *testing.T) {
 			if !assert.Error(t, err, "No error occured while uploading nil submission") {
 				return false
 			} else if submission != nil {
-				_, err := os.Stat(filepath.Join(TEST_FILES_DIR, fmt.Sprint(submission.ID), submission.Name))
+				_, err := os.Stat(getSubmissionDirectoryPath(*submission))
 				switch {
 				case !assert.True(t, os.IsNotExist(err), "The submission's directory should not have been created."):
 					return false
@@ -611,13 +611,13 @@ func TestGetSubmission(t *testing.T) {
 
 	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-
+		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
 	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-
+		return
 	}
 	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
@@ -632,13 +632,18 @@ func TestGetSubmission(t *testing.T) {
 
 		// gets the submission back
 		queriedSubmission, err := getSubmission(submissionID)
-		assert.NoErrorf(t, err, "Error occurred while retrieving submission: %v", err)
+		if !assert.NoErrorf(t, err, "Error occurred while retrieving submission: %v", err) {
+			return
+		}
 
 		// tests the submission was returned properly
-		assert.Equal(t, testSubmission.Name, queriedSubmission.Name, "Submission names do not match")
-		assert.Equal(t, testSubmission.License, queriedSubmission.License, "Submission Licenses do not match")
-		assert.ElementsMatch(t, testSubmission.Categories, queriedSubmission.Categories, "Submission tags do not match")
-		assert.Equal(t, testSubmission.MetaData.Abstract, queriedSubmission.MetaData.Abstract, "Abstracts do not match")
+		switch {
+		case !assert.Equal(t, testSubmission.Name, queriedSubmission.Name, "Submission names do not match"),
+			!assert.Equal(t, testSubmission.License, queriedSubmission.License, "Submission Licenses do not match"),
+			!assert.ElementsMatch(t, testSubmission.Categories, queriedSubmission.Categories, "Submission tags do not match"),
+			!assert.Equal(t, testSubmission.MetaData.Abstract, queriedSubmission.MetaData.Abstract, "Abstracts do not match"):
+			return
+		}
 
 		// tests authors
 		authorIDs := []string{}
@@ -720,21 +725,28 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	testAuthor := testAuthors[0]
 
 	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
+	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+		return
+	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
 	submissionID, err := addSubmission(&testSubmission)
-	assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
+	if !assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err) {
+		return
+	}
 
 	// valid metadata file and format
 	t.Run("Valid Metadata", func(t *testing.T) {
 		// tests that the metadata can be read back properly, and that it matches the uploaded submission
 		submissionData, err := getSubmissionMetaData(submissionID)
-		assert.NoErrorf(t, err, "Error getting submission metadata: %v", err)
-		assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
-			"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
-			submissionData.Abstract, testSubmission.MetaData.Abstract)
-		assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match")
+		switch {
+		case !assert.NoErrorf(t, err, "Error getting submission metadata: %v", err),
+			!assert.Equalf(t, submissionData.Abstract, testSubmission.MetaData.Abstract,
+				"submission metadata not added to filesystem properly. Abstracts %s, %s do not match",
+				submissionData.Abstract, testSubmission.MetaData.Abstract),
+			!assert.ElementsMatch(t, submissionData.Reviews, testSubmission.MetaData.Reviews, "Submission Reviews do not match"):
+
+		}
 	})
 
 	// Tests that getSubmissionMetaData will throw an error if an incorrect submission ID is passed in

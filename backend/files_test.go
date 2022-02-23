@@ -136,10 +136,10 @@ func TestGetFile(t *testing.T) {
 
 		// tests that the file was retrieved with the correct information
 		switch {
-		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"):
-		case !assert.Equal(t, testFile.Name, file.Name, "file names do not match"):
-		case !assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"):
-		case !assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
+		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"),
+			!assert.Equal(t, testFile.Name, file.Name, "file names do not match"),
+			!assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"),
+			!assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
 			return
 		}
 
@@ -313,8 +313,7 @@ func TestAddFile(t *testing.T) {
 
 			// gets the submission name from the db
 			submission := &Submission{}
-			submission.ID = submissionID
-			if !assert.NoError(t, gormDb.Model(submission).Select("submissions.name").First(submission).Error,
+			if !assert.NoError(t, gormDb.Select("Name, created_at, ID").First(submission, submissionID).Error,
 				"Error retrieving submission name") {
 				return
 			}
@@ -328,7 +327,7 @@ func TestAddFile(t *testing.T) {
 			}
 
 			// gets the file content from the filesystem
-			filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionID), submission.Name, queriedFile.Path)
+			filePath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(queriedFile.ID))
 			fileBytes, err := ioutil.ReadFile(filePath)
 			if !assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err) {
 				return

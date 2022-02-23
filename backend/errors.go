@@ -29,3 +29,12 @@ type NoSubmissionError struct {
 }
 
 func (e *NoSubmissionError) Error() string { return fmt.Sprintf("Submission %d doesn't exist!", e.ID) }
+
+// Handle duplicate files.
+type DuplicateFileError struct {
+	Path string
+}
+
+func (e *DuplicateFileError) Error() string {
+	return fmt.Sprintf("Path %s appears more than once!", e.Path)
+}

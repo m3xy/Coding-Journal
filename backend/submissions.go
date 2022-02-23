@@ -253,6 +253,7 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 func addSubmission(submission *Submission) (uint, error) {
 	// adds the submission to the db, automatically setting submission.ID
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// Database operations
 		if err := tx.Omit(clause.Associations).Create(submission).Error; err != nil {
 			return err
 		} else if err := addAuthors(tx, submission.Authors, submission.ID); err != nil {
@@ -261,48 +262,79 @@ func addSubmission(submission *Submission) (uint, error) {
 			return err
 		} else if err := addTags(tx, submission.Categories, submission.ID); err != nil {
 			return err
-		} else {
-			return nil
 		}
+
+		// creates the directories to hold the submission in the filesystem
+		submissionPath := getSubmissionDirectoryPath(*submission)
+		if err := os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
+			return err
+		}
+
+		// Add files and metadata to the system.
+		if err := addFiles(tx, submission); err != nil {
+			return err
+		} else if err := addMetaData(submission); err != nil {
+			return err
+		}
+		return nil
 	}); err != nil {
+		// An error has occured - db has rolled back, now filesystem is rolled back.
+		if submission != nil {
+			_ = os.RemoveAll(getSubmissionDirectoryPath(*submission))
+		}
 		return 0, err
-	}
-
-	// creates the directories to hold the submission in the filesystem
-	submissionPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), submission.Name)
-	submissionDataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submission.ID), DATA_DIR_NAME, submission.Name)
-	if err := os.MkdirAll(submissionPath, DIR_PERMISSIONS); err != nil {
-		return 0, err
-	} else if err := os.MkdirAll(submissionDataPath, DIR_PERMISSIONS); err != nil {
-		return 0, err
-	}
-
-	// opens a JSON file for the submission metadata, and writes a SubmissionData struct to it
-	dataFile, err := os.OpenFile(submissionDataPath+".json", os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	if err != nil {
-		return 0, err
-	}
-	defer dataFile.Close()
-	if err := json.NewEncoder(dataFile).Encode(submission.MetaData); err != nil {
-		return 0, err
-	}
-
-	// Adds each member file to the filesystem and database
-	for _, file := range submission.Files {
-		_, err = addFileTo(&file, submission.ID)
 	}
 	return submission.ID, nil
 }
 
-// Add an array of authors to the given submission provided the id given corresponds to a valid
-// user with publisher or publisher-reviewer permissions
-//
-// Params:
-//	authors ([]GlobalUser) : the global user structs of the authors to add to the submission. Only
-// 		the GlobalUser.ID field must be set here
-//	submissionID (int) : the id of the submission to be added to
-// Returns:
-//	(error) : an error if one occurs, nil otherwise
+// Add collection of files to a new submission.
+func addFiles(tx *gorm.DB, s *Submission) error {
+	// Check if files are valid
+	filepaths := make(map[string]struct{})
+	for _, file := range s.Files {
+		if _, exists := filepaths[file.Path]; !exists {
+			filepaths[file.Path] = struct{}{}
+		} else {
+			return &DuplicateFileError{Path: file.Path}
+		}
+	}
+
+	// Add files to the database
+	if err := tx.Model(s).Association("Files").Append(s.Files); err != nil {
+		return err
+	}
+
+	// Add files to directory struct.
+	submissionPath := getSubmissionDirectoryPath(*s)
+	for _, fileRef := range s.Files {
+		fPath := filepath.Join(submissionPath, fmt.Sprint(fileRef.ID))
+		if f, err := os.Create(fPath); err != nil {
+			return err
+		} else {
+			defer f.Close()
+			f.Write([]byte(fileRef.Base64Value))
+		}
+	}
+	return nil
+}
+
+// Add a submission's metadata to the filesystem.
+func addMetaData(s *Submission) error {
+	// opens a JSON file for the submission metadata, and writes a SubmissionData struct to it
+	submissionPath := getSubmissionDirectoryPath(*s)
+	if f, err := os.OpenFile(filepath.Join(submissionPath, "data.json"), os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS); err != nil {
+		return err
+	} else {
+		defer f.Close()
+		if err := json.NewEncoder(f).Encode(s.MetaData); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Add array of registered authors with appropriate permissions to a submission's authorized authors attributes.
+// Errors on first unregistered author or author with invalid permissions.
 func addAuthors(tx *gorm.DB, authors []GlobalUser, submissionID uint) error {
 	// Check if there is at least 1 author.
 	switch {
@@ -312,15 +344,8 @@ func addAuthors(tx *gorm.DB, authors []GlobalUser, submissionID uint) error {
 	return appendUsers(tx, authors, []int{USERTYPE_PUBLISHER, USERTYPE_REVIEWER_PUBLISHER}, "Authors", submissionID)
 }
 
-// Add an array of reviewers to the given submission provided the id given corresponds to a valid
-// user with reviewer or publisher-reviewer permissions
-//
-// Params:
-//	reviewers ([]GlobalUser) : the global user structs of the reviewers to add to the submission.
-// 		Only GlobalUser.ID must be set here
-//	submissionID (uint) : the id of the submission to be added to
-// Returns:
-//	(error) : an error if one occurs, nil otherwise
+// Add array of registered reviewers with appropriate permissions to a submission's authorized reviewers attribute.
+// Errors on first unregistered reviewer or reviewer with invalid permissions.
 func addReviewers(tx *gorm.DB, reviewers []GlobalUser, submissionID uint) error {
 	return appendUsers(tx, reviewers, []int{USERTYPE_REVIEWER, USERTYPE_REVIEWER_PUBLISHER}, "Reviewers", submissionID)
 }
@@ -331,28 +356,27 @@ func appendUsers(tx *gorm.DB, users []GlobalUser, priviledges []int, association
 	if users == nil {
 		return nil
 	}
+
 	// Return transaction for user append with priviledge check
-	return tx.Transaction(func(tx *gorm.DB) error {
-		// For each user - find by ID and priviledges.
-		for _, user := range users {
-			if res := tx.Where("user_type IN ?", priviledges).Limit(1).Find(&user, "ID = ?", user.ID); res.Error != nil {
-				return res.Error
-			} else if res.RowsAffected == 0 {
-				if isUnique(tx, &GlobalUser{}, "ID", user.ID) {
-					return &BadUserError{userID: user.ID} // ID unique - user not registered.
-				} else {
-					return &WrongPermissionsError{userID: user.ID} // User registered - permissions false.
-				}
+	// For each user - find by ID and priviledges.
+	for _, user := range users {
+		if res := tx.Where("user_type IN ?", priviledges).Limit(1).Find(&user, "ID = ?", user.ID); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected == 0 {
+			if isUnique(tx, &GlobalUser{}, "ID", user.ID) {
+				return &BadUserError{userID: user.ID} // ID unique - user not registered.
+			} else {
+				return &WrongPermissionsError{userID: user.ID} // User registered - permissions false.
 			}
 		}
-		// Append checked users into the submission's association.
-		submission := Submission{}
-		submission.ID = submissionID
-		if err := tx.Model(&submission).Association(association).Append(users); err != nil {
-			return err
-		}
-		return nil
-	})
+	}
+	// Append checked users into the submission's association.
+	submission := Submission{}
+	submission.ID = submissionID
+	if err := tx.Model(&submission).Association(association).Append(users); err != nil {
+		return err
+	}
+	return nil
 }
 
 // function to add tags for a given submission
@@ -508,13 +532,12 @@ func getSubmissionCategories(tx *gorm.DB, submissionID uint) ([]string, error) {
 func getSubmissionMetaData(submissionID uint) (*SubmissionData, error) {
 	// gets the submission name from the database
 	submission := &Submission{}
-	submission.ID = submissionID
-	if err := gormDb.Model(submission).Select("submissions.Name").First(&submission).Error; err != nil {
+	if err := gormDb.Select("Name, created_at, ID").First(&submission, submissionID).Error; err != nil {
 		return nil, err
 	}
 
 	// reads the data file into a string
-	dataPath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), DATA_DIR_NAME, submission.Name+".json")
+	dataPath := filepath.Join(getSubmissionDirectoryPath(*submission), "data.json")
 	dataString, err := ioutil.ReadFile(dataPath)
 	if err != nil {
 		return nil, err
@@ -563,7 +586,7 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 	var supergroupFile *SupergroupFile
 	supergroupFiles := []*SupergroupFile{}
 	for _, file := range localSubmission.Files {
-		fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(localSubmission.ID), localSubmission.Name, file.Path)
+		fullFilePath := filepath.Join(getSubmissionDirectoryPath(*localSubmission), fmt.Sprint(file.ID))
 		base64, err = getFileContent(fullFilePath)
 		if err != nil {
 			return nil, err
