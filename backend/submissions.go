@@ -154,36 +154,9 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Decode a validated submission upload body into a submission model.
-func ValidateAndDecodeSubmission(body UploadSubmissionBody) (*Submission, error) {
-	// Get arrays of authors, reviewers and categories from a submission upload body.
-	if err := validate.Struct(body); err != nil {
-		return nil, err
-	}
-
-	// Get array of author and reviewer users from body.
-	authors, reviewers := []GlobalUser{}, []GlobalUser{}
-	for _, author := range body.Authors {
-		authors = append(authors, GlobalUser{ID: author})
-	}
-	for _, reviewer := range body.Reviewers {
-		reviewers = append(reviewers, GlobalUser{ID: reviewer})
-	}
-
-	return &Submission{
-		Name: body.Name, License: body.License,
-		Files: body.Files, Categories: body.Tags,
-		Authors: authors, Reviewers: reviewers,
-		MetaData: &SubmissionData{
-			Abstract: "test abstract",
-		},
-	}, nil
-
-}
-
 // Controller for the upload submission POST request.
 func ControllerUploadSubmission(body UploadSubmissionBody) (uint, error) {
-	if submission, err := ValidateAndDecodeSubmission(body); err != nil {
+	if err := validate.Struct(body); err != nil {
 		// Deal with validation errors - print all failed fields.
 		if errors, ok := err.(validator.ValidationErrors); ok {
 			log.Printf("[WARN] Given submission is invalid! ")
@@ -193,7 +166,24 @@ func ControllerUploadSubmission(body UploadSubmissionBody) (uint, error) {
 			log.Printf("[ERROR] Validation failure! ")
 			return 0, err
 		}
-	} else if submissionID, err := addSubmission(submission); err != nil {
+	}
+	authors, reviewers := []GlobalUser{}, []GlobalUser{}
+	for _, author := range body.Authors {
+		authors = append(authors, GlobalUser{ID: author})
+	}
+	for _, reviewer := range body.Reviewers {
+		reviewers = append(reviewers, GlobalUser{ID: reviewer})
+	}
+	submission := &Submission{
+		Name: body.Name, License: body.License,
+		Files: body.Files, Categories: body.Tags,
+		Authors: authors, Reviewers: reviewers,
+		MetaData: &SubmissionData{
+			Abstract: "test abstract",
+		},
+	}
+
+	if submissionID, err := addSubmission(submission); err != nil {
 		return 0, err
 	} else {
 		return submissionID, nil
@@ -465,7 +455,7 @@ func getSubmission(submissionID uint) (*Submission, error) {
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		var err error
-		if res := tx.Preload("Authors").Preload("Files").Preload("Reviewers").Find(submission, submissionID); res.Error != nil {
+		if res := tx.Preload(clause.Associations).Find(submission, submissionID); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected == 0 {
 			return &NoSubmissionError{ID: submissionID}
@@ -506,25 +496,6 @@ func getSubmissionCategories(tx *gorm.DB, submissionID uint) ([]string, error) {
 		tags = append(tags, category.Tag)
 	}
 	return tags, nil
-}
-
-// Queries the database for a submissions member files. Note that this
-// function does not access the filesystem, and therefore does not return
-// file content or metadata
-//
-// Params:
-//	submissionID (int) : the id of the submission to get the files of
-//Returns:
-//	([]File) : Array of files which are members of the given submission
-//	(error) : if something goes wrong during the query
-func getSubmissionFiles(submissionID uint) ([]File, error) {
-	var files []File
-	file := &File{}
-	file.SubmissionID = submissionID
-	if err := gormDb.Model(file).Find(&files).Error; err != nil {
-		return nil, err
-	}
-	return files, nil
 }
 
 // This function gets a submission's meta-data from the filesystem

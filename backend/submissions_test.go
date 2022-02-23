@@ -25,11 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	TEST_PORT_SUBMISSION = ":59217"
-	ADDRESS_SUBMISSION   = "http://localhost:59217"
-)
-
 // data to use in the tests
 // NOTE: make sure to use these directly, not as pointers, so that the
 // .ID field will not be set in any test
@@ -84,19 +79,6 @@ var testReviewers []User = []User{
 		LastName: "Doe"},
 	{Email: "reviewer3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
 		LastName: "Doe"},
-}
-
-// Set up server used for submissions testing.
-func submissionServerSetup() *http.Server {
-	router := mux.NewRouter()
-
-	getSubmissionsSubRoutes(router)
-	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
-
-	return &http.Server{
-		Addr:    TEST_PORT_SUBMISSION,
-		Handler: router,
-	}
 }
 
 // Initialise mock data in the database for use later on in the testing.
@@ -393,16 +375,34 @@ func TestAddSubmission(t *testing.T) {
 	})
 
 	// tests that trying to add a nil submission to the db and filesystem will result in an error
-	t.Run("Add Nil Submission", func(t *testing.T) {
-		_, err := addSubmission(nil)
-		assert.Error(t, err, "No error occurred while uploading nil submission")
+	t.Run("Invalid cases do not change the database and filesystem's state", func(t *testing.T) {
+		verifyRollback := func(submission *Submission) bool {
+			_, err := addSubmission(submission)
+			if !assert.Error(t, err, "No error occured while uploading nil submission") {
+				return false
+			} else if submission != nil {
+				_, err := os.Stat(filepath.Join(TEST_FILES_DIR, fmt.Sprint(submission.ID), submission.Name))
+				switch {
+				case !assert.True(t, os.IsNotExist(err), "The submission's directory should not have been created."):
+					return false
+				}
+			}
+			return true
+		}
+		t.Run("Add Nil Submission", func(t *testing.T) {
+			verifyRollback(nil)
+		})
+		t.Run("Duplicate files", func(t *testing.T) {
+			BadFilesSubmission := Submission{
+				Name: "Test", Authors: globalAuthors,
+				Files: []File{
+					{Name: "test.txt", Path: "test.txt"},
+					{Name: "test.txt", Path: "test.txt"},
+				},
+			}
+			verifyRollback(&BadFilesSubmission)
+		})
 	})
-}
-
-// tests the ability of the submissions.go module to add reviewers to submissions
-// Test Depends on:
-// 	- TestAddSubmission
-func TestAppendUsers(t *testing.T) {
 }
 
 // This function tests the addTags function
