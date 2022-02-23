@@ -1,38 +1,23 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	TEST_PORT_USERS = ":59219"
-)
-
-// Set up server used for user testing.
-func userServerSetup() *http.Server {
-	router := mux.NewRouter()
-	getUserSubroutes(router)
-
-	return &http.Server{
-		Addr:    TEST_PORT_USERS,
-		Handler: router,
-	}
-}
-
 // Test user info getter.
 func TestGetUserProfile(t *testing.T) {
 	testInit()
-	srv := userServerSetup()
+	defer testEnd()
 
-	// Start server.
-	go srv.ListenAndServe()
+	// Start mux router
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_USER+"/{id}", getUserProfile)
 
 	// Populate database for testing and test valid user.
 	globalUsers := make([]GlobalUser, len(testUsers))
@@ -42,13 +27,16 @@ func TestGetUserProfile(t *testing.T) {
 
 	t.Run("Valid user profiles", func(t *testing.T) {
 		for i, u := range globalUsers {
-			res, err := sendJsonRequest(SUBROUTE_USER+"/"+u.ID, http.MethodGet, nil, TEST_PORT_USERS)
-			assert.Nil(t, err, "Request should not error.")
+			r, w := httptest.NewRequest(http.MethodGet, SUBROUTE_USER+"/"+u.ID, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			res := w.Result()
+
 			assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
 
 			resCreds := GlobalUser{}
-			err = json.NewDecoder(res.Body).Decode(&resCreds)
-			assert.Nil(t, err, "JSON decoding must not error.")
+			if err := json.NewDecoder(res.Body).Decode(&resCreds); !assert.Nil(t, err, "JSON decoding must not error.") {
+				return
+			}
 
 			// Check equality for all user info.
 			equal := (testUsers[i].Email == resCreds.User.Email) &&
@@ -62,14 +50,10 @@ func TestGetUserProfile(t *testing.T) {
 
 	// Test invalid users.
 	t.Run("Invalid user profile", func(t *testing.T) {
-		res, err := sendJsonRequest(SUBROUTE_USER+"/"+INVALID_ID, http.MethodGet, nil, TEST_PORT_USERS)
-		assert.Nil(t, err, "Request should not error.")
+		r, w := httptest.NewRequest(http.MethodGet, SUBROUTE_USER+"/"+INVALID_ID, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+		res := w.Result()
+
 		assert.Equalf(t, http.StatusNotFound, res.StatusCode, "Request should return status %d", http.StatusNotFound)
 	})
-
-	// Close server.
-	if err := srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
-	testEnd()
 }

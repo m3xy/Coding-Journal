@@ -22,6 +22,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -369,4 +370,17 @@ func registerUser(user User, UserType int) (string, error) {
 
 	// Return user's primary key (the UUID)
 	return registeredUser.ID, nil
+}
+
+// -- Password control --
+
+// Hash a password
+func hashPw(pw string) []byte {
+	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
+	return hash
+}
+
+// Compare password and hash for validity.
+func comparePw(pw string, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }

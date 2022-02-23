@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"gorm.io/gorm/logger"
 
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,47 +81,6 @@ func (u *User) getCopy() User {
 	return User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
 		LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
 }
-func (u *GlobalUser) getCopy() GlobalUser {
-	return GlobalUser{ID: u.ID, FullName: u.FullName}
-}
-
-// Get a copy of a user array.
-func getUserCopies(uc []User) []User {
-	res := make([]User, len(uc))
-	for i, u := range uc {
-		res[i] = u.getCopy()
-	}
-	return res
-}
-func getGlobalCopies(gc []User) []GlobalUser {
-	res := make([]GlobalUser, len(gc))
-	for i, u := range gc {
-		res[i] = GlobalUser{User: u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
-	}
-	return res
-
-}
-func getObjectCopies(gc []GlobalUser) []GlobalUser {
-	res := make([]GlobalUser, len(gc))
-	for i, u := range gc {
-		res[i] = u.getCopy()
-	}
-	return res
-}
-
-func testingServerSetup() *http.Server {
-	router := mux.NewRouter()
-
-	// Call authentication endpoints.
-	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet)
-	router.HandleFunc("/users/{"+getJsonTag(&GlobalUser{}, "ID")+"}", getUserProfile).Methods(http.MethodGet)
-
-	// Setup testing HTTP server
-	return &http.Server{
-		Addr:    TEST_PORT,
-		Handler: router,
-	}
-}
 
 // Close database at the end of test.
 func testEnd() {
@@ -134,22 +89,6 @@ func testEnd() {
 	}
 	getDB, _ := gormDb.DB()
 	getDB.Close()
-}
-
-// Send a secure request in a JSON body from a given interface.
-func sendJsonRequest(endpoint string, method string, data interface{}, port ...string) (*http.Response, error) {
-	usedPort := TEST_PORT
-	if len(port) > 0 {
-		usedPort = port[0]
-	}
-	var req *http.Request
-	if data != nil {
-		jsonDat, _ := json.Marshal(data)
-		req, _ = http.NewRequest(method, LOCALHOST+usedPort+endpoint, bytes.NewBuffer(jsonDat))
-	} else {
-		req, _ = http.NewRequest(method, LOCALHOST+usedPort+endpoint, nil)
-	}
-	return sendSecureRequest(gormDb, req, TEAM_ID)
 }
 
 // Set up authentication on a test server.
@@ -200,7 +139,10 @@ func TestIsUnique(t *testing.T) {
 
 	// Add an element to table
 	// Add test users to database
-	trialObjects := getObjectCopies(testObjects)
+	trialObjects := make([]GlobalUser, len(testObjects))
+	for i, u := range testObjects {
+		trialObjects[i] = GlobalUser{ID: u.ID, FullName: u.FullName}
+	}
 	if err := gormDb.Create(&trialObjects).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)
 		return

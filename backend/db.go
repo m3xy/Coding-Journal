@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"reflect"
 	"regexp"
 	"strconv"
 	"time"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	uuid "github.com/satori/go.uuid"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -260,16 +258,6 @@ func isUnique(db *gorm.DB, table interface{}, varname string, val string) bool {
 	}
 }
 
-// Get the database tag for a struct.
-func getJsonTag(v interface{}, structVar string) string {
-	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
-	if !ok {
-		return ""
-	} else {
-		return field.Tag.Get("json")
-	}
-}
-
 // Get database parameters string to place into DSN from a map.
 func getDbParams(paramMap map[string]string) string {
 	params := ""
@@ -284,7 +272,7 @@ func getDbParams(paramMap map[string]string) string {
 	return params
 }
 
-// -- Validation
+// -- Validation -- //
 
 // Checks if a password contains upper case, lower case, numbers, and special characters.
 func ispw(fl validator.FieldLevel) bool {
@@ -306,17 +294,4 @@ func ispw(fl validator.FieldLevel) bool {
 		}
 		return true
 	}
-}
-
-// -- Password control --
-
-// Hash a password
-func hashPw(pw string) []byte {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
-	return hash
-}
-
-// Compare password and hash for validity.
-func comparePw(pw string, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }

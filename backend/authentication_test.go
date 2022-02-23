@@ -1,12 +1,12 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -25,19 +25,7 @@ const (
 	PW_NO_SC       = "aB123456"
 	PW_WRONG_CHARS = "asbd/\\s@!"
 	INVALID_ID     = "invalid-always"
-	TEST_PORT_AUTH = ":59215"
 )
-
-// Set up server used for authentication testing.
-func authServerSetup() *http.Server {
-	router := mux.NewRouter()
-	getAuthSubRoutes(router)
-
-	return &http.Server{
-		Addr:    TEST_PORT_AUTH,
-		Handler: router,
-	}
-}
 
 // Test successful password hashing
 func TestPwHash(t *testing.T) {
@@ -119,25 +107,20 @@ func TestRegisterUser(t *testing.T) {
 func TestSignUp(t *testing.T) {
 	// Set up test
 	testInit()
-	srv := authServerSetup()
+	defer testEnd()
 
-	// Start server.
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v\n", err)
-		}
-	}()
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
 
 	// Test not yet registered users.
 	t.Run("Valid signup requests", func(t *testing.T) {
 		for i := range testUsers {
 			// Create JSON body for sign up request based on test user.
 			trialUser := testUsers[i].getCopy()
-			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_SIGNUP, http.MethodPost, trialUser, TEST_PORT_AUTH)
-			if err != nil {
-				t.Errorf("Error sending request: %v", err)
-				return
-			}
+			reqBody, _ := json.Marshal(trialUser)
+			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
 
 			// Check if response OK and user registered.
@@ -158,7 +141,11 @@ func TestSignUp(t *testing.T) {
 	// Test bad request response for an already registered user.
 	t.Run("Repeat user signups", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			resp, _ := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_SIGNUP, http.MethodPost, testUsers[i], TEST_PORT_AUTH)
+			trialUser := testUsers[i].getCopy()
+			reqBody, _ := json.Marshal(trialUser)
+			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
 
 			// Check if response is indeed unsuccessful.
@@ -168,9 +155,14 @@ func TestSignUp(t *testing.T) {
 
 	// Test bad request response for invalid credentials.
 	t.Run("Invalid signups", func(t *testing.T) {
-		for i := range wrongCredsUsers {
-			resp, _ := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_SIGNUP, http.MethodPost, wrongCredsUsers[i], TEST_PORT_AUTH)
+		for _, user := range wrongCredsUsers {
+			trialUser := user.getCopy()
+			reqBody, _ := json.Marshal(trialUser)
+			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
+
 			// Check if response is indeed unsuccessful.
 			if resp.StatusCode != http.StatusBadRequest {
 				t.Errorf("Status incorrect, should be %d, got %d\n", http.StatusBadRequest, resp.StatusCode)
@@ -178,24 +170,16 @@ func TestSignUp(t *testing.T) {
 			}
 		}
 	})
-
-	// Close server.
-	if err := srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
-	testEnd()
 }
 
 // Test user client login
 func TestAuthLogIn(t *testing.T) {
 	// Set up test and start server.
 	testInit()
-	srv := authServerSetup()
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v\n", err)
-		}
-	}()
+	defer testEnd()
+
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn)
 
 	// Populate database.
 	for _, u := range testUsers {
@@ -213,14 +197,14 @@ func TestAuthLogIn(t *testing.T) {
 	t.Run("Valid logins", func(t *testing.T) {
 		for _, user := range testUsers {
 			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
+			bodyBuf, _ := json.Marshal(body)
 
 			// Send request
-			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_LOGIN, http.MethodPost, body, TEST_PORT_AUTH)
-			if err != nil {
-				t.Errorf("Request error: %v\n", err)
-				return
-			}
+			req, w := httptest.NewRequest("POST", ENDPOINT_LOGIN, bytes.NewBuffer(bodyBuf)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
+
 			if !assert.Equalf(t, 200, resp.StatusCode, "Request should be successful!") {
 				return
 			}
@@ -254,12 +238,12 @@ func TestAuthLogIn(t *testing.T) {
 	t.Run("Invalid logins", func(t *testing.T) {
 		for _, user := range wrongCredsUsers {
 			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
+			bodyBuf, _ := json.Marshal(body)
+
 			// Send request
-			resp, err := sendJsonRequest(SUBROUTE_AUTH+ENDPOINT_LOGIN, http.MethodPost, body, TEST_PORT_AUTH)
-			if err != nil {
-				t.Errorf("Request error: %v\n", err)
-				return
-			}
+			req, w := httptest.NewRequest("POST", ENDPOINT_LOGIN, bytes.NewBuffer(bodyBuf)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
 			if !assert.Equal(t, 401, resp.StatusCode, "Status code should be 401 - unauthorized") {
 				return
@@ -272,6 +256,4 @@ func TestAuthLogIn(t *testing.T) {
 			}
 		}
 	})
-
-	testEnd()
 }
