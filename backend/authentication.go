@@ -316,7 +316,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		goto ERROR
 	}
 
-	if _, err := registerUser(*user, USERTYPE_USER); err != nil {
+	if _, err := registerUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		message = "Registration failed - " + err.Error()
 		goto ERROR

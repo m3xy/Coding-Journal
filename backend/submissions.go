@@ -167,16 +167,19 @@ func ControllerUploadSubmission(body UploadSubmissionBody) (uint, error) {
 			return 0, err
 		}
 	}
-	authors, reviewers := []GlobalUser{}, []GlobalUser{}
+	authors, reviewers, categories := []GlobalUser{}, []GlobalUser{}, []Category{}
 	for _, author := range body.Authors {
 		authors = append(authors, GlobalUser{ID: author})
 	}
 	for _, reviewer := range body.Reviewers {
 		reviewers = append(reviewers, GlobalUser{ID: reviewer})
 	}
+	for _, category := range body.Tags {
+		categories = append(categories, Category{Tag: category})
+	}
 	submission := &Submission{
 		Name: body.Name, License: body.License,
-		Files: body.Files, Categories: body.Tags,
+		Files: body.Files, Categories: categories,
 		Authors: authors, Reviewers: reviewers,
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
@@ -252,15 +255,20 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 //	(error) : if the operation fails
 func addSubmission(submission *Submission) (uint, error) {
 	// adds the submission to the db, automatically setting submission.ID
+	if submission == nil {
+		return 0, errors.New("Submission is empty.")
+	}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Database operations
+		categories := submission.Categories
+		submission.Categories = []Category{}
 		if err := tx.Omit(clause.Associations).Create(submission).Error; err != nil {
 			return err
 		} else if err := addAuthors(tx, submission.Authors, submission.ID); err != nil {
 			return err
 		} else if err := addReviewers(tx, submission.Reviewers, submission.ID); err != nil {
 			return err
-		} else if err := addTags(tx, submission.Categories, submission.ID); err != nil {
+		} else if err := tx.Model(&submission).Association("Categories").Append(categories); err != nil {
 			return err
 		}
 
@@ -379,49 +387,6 @@ func appendUsers(tx *gorm.DB, users []GlobalUser, priviledges []int, association
 	return nil
 }
 
-// function to add tags for a given submission
-//
-// Parameters:
-// 	tags ([]string) : the tags to add to the submission
-// 	submissionID (int) : the unique ID of the submission to add tags to
-// Returns:
-// 	(error) : an error if one occurs, nil otherwise
-func addTags(tx *gorm.DB, tags []string, submissionID uint) error {
-	// Skip if no tags given.
-	switch {
-	case tags == nil:
-		return nil
-	case len(tags) == 0:
-		return nil
-	}
-
-	// builds a list of category structs to be inserted
-	categories := []Category{}
-	for _, tag := range tags {
-		if tag == "" {
-			return errors.New("Tag cannot be an empty string")
-		}
-		categories = append(categories, Category{Tag: tag, SubmissionID: submissionID})
-	}
-	// inserts the tags using a transaction
-	if err := tx.Transaction(func(tx *gorm.DB) error {
-		// checks that the submission exists
-		submission := &Submission{}
-		submission.ID = submissionID
-		if err := tx.Model(submission).First(submission).Error; err != nil {
-			return err
-		}
-		// inserts the array of categories
-		if err := tx.Model(&Category{}).Create(&categories).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	return nil
-}
-
 // gets all submissions which are written by a given user and returns them
 //
 // Params:
@@ -478,14 +443,10 @@ func getSubmission(submissionID uint) (*Submission, error) {
 	// Get data contained inside the database.
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		var err error
 		if res := tx.Preload(clause.Associations).Find(submission, submissionID); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected == 0 {
 			return &NoSubmissionError{ID: submissionID}
-		}
-		if submission.Categories, err = getSubmissionCategories(tx, submissionID); err != nil {
-			return err
 		}
 		return nil
 	}); err != nil {
@@ -498,28 +459,6 @@ func getSubmission(submissionID uint) (*Submission, error) {
 		return nil, err
 	}
 	return submission, nil
-}
-
-// Queries the database for categories (tags) associated with the given
-// submission (i.e. python, c++, sorting algorithm, etc.)
-//
-// Parameters:
-// 	submissionID (int) : the submission to get the categories for
-// Returns:
-// 	([]string) : an array of the tags associated with the given submission
-// 	(error) : an error if one occurs while retrieving the tags
-func getSubmissionCategories(tx *gorm.DB, submissionID uint) ([]string, error) {
-	// gets all tags with foreign key submission_id = submissionID
-	var categories []Category
-	if err := tx.Model(&Category{SubmissionID: submissionID}).Find(&categories).Error; err != nil {
-		return nil, err
-	}
-	// loops over the query results to build a string array of tags
-	tags := []string{}
-	for _, category := range categories {
-		tags = append(tags, category.Tag)
-	}
-	return tags, nil
 }
 
 // This function gets a submission's meta-data from the filesystem
@@ -549,59 +488,4 @@ func getSubmissionMetaData(submissionID uint) (*SubmissionData, error) {
 		return nil, err
 	}
 	return submissionData, nil
-}
-
-// This function queries a submission in the local format from the db, and transforms
-// it into the supergroup compliant format
-//
-// Parameters:
-// 	submissionID (int) : the id of the submission to be converted to the supergroup-compliant
-// 		format
-// Returns:
-// 	(*SupergroupSubmission) : a supergroup compliant submission struct
-// 	(error) : an error if one occurs
-func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
-	// gets the submission struct which submissionID refers to
-	localSubmission, err := getSubmission(submissionID)
-	if err != nil {
-		return nil, err
-	}
-	// creates the Supergroup metadata struct
-	supergroupData := &SupergroupSubmissionData{
-		CreationDate: fmt.Sprint(localSubmission.CreatedAt),
-		Categories:   localSubmission.Categories,
-		Abstract:     localSubmission.MetaData.Abstract,
-		License:      localSubmission.License,
-	}
-
-	// adds author names to an array
-	authorNames := []string{}
-	for _, author := range localSubmission.Authors {
-		authorNames = append(authorNames, author.FullName)
-	}
-	supergroupData.AuthorNames = authorNames
-
-	// creates the list of file structs using the file paths and files.go
-	var base64 string
-	var supergroupFile *SupergroupFile
-	supergroupFiles := []*SupergroupFile{}
-	for _, file := range localSubmission.Files {
-		fullFilePath := filepath.Join(getSubmissionDirectoryPath(*localSubmission), fmt.Sprint(file.ID))
-		base64, err = getFileContent(fullFilePath)
-		if err != nil {
-			return nil, err
-		}
-		supergroupFile = &SupergroupFile{
-			Name:        filepath.Base(file.Path),
-			Base64Value: base64,
-		}
-		supergroupFiles = append(supergroupFiles, supergroupFile)
-	}
-
-	// creates the supergroup submission to return
-	return &SupergroupSubmission{
-		Name:     localSubmission.Name,
-		Files:    supergroupFiles,
-		MetaData: supergroupData,
-	}, nil
 }

@@ -81,7 +81,7 @@ func TestRegisterUser(t *testing.T) {
 	t.Run("Valid registrations", func(t *testing.T) {
 		for i := range testUsers {
 			trialUser := testUsers[i].getCopy()
-			_, err := registerUser(trialUser, USERTYPE_USER)
+			_, err := registerUser(*trialUser, USERTYPE_NIL)
 			if err != nil {
 				t.Errorf("User registration error: %v\n", err.Error())
 				return
@@ -93,7 +93,7 @@ func TestRegisterUser(t *testing.T) {
 	t.Run("Repeat registrations", func(t *testing.T) {
 		for i := range testUsers {
 			trialUser := testUsers[i].getCopy()
-			_, err := registerUser(trialUser, USERTYPE_USER)
+			_, err := registerUser(*trialUser, USERTYPE_NIL)
 			if err == nil {
 				t.Error("Already registered account cannot be reregistered.")
 				return
@@ -183,7 +183,7 @@ func TestAuthLogIn(t *testing.T) {
 
 	// Populate database.
 	for _, u := range testUsers {
-		registerUser(u, USERTYPE_USER)
+		registerUser(u, USERTYPE_NIL)
 	}
 
 	// Set JWT Secret.

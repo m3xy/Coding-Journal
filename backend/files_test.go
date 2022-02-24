@@ -157,7 +157,7 @@ func TestUploadUserComment(t *testing.T) {
 	testReply := testComments[1]
 
 	// Register submission author.
-	subAuthorID, err := registerUser(testAuthors[0], USERTYPE_USER)
+	subAuthorID, err := registerUser(testAuthors[0], USERTYPE_NIL)
 	if assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -172,7 +172,7 @@ func TestUploadUserComment(t *testing.T) {
 	}
 
 	// Register comment author and it's bearer token.
-	authorID, err := registerUser(testAuthor, USERTYPE_USER)
+	authorID, err := registerUser(testAuthor, USERTYPE_NIL)
 	if assert.NoErrorf(t, err, "error occurred while adding testAuthor: %v", err) {
 		return
 	}

@@ -25,7 +25,7 @@ const (
 	USERTYPE_PUBLISHER          = 1
 	USERTYPE_REVIEWER           = 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
-	USERTYPE_USER               = 4
+	USERTYPE_EDITOR             = 4
 
 	// Password related
 	HASH_COST = 8
@@ -92,7 +92,7 @@ type Submission struct {
 	// an array of the submission's reviewers
 	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
 	// tags for organizing/grouping code submissions
-	Categories []string `gorm:"-" json:"categories,omitempty"`
+	Categories []Category `gorm:"many2many:categories_submissions" json:"categories,omitempty"`
 	// metadata about the submission
 	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
@@ -169,8 +169,10 @@ type Comment struct {
 // stores submission tags (i.e. networking, java, python, etc.)
 // uniqueIndex:idx_first_second specifies the first and second column as a unique pair
 type Category struct {
-	Tag          string `gorm:"column;uniqueIndex:idx_first_second" json:"category"` // actual content of the tag
-	SubmissionID uint   `gorm:"uniqueIndex:idx_first_second" json:"-"`
+	Tag string `gorm:"primaryKey" json:"category"` // actual content of the tag
+
+	CreatedAt time.Time `json:"-"`
+	DeletedAt time.Time `json:"-"`
 }
 
 // ---- Database and reflect utilities ----
@@ -187,7 +189,7 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{}, &Comment{})
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Category{}, &Submission{}, &File{}, &Comment{})
 	if err != nil {
 		goto ERR
 	}
@@ -270,6 +272,14 @@ func getDbParams(paramMap map[string]string) string {
 		i++
 	}
 	return params
+}
+
+func getTagArray(categories []Category) []string {
+	arr := []string{}
+	for _, category := range categories {
+		arr = append(arr, category.Tag)
+	}
+	return arr
 }
 
 // -- Validation -- //

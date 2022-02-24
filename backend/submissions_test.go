@@ -36,7 +36,7 @@ var testSubmissions []Submission = []Submission{
 		Authors:    []GlobalUser{},
 		Reviewers:  []GlobalUser{},
 		Files:      []File{},
-		Categories: []string{"testtag"},
+		Categories: []Category{{Tag: "testtag"}},
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
 			Reviews:  []*Comment{},
@@ -48,7 +48,7 @@ var testSubmissions []Submission = []Submission{
 		Authors:    []GlobalUser{},
 		Reviewers:  []GlobalUser{},
 		Files:      []File{},
-		Categories: []string{"testtag"},
+		Categories: []Category{{Tag: "testtag"}},
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
 			Reviews:  []*Comment{},
@@ -405,95 +405,6 @@ func TestAddSubmission(t *testing.T) {
 	})
 }
 
-// This function tests the addTags function
-//
-// This test depends on:
-// 	- TestAddSubmission
-func TestAddTags(t *testing.T) {
-	// utility function to add a submission to the db (no authors required here)
-	testAddSubmission := func(submission *Submission) uint {
-		assert.NoError(t, gormDb.Create(submission).Error, "Error creating submission")
-		return submission.ID
-	}
-
-	// standard use case
-	t.Run("Add Valid Tag", func(t *testing.T) {
-		testTag := "TEST"
-
-		// sets up the test environment, and uploads a test submission
-		testInit()
-		testSubmission := testSubmissions[0]
-		submissionID := testAddSubmission(&testSubmission)
-
-		// adds a tag to the submission
-		addTags(gormDb, []string{testTag}, submissionID)
-
-		// queries the db to make sure the tag was added properly
-		cat := &Category{}
-		assert.NoError(t, gormDb.Model(&Category{SubmissionID: submissionID, Tag: testTag}).Find(cat).Error, "Tag unable to be retrieved")
-		testEnd()
-	})
-
-	// duplicate tag case
-	t.Run("Add Duplicate Tag", func(t *testing.T) {
-		testTag := "TEST"
-
-		// sets up the test environment, and uploads a test submission
-		testInit()
-		testSubmission := testSubmissions[0]
-		submissionID := testAddSubmission(&testSubmission)
-
-		// adds a tag to the submission twice (second prints to log as it violates a key constraint)
-		assert.NoError(t, addTags(gormDb, []string{testTag}, submissionID), "adding first tag caused an error")
-		assert.Error(t, addTags(gormDb, []string{testTag}, submissionID), "attempting to add duplicate tag does not return an error")
-
-		testEnd()
-	})
-
-	// 2 identical tags on different submissions
-	t.Run("Add Same Tag to Different Submissions", func(t *testing.T) {
-		testTag := "TEST"
-
-		// sets up the test environment, and uploads test submissions
-		testInit()
-		testSubmission1 := testSubmissions[0]
-		testSubmission2 := testSubmissions[1]
-		submissionID1 := testAddSubmission(&testSubmission1)
-		submissionID2 := testAddSubmission(&testSubmission2)
-
-		// adds the tags
-		assert.NoError(t, addTags(gormDb, []string{testTag}, submissionID1), "Error occurred while adding 1st tag")
-		assert.NoError(t, addTags(gormDb, []string{testTag}, submissionID2), "Error occurred while adding 2nd tag")
-
-		// queries the db to make sure the tags were added properly
-		cat := &Category{}
-		assert.NoError(t, gormDb.Model(&Category{SubmissionID: submissionID1, Tag: testTag}).Find(cat).Error, "Tag 1 unable to be retrieved")
-		assert.NoError(t, gormDb.Model(&Category{SubmissionID: submissionID2, Tag: testTag}).Find(cat).Error, "Tag 2 unable to be retrieved")
-
-		testEnd()
-	})
-
-	// invalid tag case
-	t.Run("Add Empty Tag", func(t *testing.T) {
-		// sets up the test environment, and uploads a test submission
-		testInit()
-		testSubmission := testSubmissions[0]
-		submissionID := testAddSubmission(&testSubmission)
-
-		// adds an invalid tag to an existing submission
-		assert.Error(t, addTags(gormDb, []string{""}, submissionID), "empty tag was able ot be added")
-
-		testEnd()
-	})
-
-	// add tag to non-existant project (foreign key constraint fails in db)
-	t.Run("Add Tag Invalid Project", func(t *testing.T) {
-		testInit()
-		assert.Error(t, addTags(gormDb, []string{"INVALID_PROJECT"}, 10), "Error not thrown when tag added to a non-existant submission")
-		testEnd()
-	})
-}
-
 // test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
 // Test Depends On:
 // 	- TestAddSubmission
@@ -501,10 +412,10 @@ func TestAddTags(t *testing.T) {
 func TestGetAuthoredSubmissions(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from an Author", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0] // test submission to return on getAuthoredSubmissions()
-		testSubmission2 := testSubmissions[1] // test submission to not return on getAuthoredSubmissions()
-		testAuthor := testAuthors[0]          // test author of the submission being queried
-		testNonAuthor := testAuthors[3]       // test author of submission not being queried
+		testSubmission1 := *testSubmissions[0].getCopy() // test submission to return on getAuthoredSubmissions()
+		testSubmission2 := *testSubmissions[1].getCopy() // test submission to not return on getAuthoredSubmissions()
+		testAuthor := testAuthors[0]                     // test author of the submission being queried
+		testNonAuthor := testAuthors[3]                  // test author of submission not being queried
 
 		testInit()
 
@@ -551,10 +462,10 @@ func TestGetAuthoredSubmissions(t *testing.T) {
 func TestGetReviewedSubmissions(t *testing.T) {
 	// adds two submissions each with different authors to the db and then queries one author's submissions
 	t.Run("Get Single Submission from a Reviewer", func(t *testing.T) {
-		testSubmission1 := testSubmissions[0] // test submission to return on getAuthoredSubmissions()
-		testSubmission2 := testSubmissions[1] // test submission to not return on getAuthoredSubmissions()
-		testReviewer := testReviewers[0]      // test author of the submission being queried
-		testNonReviewer := testReviewers[3]   // test author of submission not being queried
+		testSubmission1 := *testSubmissions[0].getCopy() // test submission to return on getAuthoredSubmissions()
+		testSubmission2 := *testSubmissions[1].getCopy() // test submission to not return on getAuthoredSubmissions()
+		testReviewer := testReviewers[0]                 // test author of the submission being queried
+		testNonReviewer := testReviewers[3]              // test author of submission not being queried
 
 		testInit()
 
@@ -602,7 +513,7 @@ func TestGetSubmission(t *testing.T) {
 	testInit()
 	defer testEnd()
 
-	testSubmission := testSubmissions[0]
+	testSubmission := *testSubmissions[0].getCopy()
 	testFile := testFiles[0]
 	testAuthor := testAuthors[0]
 	testReviewer := testReviewers[0]
@@ -640,7 +551,7 @@ func TestGetSubmission(t *testing.T) {
 		switch {
 		case !assert.Equal(t, testSubmission.Name, queriedSubmission.Name, "Submission names do not match"),
 			!assert.Equal(t, testSubmission.License, queriedSubmission.License, "Submission Licenses do not match"),
-			!assert.ElementsMatch(t, testSubmission.Categories, queriedSubmission.Categories, "Submission tags do not match"),
+			!assert.ElementsMatch(t, getTagArray(testSubmission.Categories), getTagArray(queriedSubmission.Categories), "Submission tags do not match"),
 			!assert.Equal(t, testSubmission.MetaData.Abstract, queriedSubmission.MetaData.Abstract, "Abstracts do not match"):
 			return
 		}
@@ -686,33 +597,6 @@ func TestGetSubmission(t *testing.T) {
 	})
 }
 
-// This function tests the getSubmissionCategories function
-//
-// This test depends on:
-// 	- TestAddSubmission
-func TestGetSubmissionCategories(t *testing.T) {
-	// valid metadata file and format
-	t.Run("Valid Categories", func(t *testing.T) {
-		testSubmission := testSubmissions[0]
-		testAuthor := testAuthors[0]
-
-		// sets up the test environment, and uploads a test submission
-		testInit()
-		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-		submissionID, err := addSubmission(&testSubmission)
-		assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err)
-
-		// tests that the metadata can be read back properly, and that it matches the uploaded submission
-		categories, err := getSubmissionCategories(gormDb, submissionID)
-		assert.NoErrorf(t, err, "Error getting submission tags: %v", err)
-		assert.ElementsMatch(t, testSubmission.Categories, categories, "Submission tags do not match")
-		testEnd()
-	})
-}
-
 // This function tests the getSubmissionMetaData function
 //
 // This test depends on:
@@ -721,7 +605,7 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	testInit()
 	defer testEnd()
 
-	testSubmission := testSubmissions[0]
+	testSubmission := *testSubmissions[0].getCopy()
 	testAuthor := testAuthors[0]
 
 	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
@@ -753,62 +637,5 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	t.Run("Invalid Submission ID", func(t *testing.T) {
 		_, err := getSubmissionMetaData(400)
 		assert.Errorf(t, err, "No error was thrown for invalid submission")
-	})
-}
-
-// This tests converting from the local submission data format to the supergroup specified format
-func TestLocalToGlobal(t *testing.T) {
-	testInit()
-	defer testEnd()
-
-	// adds the submission and a file to the system
-	testSubmission := testSubmissions[0]
-	testFile := testFiles[0]
-	testAuthor := testAuthors[0]
-	testReviewer := testReviewers[0]
-
-	// registers authors and reviewers, and adds them to the test submission
-	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
-	testSubmission.Files = []File{testFile}
-	submissionID, err := addSubmission(&testSubmission)
-	if !assert.NoErrorf(t, err, "Error occurred while adding submission: %v", err) {
-		return
-	}
-
-	// tests valid submission struct
-	t.Run("Valid Submission", func(t *testing.T) {
-		// gets the supergroup compliant submission
-		globalSubmission, err := localToGlobal(submissionID)
-		if !assert.NoErrorf(t, err, "Error occurred while converting submission format: %v", err) {
-			return
-		}
-
-		// compares submission fields
-		switch {
-		case !assert.Equal(t, testSubmission.Name, globalSubmission.Name, "Names do not match"),
-			!assert.Equal(t, testSubmission.License, globalSubmission.MetaData.License,
-				"Licenses do not match"),
-			!assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, globalSubmission.MetaData.AuthorNames[0],
-				"Authors do not match"),
-			!assert.Equal(t, testSubmission.Categories, globalSubmission.MetaData.Categories,
-				"Tags do not match"),
-			!assert.Equal(t, testSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
-				"Abstracts do not match"),
-			// compares files
-			!assert.Equal(t, testFile.Name, globalSubmission.Files[0].Name, "File names do not match"),
-			!assert.Equal(t, testFile.Base64Value, globalSubmission.Files[0].Base64Value, "File content does not match"):
-			return
-		}
 	})
 }

@@ -77,9 +77,60 @@ func testInit() {
 }
 
 // Get a copy of a user object.
-func (u *User) getCopy() User {
-	return User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
-		LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+func (u *User) getCopy() *User {
+	if u != nil {
+		return &User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
+			LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+	} else {
+		return nil
+	}
+}
+func (g *GlobalUser) getCopy() *GlobalUser {
+	if g != nil {
+		return &GlobalUser{
+			ID: g.ID, FullName: g.ID, User: *g.User.getCopy(), UserType: g.UserType,
+		}
+	} else {
+		return nil
+	}
+}
+func (s *Submission) getCopy() *Submission {
+	if s != nil {
+		var authors []GlobalUser = nil
+		var reviewers []GlobalUser = nil
+		var categories []Category = nil
+		var files []File = nil
+		if s.Authors != nil {
+			authors = []GlobalUser{}
+			for _, author := range s.Authors {
+				authors = append(authors, *author.getCopy())
+			}
+		}
+		if s.Reviewers != nil {
+			reviewers = []GlobalUser{}
+			for _, reviewer := range s.Reviewers {
+				reviewers = append(reviewers, *reviewer.getCopy())
+			}
+		}
+		if s.Categories != nil {
+			categories = make([]Category, len(s.Categories))
+			copy(categories, s.Categories)
+		}
+		if s.Files != nil {
+			files = make([]File, len(s.Files))
+			copy(files, s.Files)
+		}
+
+		submission := &Submission{
+			Name: s.Name, License: s.License,
+			Files: files, Categories: categories,
+			MetaData: &SubmissionData{Abstract: s.MetaData.Abstract, Reviews: s.MetaData.Reviews},
+			Authors:  authors, Reviewers: reviewers,
+		}
+		return submission
+	} else {
+		return nil
+	}
 }
 
 // Close database at the end of test.
