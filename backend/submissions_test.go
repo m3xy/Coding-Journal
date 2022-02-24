@@ -23,6 +23,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/clause"
 )
 
 // data to use in the tests
@@ -405,105 +406,6 @@ func TestAddSubmission(t *testing.T) {
 	})
 }
 
-// test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
-// Test Depends On:
-// 	- TestAddSubmission
-// 	- TestAddAuthors
-func TestGetAuthoredSubmissions(t *testing.T) {
-	// adds two submissions each with different authors to the db and then queries one author's submissions
-	t.Run("Get Single Submission from an Author", func(t *testing.T) {
-		testSubmission1 := *testSubmissions[0].getCopy() // test submission to return on getAuthoredSubmissions()
-		testSubmission2 := *testSubmissions[1].getCopy() // test submission to not return on getAuthoredSubmissions()
-		testAuthor := testAuthors[0]                     // test author of the submission being queried
-		testNonAuthor := testAuthors[3]                  // test author of submission not being queried
-
-		testInit()
-
-		// adds two test users to the db as authors
-		authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Authors = []GlobalUser{{ID: authorID}}
-
-		nonauthorID, err := registerUser(testNonAuthor, USERTYPE_PUBLISHER) // author of the submission we are not interested in
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission2.Authors = []GlobalUser{{ID: nonauthorID}}
-
-		// adds dummy reviewers
-		reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerID}}
-		testSubmission2.Reviewers = []GlobalUser{{ID: reviewerID}}
-
-		// adds two test submissions to the db
-		testSubmission1.ID, err = addSubmission(&testSubmission1)
-		assert.NoErrorf(t, err, "Error occurred while adding submission1: %v", err)
-		testSubmission2.ID, err = addSubmission(&testSubmission2)
-		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
-
-		// queries all of testAuthor's submissions
-		submissions, err := getAuthoredSubmissions(authorID)
-		assert.NoErrorf(t, err, "Error getting user submissions: %v", err)
-
-		// tests for equality of submission ID and that testSubmission2.ID is not in the map
-		_, ok := submissions[testSubmission2.ID]
-		assert.False(t, ok, "Returned submission where the test author is not an author")
-		assert.Equalf(t, submissions[testSubmission1.ID], testSubmission1.Name,
-			"Returned incorrect submission name: %s", submissions[testSubmission1.ID])
-
-		testEnd()
-	})
-}
-
-// test for basic functionality. Adds 2 submissions to the db with different authors, then queries them and tests for equality
-// Test Depends On:
-// 	- TestAddSubmission
-// 	- TestAddAuthors
-// 	- TestAddReviewers
-func TestGetReviewedSubmissions(t *testing.T) {
-	// adds two submissions each with different authors to the db and then queries one author's submissions
-	t.Run("Get Single Submission from a Reviewer", func(t *testing.T) {
-		testSubmission1 := *testSubmissions[0].getCopy() // test submission to return on getAuthoredSubmissions()
-		testSubmission2 := *testSubmissions[1].getCopy() // test submission to not return on getAuthoredSubmissions()
-		testReviewer := testReviewers[0]                 // test author of the submission being queried
-		testNonReviewer := testReviewers[3]              // test author of submission not being queried
-
-		testInit()
-
-		// adds two test users to the db as authors
-		reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Reviewers = []GlobalUser{{ID: reviewerID}}
-
-		nonreviewerID, err := registerUser(testNonReviewer, USERTYPE_REVIEWER) // author of the submission we are not interested in
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission2.Reviewers = []GlobalUser{{ID: nonreviewerID}}
-
-		// adds dummy authors
-		authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-		assert.NoErrorf(t, err, "Error occurred while registering user: %v", err)
-		testSubmission1.Authors = []GlobalUser{{ID: authorID}}
-		testSubmission2.Authors = []GlobalUser{{ID: authorID}}
-
-		// adds two test submissions to the db
-		testSubmission1.ID, err = addSubmission(&testSubmission1)
-		assert.NoErrorf(t, err, "Error occurred while adding submission1: %v", err)
-		testSubmission2.ID, err = addSubmission(&testSubmission2)
-		assert.NoErrorf(t, err, "Error occurred while adding submission2: %v", err)
-
-		// queries all of testAuthor's submissions
-		submissions, err := getReviewedSubmissions(reviewerID)
-		assert.NoErrorf(t, err, "Error getting user reviewed submissions: %v", err)
-
-		// tests for equality of submission ID and that testSubmission2.ID is not in the map
-		_, ok := submissions[testSubmission2.ID]
-		assert.False(t, ok, "Returned submission where the test reviewer is not a reviewer")
-		assert.Equalf(t, submissions[testSubmission1.ID], testSubmission1.Name,
-			"Returned incorrect submission name: %s", submissions[testSubmission1.ID])
-
-		testEnd()
-	})
-}
-
 // tests the getSubmission() function, which returns a submission struct
 //
 // Test Depends On:
@@ -594,6 +496,14 @@ func TestGetSubmission(t *testing.T) {
 	t.Run("Invalid Submission", func(t *testing.T) {
 		_, err := getSubmission(100)
 		assert.Errorf(t, err, "No error was thrown for invalid submission")
+	})
+
+	t.Run("Delete Submission", func(t *testing.T) {
+		if err := gormDb.Select(clause.Associations).Delete(&testSubmission).Error; !assert.NoError(t, err, "Submission deletion should not error!") {
+			return
+		}
+		_, err := getSubmission(testSubmission.ID)
+		assert.Error(t, err, "No error thrown for deleted submission.")
 	})
 }
 
