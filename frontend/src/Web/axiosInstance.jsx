@@ -13,16 +13,44 @@ const axiosInstance = axios.create({
   baseURL: process.env.BACKEND_ADDRESS,
   timeout: 1000,
   headers: {
-    "X-FOREIGNJOURNAL-SECURITY-TOKEN": process.env.BACKEND_TOKEN,
     "Content-Type": "application/json",
   },
 });
+
+// Handler for 401
+axiosInstance.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) =>  {
+    var origRequest = error.config;
+    if (origRequest.url !== "/token" && error.response) {
+      if (error.response.status === 401 && !origRequest._retry) {
+        origRequest._retry = true;
+        try {
+          const rs = await axiosInstance({
+            method: "get",
+            url: "/auth/token",
+            headers: {
+              refresh_token: "Refresh " + JwtService.getRefreshToken(),
+            },
+          });
+          JwtService.updateAccessToken(rs.data.content.token);
+          return axiosInstance(origRequest);
+        } catch (err) {
+          return Promise.reject(error);
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = JwtService.getAccessToken();
     if (token) {
-      config.headers["bearer_token"] = token;
+      config.headers["bearer_token"] = "Bearer " + token;
     }
     return config;
   },

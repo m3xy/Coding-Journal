@@ -1,86 +1,190 @@
-
 /**
  * Navigation.jsx
  * Author: 190010714, 190019931
- * 
+ *
  * Navigation Bar Component Class
  */
-import React from 'react'
-import { Navbar,Nav, /*NavLink, */  Container} from 'react-bootstrap'
-import { LinkContainer } from 'react-router-bootstrap'
-// import { useNavigate } from 'react-router-dom'
-// import {Helmet} from "react-helmet";
-
-
-
-
-/*class Navigation extends React.Component{
-
-    render(){
-        return(
-			
-			<Navbar bg="dark" variant="dark" expand="lg">
-				<Container>
-				<Navbar.Brand href="/">Journal</Navbar.Brand>
-				<Nav className="me-auto">
-				<Nav.Link href="/">Home</Nav.Link>
-				<Nav.Link href="/register">Register</Nav.Link>
-				<Nav.Link href="/code">Code</Nav.Link>
-				<Nav.Link href="/about">About</Nav.Link>
-				<Nav.Link href="/contact">Contact</Nav.Link>
-				<Nav.Link href="/commentModal">Comment</Nav.Link>
-				<Nav.Link href="/upload">Upload</Nav.Link>
-				<Nav.Link href="/profile">Profile</Nav.Link>
-
-				</Nav>
-				</Container>
-			</Navbar>
-			
-        )  
-    }
-}*/
+import React, { useState, useEffect } from "react"
+import {
+	Navbar,
+	Nav,
+	Container,
+	Form,
+	FormControl,
+	Button,
+	Offcanvas,
+	Modal,
+	Dropdown
+} from "react-bootstrap"
+import { BsSearch } from "react-icons/bs"
+import { MdArrowDropDownCircle } from "react-icons/md"
+import { useNavigate } from "react-router-dom"
+import { LinkContainer } from "react-router-bootstrap"
+import JwtService from "../Web/jwt.service"
+import axiosInstance from "../Web/axiosInstance"
 
 function Navigation() {
-	return(
+	const [user, setUser] = useState(null)
+	const [loading, setLoading] = useState(true)
+	const [showSearch, setShowSearch] = useState(false)
+	const navigate = useNavigate()
 
-		<Navbar bg="dark" variant="dark" expand="lg">
-			<Container>
-				<LinkContainer to="/">
-					<Navbar.Brand >Journal</Navbar.Brand>
-				</ LinkContainer>
-				<Nav className="me-auto">
+	// Check if a user is logged in.
+	useEffect(() => {
+		if (user !== null && JwtService.getUserID() === null) {
+			setUser(null)
+		} else if (user === null && JwtService.getUserID() !== null) {
+			setUser({})
+			axiosInstance
+				.get("/user/" + JwtService.getUserID())
+				.then((response) => {
+					if (response.data.userId) {
+						setUser(response.data.profile)
+						setLoading(false)
+					}
+				})
+				.catch(() => {
+					JwtService.rmUser()
+				})
+		}
+	})
+
+	// Modal used for small screen searches
+	let searchForm = (
+		<Form className="d-flex">
+			<FormControl
+				type="search"
+				placeholder="Submissions, authors, tags..."
+				className="me-2 "
+				aria-label="Search"
+			/>
+			<Button className="" variant="outline-secondary">
+				<BsSearch />
+			</Button>
+		</Form>
+	)
+
+	// Toggle for custom user drop-down menu.
+	const loginToggle = React.forwardRef(({ children, onClick }, ref) => (
+		<a
+			ref={ref}
+			style={{ color: "#FFFFFF" }}
+			onClick={(e) => {
+				e.preventDefault()
+				onClick(e)
+			}}>
+			{children} <MdArrowDropDownCircle />
+		</a>
+	))
+
+	return (
+		<Navbar bg="dark" variant="dark" expand={false} sticky="top">
+			<Container fluid>
+				{/* Navbar toggle and brand title. */}
+				<Nav className="flex-row me-auto">
+					<Navbar.Toggle
+						aria-controls="offcanvasNavbar"
+						style={{ marginRight: "1rem" }}
+					/>
+					<Navbar.Offcanvas>
+						<Offcanvas.Header closeButton></Offcanvas.Header>
+						<Offcanvas.Body>
+							<Nav justify>
+								<LinkContainer to="/">
+									<Nav.Link>Home</Nav.Link>
+								</LinkContainer>
+								<LinkContainer to="/about">
+									<Nav.Link>About</Nav.Link>
+								</LinkContainer>
+								<LinkContainer to="/contact">
+									<Nav.Link>Contact</Nav.Link>
+								</LinkContainer>
+								<LinkContainer to="/upload">
+									<Nav.Link>Publish</Nav.Link>
+								</LinkContainer>
+							</Nav>
+						</Offcanvas.Body>
+					</Navbar.Offcanvas>
 					<LinkContainer to="/">
-						<Nav.Link>Home</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/register">
-						<Nav.Link >Register</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/code">
-						<Nav.Link>Code</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/comment">
-						<Nav.Link>Comment</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/about">
-						<Nav.Link>About</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/contact">
-						<Nav.Link>Contact</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/upload">
-						<Nav.Link>Upload</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/profile">
-						<Nav.Link>Profile</Nav.Link>
-					</ LinkContainer>
-					<LinkContainer to="/submissions">
-						<Nav.Link>Submissions</Nav.Link>
-					</ LinkContainer>
+						<Navbar.Brand>Project_Code</Navbar.Brand>
+					</LinkContainer>
 				</Nav>
+
+				{/* Search bar for bigger screens */}
+				<Nav className="me-auto d-none d-lg-block">{searchForm}</Nav>
+
+				{/* Search bar for smaller screens */}
+				<Nav className="me-auto d-block d-lg-none">
+					<Button
+						variant="outline-secondary"
+						onClick={() => {
+							setShowSearch(true)
+						}}>
+						<BsSearch />
+					</Button>
+					<Modal
+						show={showSearch}
+						onHide={() => {
+							setShowSearch(false)
+						}}>
+						<Modal.Header closeButton>
+							<Modal.Title>
+								Search submissions, authors, tags...
+							</Modal.Title>
+							<Modal.Body>{searchForm}</Modal.Body>
+						</Modal.Header>
+					</Modal>
+				</Nav>
+
+				{user !== null ? (
+					/* Logged in component - Full Name with drop-down Menu */
+					!loading ? (
+						<Dropdown id="user-nav-dropdown">
+							<Dropdown.Toggle as={loginToggle}>
+								{user.firstName + " " + user.lastName}
+							</Dropdown.Toggle>
+							<Dropdown.Menu variant="dark" align="end">
+								<Dropdown.Item
+									onClick={() => {
+										navigate("/profile")
+									}}>
+									{" "}
+									Profile{" "}
+								</Dropdown.Item>
+								<Dropdown.Item
+									onClick={() => {
+										navigate("/submissions")
+									}}>
+									{" "}
+									Submissions{" "}
+								</Dropdown.Item>
+							</Dropdown.Menu>
+						</Dropdown>
+					) : (
+						<></>
+					)
+				) : (
+					/* Logged out component - Register and Log In buttons. */
+					<Form>
+						<Button
+							onClick={() => {
+								navigate("/register")
+							}}
+							variant="primary">
+							Register
+						</Button>{" "}
+						<Button
+							onClick={() => {
+								navigate("/login")
+							}}
+							variant="outline-primary">
+							Log In
+						</Button>{" "}
+					</Form>
+				)}
 			</Container>
 		</Navbar>
-
 	)
 }
 
-export default Navigation;
+export default Navigation

@@ -1,225 +1,269 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
+	"errors"
 	"log"
-	"os"
+	"net"
 	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
+
+	"fmt"
+	"os"
+
+	uuid "github.com/satori/go.uuid"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var db *sql.DB
-
 const (
-	TEAM_ID = "11"
-
-	// Constant for table operations.
-	VIEW_PERMISSIONS    = "globalPermissions"
-	TABLE_SERVERS       = "servers"
-	VIEW_LOGIN          = "globalLogins"
-	TABLE_USERS         = "users"
-	TABLE_SUBMISSIONS   = "submissions"
-	TABLE_FILES         = "files"
-	TABLE_AUTHORS       = "authors"
-	TABLE_REVIEWERS     = "reviewers"
-	TABLE_CATEGORIES    = "categories"
-	TABLE_IDMAPPINGS    = "idMappings"
-	VIEW_USER_INFO      = "globalUserInfo"
-	VIEW_SUBMISSIONLIST = "submissionList"
-
-	// TEMP: reconcile these
-	INNER_JOIN    = "%s INNER JOIN %s"
-	INSERT_DOUBLE = "INSERT INTO %s (%s, %s) VALUES (?, ?)"
-
-	SELECT_ROW               = "SELECT %s FROM %s WHERE %s = ?"
-	SELECT_EXISTS            = "SELECT EXISTS (SELECT %s FROM %s WHERE %s = ?)"
-	SELECT_ROW_TWO_CONDITION = "SELECT %s FROM %s WHERE %s = ? AND %s = ?"
-	SELECT_ALL_ORDER_BY      = "SELECT %s FROM %s ORDER BY ?"
-	SELECT_ROW_INNER_JOIN    = "SELECT %s FROM %s INNER JOIN %s ON %s = %s WHERE %s = ?"
-	SELECT_ROW_ORDER_BY      = "SELECT %s FROM %s ORDER BY ? WHERE %s = ?"
-	INSERT_CRED              = "INSERT INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)"
-	INSERT_PROJ              = "INSERT INTO %s (%s) VALUES (?) RETURNING id"
-	INSERT_FILE              = "INSERT INTO %s (%s, %s) VALUES (?, ?) RETURNING id"
-	INSERT_AUTHOR            = "INSERT INTO %s VALUES (?, ?)"
-	INSERT_REVIEWER          = "INSERT INTO %s VALUES (?, ?)"
-	INSERT_FULL              = "INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	UPDATE_ROWS              = "UPDATE %s SET %s = ? WHERE %s = ?"
-	DELETE_ALL_ROWS          = "DELETE FROM %s"
-
+	TEAM_ID                     = 11
 	USERTYPE_NIL                = 0
 	USERTYPE_PUBLISHER          = 1
 	USERTYPE_REVIEWER           = 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
 	USERTYPE_USER               = 4
+
+	// Password related
+	HASH_COST = 8
 )
 
+var gormDb *gorm.DB
 var DB_PARAMS map[string]string = map[string]string{
 	"interpolateParams": "true",
+	"parseTime":         "true",
 }
 
-// Structure for user table.
-type Credentials struct {
-	// User auto incremented ID.
-	Id string `json:"userId" db:"id"`
-	// Email Address.
-	Email string `json:"email" db:"email" validate:"nonzero,max=100"`
-	// Password - given as plaintext by front end, and as hash by the database.
-	Pw string `json:"password,omitempty" db:"password" validate:"min=8,max=64,validpw"`
-	// First Name.
-	Fname string `json:"firstname" db:"firstName" validate:"nonzero,max=32"`
-	// Last Name.
-	Lname string `json:"lastname" db:"lastName" validate:"nonzero,max=32"`
-	// User role.
-	Usertype int `json:"usertype" db:"userType"`
-	// User phone number.
-	PhoneNumber string `json:"phonenumber" db:"phoneNumber" validate:"max=11"`
-	// Organization name.
-	Organization string `json:"organization" db:"organization" validate:"max=32"`
+// User profile and personal information.
+type User struct {
+	ID           uint   `gorm:"primaryKey" json:"-"`
+	GlobalUserID string `json:"-"`
+	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"isemail"`
+	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw"`
+	FirstName    string `validate:"nonzero,max=32" json:"firstName"`
+	LastName     string `validate:"nonzero,max=32" json:"lastName"`
+	UserType     int    `gorm:"default:4" json:"userType"`
+	PhoneNumber  string `json:"phoneNumber,omitempty"`
+	Organization string `json:"organization,omitempty"`
+
+	CreatedAt time.Time      `json:",omitempty"`
+	UpdatedAt time.Time      `json:"-"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// Structure for ID mappings.
-type IdMappings struct {
-	GlobalId string `json:"globalId" db:"globalId"`
-	Id       string `json:"userId" db:"localId"`
+// User global identification.
+type GlobalUser struct {
+	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
+	FullName            string       `json:"fullName,omitempty"`
+	User                User         `json:"profile,omitempty"`
+	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
+	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
+
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"-"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// Foreign journals which this journal can connect to.
+type Server struct {
+	GroupNumber int    `gorm:"not null;primaryKey"`
+	Token       string `gorm:"size:1028;not null"`
+	Url         string `gorm:"not null; size:512"`
+
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Structure for code Submissions
 type Submission struct {
-	// unique id for the submisions as generated by the db
-	Id int `json:"id" db:"id"`
+	gorm.Model
 	// name of the submission
-	Name string `json:"name" db:"submissionName"`
-	// the ids of the submission's reviewers
-	Reviewers []string `json:"reviewers"`
-	// the ids of the submission's authors
-	Authors []string `json:"authors"`
-	// file paths associated with the submission
-	FilePaths []string `json:"files" db:"filePath"`
+	Name string `gorm:"not null;size:128;index" json:"name"`
+	// license which the code is published under
+	License string `gorm:"size:64" json:"license"`
+	// an array of the submission's files
+	Files []File `json:"files,omitempty"`
+	// an array of the submissions's authors
+	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty"`
+	// an array of the submission's reviewers
+	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
+	// tags for organizing/grouping code submissions
+	Categories []string `gorm:"-" json:"categories,omitempty"`
 	// metadata about the submission
-	MetaData *CodeSubmissionData `json:"metadata"`
+	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
 
-// Structure for code files
-type File struct {
-	// unique id of the file as maintained in the db
-	Id int `json:"id" db:"id"`
-	// id of the submission this file is a part of
-	SubmissionId int `json:"submissionId" db:"submissionId"`
-	// name of the submission this file is a part of
-	SubmissionName string `json:"submissionName"`
-	// relative path to the file from the root of the submission's file structure
-	Path string `json:"filePath" db:"filePath"`
-	// base name of the file with extension
+// Supergroup compliant code submissions (never stored in db)
+type SupergroupSubmission struct {
+	// name of the submission
 	Name string `json:"name"`
-	// content of the file encoded as a Base64 string
-	Content string `json:"content"`
-	// user comments on the file
-	Comments []*Comment `json:"comments"` // TODO: adapt this to be a metadata object not directly storing comments
+	// metadata about the submission
+	MetaData *SupergroupSubmissionData `json:"metadata"`
+	// file objects which are members of the submission
+	Files []*SupergroupFile `json:"files"`
 }
 
-// Structure for user comments on code
-type Comment struct {
-	// author of the comment as an id
-	AuthorId string `json:"author"`
-	// time that the comment was recorded as a string
-	Time string `json:"time"`
-	// content of the comment as a string
-	Content string `json:"content"`
-	// replies TEMP: maybe don't allow nested replies?
-	Replies []*Comment `json:"replies"`
-}
-
-// Structure for authors and reviewers
-type AuthorsReviewers struct {
-	SubmissionId int    `json:"submissionId" db:"submissionId"`
-	Id           string `json:"id" db:"userId"`
-}
-
-// structure for meta-data of the submission. matches the structure of the submission's JSON data file
-type CodeSubmissionData struct {
+// structure for meta-data of the submission. matches the structure of the submission's
+// JSON data file. This struct is never stored in the db
+type SubmissionData struct {
 	// abstract for the submission, to be displayed upon opening of any given submission
 	Abstract string `json:"abstract"`
 	// reviewer comments on the overall submission
 	Reviews []*Comment `json:"reviews"`
 }
 
-// structure to hold json data from data files
-type CodeFileData struct {
-	// TEMP: add IsReviewed field
-	Comments []*Comment `json:"comments"`
-}
-
-// structure to hold supergroup compliant submission metadata
-type SupergroupSubmissionMetaData struct {
-	// creation date of the submission
+// supergroup compliant structure for meta-data of the submission
+type SupergroupSubmissionData struct {
+	// date the code submission was created
 	CreationDate string `json:"creationDate"`
-	// author name
-	AuthorName string `json:"authorName"`
+	// names of the authors listed on the submission
+	AuthorNames []string `json:"authorNames"`
+	// tags for organizing/grouping code submissions (does not access db, so doesnt use Category type)
+	Categories []string `json:"categories"`
+	// abstract for the submission, to be displayed upon opening of any given submission
+	Abstract string `json:"abstract"`
+	// license which the code is published under
+	License string `json:"license"`
 }
 
-type SuperGroupFile struct {
-	Name    string `json:"filename"`
-	Content string `json:"base64Value"`
-}
-
-// structure to hold formatted supergroup submissions
-type SupergroupSubmission struct {
-	// name of the submission
+// struct for code files
+type File struct {
+	gorm.Model
+	// id of the submission this file is a part of
+	SubmissionID uint `json:"submissionId"`
+	// relative path to the file from the root of the submission's file structure
+	Path string `json:"path"`
+	// base name of the file with extension
 	Name string `json:"name"`
-	// metadata about the submission
-	Metadata *SupergroupSubmissionMetaData `json:"metadata"`
-	// files array
-	Files []*SuperGroupFile `json:"files"`
+	// content of the file encoded as a Base64 string (non-db field)
+	Base64Value string `gorm:"-" json:"base64Value"`
+	// structure to hold the user comments on the file
+	Comments []Comment `json:"comments,omitempty"`
 }
 
-// Structure for servers.
-type Servers struct {
-	GroupNb int    `json:"groupNumber" db:"groupNumber"`
-	Token   string `json:"token" db:"token"`
-	Url     string `json:"url" db:"url"`
+// Supergroup compliant file structure (never stored in db)
+type SupergroupFile struct {
+	// name of the file as a string
+	Name string `json:"filename"`
+	// file content as a base64 encoded string
+	Base64Value string `json:"base64Value"`
 }
 
-// Get the tag in a struct.
-func getTag(v interface{}, structVar string, tag string) string {
-	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
-	if !ok {
-		return ""
-	} else {
-		return field.Tag.Get(tag)
+// Structure for user comments on code (not written to db)
+type Comment struct {
+	gorm.Model
+	// author of the comment as an id
+	AuthorID string `json:"author"`
+	// file which the comment belongs to
+	FileID uint `json:"fileId"`
+	// content of the comment as a string
+	Base64Value string    `gorm:"type:mediumtext" json:"base64Value"`
+	ParentID    *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
+	Comments    []Comment `gorm:"foreignKey:ParentID" json:"comments,omitempty"`
+}
+
+// stores submission tags (i.e. networking, java, python, etc.)
+// uniqueIndex:idx_first_second specifies the first and second column as a unique pair
+type Category struct {
+	Tag          string `gorm:"column;uniqueIndex:idx_first_second" json:"category"` // actual content of the tag
+	SubmissionID uint   `gorm:"uniqueIndex:idx_first_second" json:"-"`
+}
+
+// ---- Database and reflect utilities ----
+
+// Initialise database - open connection, migrate tables, set logger.
+func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
+	// Set MySQL info in DSN format according to Go MySQL Drive -
+	// user:password@protocol(host:port)/dbname?[param1=val...]
+	mysqlInfo := fmt.Sprintf("%s/%s?%s", os.Getenv("DATABASE_URL"), dbname,
+		getDbParams(DB_PARAMS)) // Setting this to allow prepared statements.
+	db, err := gorm.Open(mysql.Open(mysqlInfo), &gorm.Config{
+		Logger: logger,
+	})
+	if err != nil {
+		goto ERR
 	}
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{}, &Comment{})
+	if err != nil {
+		goto ERR
+	}
+	return db, nil
+
+ERR:
+	log.Fatalf("SQL initialization error: %v", err)
+	return nil, err
 }
 
-// Check if a value is unique in a given table.
-func checkUnique(table string, varName string, val string) bool {
-	// Query prepared and formatted statement.
-	stmt := fmt.Sprintf(SELECT_ROW, varName, table, varName)
-	query := db.QueryRow(stmt, val)
+// Pre-user creation hook - generate UUID with journal number appended.
+func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
+	if u.ID == "" {
+		u.ID = strconv.Itoa(TEAM_ID) + uuid.NewV4().String()
+	}
+	return
+}
 
-	// Scan query and check for existing rows.
-	var res interface{}
-	err := query.Scan(&res)
-	if err != sql.ErrNoRows {
-		// Table isn't empty or error occured, return false.
-		if err != nil {
-			log.Printf("Scan error on checkUnique: %v\n", err)
+// Clear every table rows in the database.
+func gormClear(db *gorm.DB) error {
+	// deletes comments w/ associations
+	var comments []Comment
+	if err := db.Find(&comments).Error; err != nil {
+		return err
+	}
+	for _, comment := range comments {
+		db.Select(clause.Associations).Unscoped().Delete(&comment)
+	}
+	// deletes files w/ associations
+	var files []File
+	if err := db.Find(&files).Error; err != nil {
+		return err
+	}
+	for _, file := range files {
+		db.Select(clause.Associations).Unscoped().Delete(&file)
+	}
+	// deletes submissions w/ associations
+	var submissions []Submission
+	if err := db.Find(&submissions).Error; err != nil {
+		return err
+	}
+	for _, submission := range submissions {
+		db.Select(clause.Associations).Unscoped().Delete(&submission)
+	}
+	// Deletes main tables
+	tables := []interface{}{&Comment{}, &File{}, &Category{}, &User{}, &GlobalUser{}, &Submission{}}
+	for _, table := range tables {
+		res := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
+			Unscoped().Delete(table)
+		if err := res.Error; err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+// Returns true if a field exists on given table and no row exists with given field with given value.
+func isUnique(db *gorm.DB, table interface{}, varname string, val string) bool {
+	var exists bool
+	if err := db.Model(table).Select("count(*) > 0").Where(varname+" = ?", val).Find(&exists).Error; err != nil {
 		return false
 	} else {
-		return true
+		return !exists
 	}
-}
-
-// Get the database tag for a struct.
-func getDbTag(v interface{}, structVar string) string {
-	return getTag(v, structVar, "db")
 }
 
 // Get the database tag for a struct.
 func getJsonTag(v interface{}, structVar string) string {
-	return getTag(v, structVar, "json")
+	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
+	if !ok {
+		return ""
+	} else {
+		return field.Tag.Get("json")
+	}
 }
 
 // Get database parameters string to place into DSN from a map.
@@ -236,63 +280,57 @@ func getDbParams(paramMap map[string]string) string {
 	return params
 }
 
-// Initialise connection to the database.
-func dbInit(dbname string) error {
-	var err error
+// -- Validation
 
-	// Set MySQL info in DSN format according to Go MySQL Drive -
-	// user:password@protocol(host:port)/dbname?[param1=val...]
-	mysqlInfo := fmt.Sprintf("%s/%s?%s", os.Getenv("DATABASE_URL"), dbname,
-		getDbParams(DB_PARAMS)) // Setting this to allow prepared statements.
-	db, err = sql.Open("mysql", mysqlInfo)
-	if err != nil {
-		return err
+func isemail(v interface{}, param string) error {
+	st := reflect.ValueOf(v)
+	if st.Kind() != reflect.String {
+		return errors.New("Email must be a string.")
 	}
-
-	// Set connection sanity options for database.
-	db.SetConnMaxLifetime(time.Minute * 3)
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
+	matcher := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	if !matcher.MatchString(st.String()) {
+		return errors.New("Wrong email format")
+	}
+	parts := strings.Split(st.String(), "@")
+	mx, err := net.LookupMX(parts[1])
+	if err != nil || len(mx) == 0 {
+		return errors.New("Email server invalid!")
+	}
 	return nil
 }
 
-// Close a database connection.
-// WARNING: this function clears all data from the database, setting it
-// back to the state it'd be in
-func dbClear() error {
-	// db tables to clear ORDER MATTERS HERE
-	tablesToClear := []string{
-		TABLE_CATEGORIES,
-		TABLE_AUTHORS,
-		TABLE_REVIEWERS,
-		TABLE_FILES,
-		TABLE_SUBMISSIONS,
-		TABLE_IDMAPPINGS,
-		TABLE_USERS,
-	}
-	// formats and executes a delete command for each table
-	for _, table := range tablesToClear {
-		stmt := fmt.Sprintf(DELETE_ALL_ROWS, table)
-		_, err := db.Exec(stmt)
-		if err != nil {
-			return err
+// Checks if a password contains upper case, lower case, numbers, and special characters.
+func ispw(v interface{}, param string) error {
+	st := reflect.ValueOf(v)
+	if st.Kind() != reflect.String {
+		return errors.New("Value must be string!")
+	} else {
+		// Set password and character number.
+		pw := st.String()
+		restrictions := []string{"[a-z]", // Must contain lowercase.
+			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
+			"[A-Z]",                               // Must contain uppercase.
+			"[0-9]",                               // Must contain numerics.
+			"[" + SPECIAL_CHARS + "]"}             // Must contain special characters.
+		for _, restriction := range restrictions {
+			matcher := regexp.MustCompile(restriction)
+			if !matcher.MatchString(pw) {
+				return errors.New("Restriction not matched!")
+			}
 		}
+		return nil
 	}
-	return nil
 }
 
-// Close database connection.
-func dbCloseConnection() {
-	db.Close()
+// -- Password control --
+
+// Hash a password
+func hashPw(pw string) []byte {
+	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
+	return hash
 }
 
-// Get all columns from an interface.
-func getCols(v interface{}) []interface{} {
-	s := reflect.ValueOf(v).Elem()
-	numCols := s.NumField()
-	cols := make([]interface{}, numCols)
-	for i := 0; i < numCols; i++ {
-		cols[i] = s.Field(i).Addr().Interface()
-	}
-	return cols
+// Compare password and hash for validity.
+func comparePw(pw string, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }

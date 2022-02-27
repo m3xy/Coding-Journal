@@ -1,5 +1,10 @@
+:root {
+	--white: #ffffff;
+	--red: #E53935;
+}
+
 .myInlineDecoration {
-	color: red !important;
+	color: var(--red) !important;
 	cursor: pointer;
 	text-decoration: underline;
 	font-weight: bold;
@@ -13,5 +18,5 @@
 }
 
 .myGlyphMarginClass {
-	background: red;
+	background: var(--red);
 }

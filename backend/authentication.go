@@ -12,210 +12,285 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
-	"reflect"
-	"regexp"
+	"strings"
+	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/joho/godotenv"
 	"gopkg.in/validator.v2"
+	"gorm.io/gorm"
 )
 
 const (
 	SPECIAL_CHARS = "//!//@//#//$//%//^//&//*//,//.//;//://_//-//+//-//=//\"//'"
 	A_NUMS        = "a-zA-Z0-9"
-	HASH_COST     = 8
+	CLAIM_BEARER  = "bearer"
+	CLAIM_REFRESH = "refresh"
+
+	ENDPOINT_TOKEN  = "/token"
+	SUBROUTE_AUTH   = "/auth"
+	ENDPOINT_LOGIN  = "/login"
+	ENDPOINT_SIGNUP = "/register"
 )
 
-// ----
-// User log in
-// ----
+var JwtSecret string // JWT Secret variable.
+
+// Subrouter
+func getAuthSubRoutes(r *mux.Router) {
+	auth := r.PathPrefix(SUBROUTE_AUTH).Subrouter()
+
+	// Authentication routes:
+	// + POST /auth/login - Log in.
+	// + POST /auth/register - Register.
+	// + GET /auth/token  - Get new access token from a refresh token.
+	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_TOKEN, GetToken).Methods(http.MethodGet)
+
+	// Set up jwt secret
+	myEnv, err := godotenv.Read("secrets.env")
+	if err == nil {
+		JwtSecret = myEnv["JWT_SECRET"]
+	}
+}
+
+// -- Log In -- //
 
 /*
- Log in to website, check credentials correctness.
- Content type: application/json
- Success: 200, Credentials are correct
- Failure: 401, Unauthorized
- Returns: userId
+  Client-made log in endpoint
+  Content-type: application/json
+  Input: {"email": string, "password": string, "groupNumber": int}
+  Success: 200, Credentials correc
+  		Returns: { access_token, refresh_token, redirect-url, expires }
+  Failure: 401, Unauthorized
+  		Returns: { message: string, error: bool }
 */
-func logIn(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received log in request from %v", r.RemoteAddr)
+func PostAuthLogIn(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received Auth Log-In request from %s.", r.RemoteAddr)
 
-	// Set up writer response.
-	w.Header().Set("Content-Type", "application/json")
-
-	// Get credentials from log in request.
-	creds := &Credentials{}
-	err := json.NewDecoder(r.Body).Decode(creds)
-	if err != nil {
-		log.Printf("[ERROR] JSON decoder failed on log in.")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// Get credentials at given email, and assign it.
-	storedCreds := &Credentials{}
-	stmt := fmt.Sprintf(SELECT_ROW, "*", VIEW_LOGIN, getDbTag(&Credentials{}, "Email"))
-	err = db.QueryRow(stmt, creds.Email).Scan(&storedCreds.Id, &storedCreds.Email, &storedCreds.Pw)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			w.WriteHeader(http.StatusUnauthorized)
-			log.Printf("[INFO] Incorrect email: %s", creds.Email)
-		} else {
-			fmt.Println(err)
-			log.Printf("[ERROR] SQL query failure on login: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
+	// Check if the body's correctly formed.
+	var credentials AuthLoginPostBody
+	var encodable interface{}
+	if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
+		encodable = StandardResponse{
+			Message: "Email or password incorrectly formed!",
+			Error:   true,
 		}
-		return
-	}
-
-	// Compare password to hash in database, and conclude status.
-	if !comparePw(creds.Pw, storedCreds.Pw) {
-		log.Printf("[INFO] Given password and password registered on %s do not match.", creds.Email)
+		log.Printf("[WARN] Request body not correctly formed: %v", err)
 		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Marshal JSON and insert it into the response.
-	jsonResp, err := json.Marshal(map[string]string{getJsonTag(&Credentials{}, "Id"): storedCreds.Id})
-	if err != nil {
 	} else {
-		w.Write(jsonResp)
-	}
-	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, creds.Email)
-}
-
-/*
-	Get user profile info for a user.
-	Content type: application/json
-	Success: 200, Credentials can be passed down.
-	Failure: 404, User not found.
-*/
-func getUserProfile(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received user credential request from %s", r.RemoteAddr)
-
-	// Get user from parameters.
-	vars := mux.Vars(r)
-	if checkUnique(TABLE_IDMAPPINGS,
-		getDbTag(&IdMappings{}, "GlobalId"), vars[getJsonTag(&Credentials{}, "Id")]) {
-		log.Printf("[WARN] User (%s) not found.", vars[getJsonTag(&Credentials{}, "Id")])
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	// Get user details from user ID.
-	info := &Credentials{Pw: ""}
-	err := db.QueryRow(fmt.Sprintf(SELECT_ROW, "*", VIEW_USER_INFO,
-		getDbTag(&IdMappings{}, "GlobalId")), vars[getJsonTag(&Credentials{}, "Id")]).
-		Scan(&info.Id, &info.Email, &info.Fname, &info.Lname, &info.Usertype,
-			&info.PhoneNumber, &info.Organization)
-	if err != nil {
-		log.Printf("[ERROR] SQL query error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	// Get map of submission IDs to submission names.
-	submissionsMap, err := getUserSubmissions(vars[getJsonTag(&Credentials{}, "Id")])
-	if err != nil {
-		log.Printf("[ERROR] Failed to retrieve user (%s)'s projects: %v'", vars[getJsonTag(&Credentials{}, "Id")], err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	buffMap := map[string]interface{}{
-		getJsonTag(&Credentials{}, "Email"):        info.Email,
-		getJsonTag(&Credentials{}, "Fname"):        info.Fname,
-		getJsonTag(&Credentials{}, "Lname"):        info.Lname,
-		getJsonTag(&Credentials{}, "Usertype"):     info.Usertype,
-		getJsonTag(&Credentials{}, "PhoneNumber"):  info.PhoneNumber,
-		getJsonTag(&Credentials{}, "Organization"): info.Organization,
-		"submissions": submissionsMap,
-	}
-	err = json.NewEncoder(w).Encode(buffMap)
-	if err != nil {
-		log.Printf("[ERROR] User data JSON encoding failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	log.Printf("[INFO] User credential request from %s successful.", r.RemoteAddr)
-}
-
-/*
-	Log in to website with any server's database.
-	Content type: application/json
-	Input: {"email": string, "password": string, "groupNumber": int}
-	Success: 200, Credentials are correct.
-	Failure: 401, Unauthorized
-	Returns: userId
-*/
-func logInGlobal(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received global login request from %s.", r.RemoteAddr)
-	propsMap := make(map[string]string)
-	err := json.NewDecoder(r.Body).Decode(&propsMap)
-	if err != nil {
-		log.Printf("[WARN] Invalid security token received from %s.", r.RemoteAddr)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// Query path from team ID.
-	retServer := &Servers{}
-	stmt := fmt.Sprintf(SELECT_ROW, "*", TABLE_SERVERS, getDbTag(&Servers{}, "GroupNb"))
-	err = db.QueryRow(stmt, propsMap[getJsonTag(&Servers{}, "GroupNb")]).Scan(getCols(retServer)...)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Printf("[WARN] Group number %s doesn't exist in database.", propsMap[getJsonTag(&Servers{}, "GroupNumber")])
-			w.WriteHeader(http.StatusUnauthorized)
-		} else {
-			log.Printf("[ERROR] SQL query error: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
+		// Get access token from controller.
+		response, status := ControllerAuthLogin(credentials)
+		switch {
+		case status == http.StatusInternalServerError:
+			encodable = StandardResponse{Message: "Internal Server Error", Error: true}
+			break
+		case status == http.StatusUnauthorized:
+			encodable = StandardResponse{Message: "Email or password incorrect!", Error: true}
+			break
+		case status == http.StatusOK:
+			encodable = response
 		}
-		return
+
+		// Send response
+		w.WriteHeader(status)
 	}
 
-	// Make request from given URL and security token
-	jsonBody, err := json.Marshal(propsMap)
-	if err != nil {
-		log.Printf("[ERROR] JSON body encoding failed: %v", err)
+	if err := json.NewEncoder(w).Encode(encodable); err != nil {
+		log.Printf("[ERROR] Response encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		return
 	}
-	globalReq, _ := http.NewRequest(
-		"POST", retServer.Url+"/login", bytes.NewBuffer(jsonBody))
-	globalReq.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
 
-	// Get response from login request.
-	res, err := sendSecureRequest(globalReq, propsMap[getJsonTag(&Servers{}, "GroupNb")])
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("[ERROR] HTTP Request error: %v", err)
-		return
-	} else if res.StatusCode != http.StatusOK {
-		log.Printf("[WARN] Foreign server login request failed, mirroring...")
-		w.WriteHeader(res.StatusCode)
-		return
+}
+
+// Controller for the Auth Login POST method.
+func ControllerAuthLogin(credentials AuthLoginPostBody) (AuthLogInResponse, int) {
+	// Get where to fetch user from given group number.
+	var uuid string
+	if credentials.GroupNumber == TEAM_ID {
+		userID, status := GetLocalUserID(JournalLoginPostBody{Email: credentials.Email, Password: credentials.Password})
+		if status != http.StatusOK {
+			return AuthLogInResponse{}, status
+		}
+		uuid = userID
+	} else if userID, err := GetForeignUserID(credentials); err != nil {
+		return AuthLogInResponse{}, http.StatusUnauthorized
+	} else {
+		uuid = userID
 	}
-	err = json.NewDecoder(res.Body).Decode(&propsMap)
-	if err != nil {
-		log.Printf("[ERROR] JSON decoding error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+
+	// Get tokens from successful login.
+	var err error
+	resp := AuthLogInResponse{
+		RedirectUrl: "/user",
+		Expires:     3600,
 	}
-	err = json.NewEncoder(w).Encode(&propsMap)
-	if err != nil {
-		log.Printf("[ERROR] JSON encoding error: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
+	if resp.AccessToken, err = createToken(uuid, "bearer"); err != nil {
+		return AuthLogInResponse{}, http.StatusInternalServerError
+	}
+	if resp.RefreshToken, err = createToken(uuid, "refresh"); err != nil {
+		return AuthLogInResponse{}, http.StatusInternalServerError
+	}
+	return resp, http.StatusOK
+}
+
+// Get a foreign user's ID from a foreign journal's POST /login endpoint.
+func GetForeignUserID(credentials AuthLoginPostBody) (string, error) {
+	// Get foreign server to request login from.
+	var retServer Server
+	res := gormDb.Limit(1).Find(&retServer, credentials.GroupNumber)
+	switch {
+	case res.Error != nil:
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		return "", res.Error
+	case res.RowsAffected == 0:
+		log.Printf("[WARN] Group number %d doesn't exist in database.", credentials.GroupNumber)
+		return "", res.Error
+	}
+
+	// Send request to foreign server.
+	var ResBody struct {
+		ID string `json:"userId"`
+	}
+	if resp, err := func() (*http.Response, error) {
+		if body, err := json.Marshal(JournalLoginPostBody{Email: credentials.Email, Password: credentials.Password}); err != nil {
+			log.Printf("[ERROR] JSON body encoding failed: %v", err)
+			return nil, err
+		} else if req, err := http.NewRequest(http.MethodPost, retServer.Url+ENDPOINT_LOGIN, bytes.NewBuffer(body)); err != nil {
+			log.Printf("[ERROR] Request creation failed: %v", err)
+			return nil, err
+		} else {
+			req.Header.Set(SECURITY_TOKEN_KEY, retServer.Token)
+			client := &http.Client{}
+			return client.Do(req)
+		}
+	}(); err != nil {
+		log.Printf("[WARN] Response getter failed: %v", err)
+		return "", err // Error in request/response
+	} else if err := json.NewDecoder(resp.Body).Decode(&ResBody); err != nil {
+		log.Printf("[ERROR] Body decoding failed: %v", err)
+		return "", err // Decoding error.
+	} else {
+		return ResBody.ID, nil
 	}
 }
 
-// ----
-// User signup
-// ----
+// Get a local user ID's from the given credentials.
+func GetLocalUserID(credentials JournalLoginPostBody) (string, int) {
+	var user struct {
+		GlobalUserID string
+		Email        string
+		Password     string
+	}
+	res := gormDb.Model(&User{}).Limit(1).Find(&user, "Email = ?", credentials.Email)
+	switch {
+	case res.Error != nil:
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		return "", http.StatusInternalServerError
+	case res.RowsAffected == 0:
+		log.Printf("[WARN] User not found: %s", credentials.Email)
+		return "", http.StatusUnauthorized
+	case credentials.Email != user.Email || !comparePw(credentials.Password, user.Password):
+		log.Printf("[WARN] User's password invalid: %s", user.GlobalUserID)
+		return "", http.StatusUnauthorized
+	}
+	return user.GlobalUserID, http.StatusOK
+}
+
+// -- Token Control -- //
+
+/*
+  Client refresh token getter function.
+  Content-type: application/json
+  Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
+*/
+func GetToken(w http.ResponseWriter, r *http.Request) {
+	refreshToken := r.Header.Get("refresh_token")
+	var body interface{}
+
+	// Validate refresh token, and create new tokens.
+	if ok, user := validateWebToken(refreshToken, "refresh"); !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		body = StandardResponse{
+			Message: "Given refresh token is invalid!",
+			Error:   true,
+		}
+	} else if token, err := createToken(user, "bearer"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		body = StandardResponse{
+			Message: "Access token creation failed!",
+			Error:   true,
+		}
+	} else if newRefresh, err := createToken(user, "refresh"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		body = StandardResponse{
+			Message: "Refresh token creation failed!",
+			Error:   true,
+		}
+	} else {
+		body = AuthLogInResponse{
+			AccessToken:  token,
+			RefreshToken: newRefresh,
+			Expires:      3600,
+			RedirectUrl:  "",
+		}
+	}
+
+	// Send response
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("[ERROR] Response parsing failed: %v", err)
+	}
+}
+
+// Validate the user's access token.
+func validateWebToken(accessToken string, scope string) (bool, string) {
+	tokenSplit := strings.Split(accessToken, " ")
+	if len(tokenSplit) != 2 || strings.ToLower(tokenSplit[0]) != scope {
+		return false, "-"
+	}
+	token, err := jwt.ParseWithClaims(tokenSplit[1], &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte(JwtSecret), nil
+	})
+	if err != nil {
+		return false, "-"
+	}
+	if claims, ok := token.Claims.(*JwtClaims); !ok {
+		return false, "-"
+	} else if claims.Scope != "scope" {
+		return false, "-"
+	} else {
+		return true, claims.ID
+	}
+
+}
+
+// Create a token with given scope.
+func createToken(ID string, scope string) (string, error) {
+	claims := JwtClaims{
+		ID:    ID,
+		Scope: scope,
+		StandardClaims: jwt.StandardClaims{
+			Issuer: "CS3099User11_Project_Code",
+		},
+	}
+	switch scope {
+	case "refresh":
+		claims.ExpiresAt = time.Now().Unix() + 72000
+		break
+	default:
+		claims.ExpiresAt = time.Now().Unix() + 3600
+		break
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS512, claims).SignedString([]byte(JwtSecret))
+}
+
+// -- Sign Up -- //
 
 /*
   Router function to sign up to website.
@@ -228,196 +303,70 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
-	creds := newUser()
-	err := json.NewDecoder(r.Body).Decode(creds)
-	if err != nil {
+	var message string
+	user := &User{}
+	if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		message = "Registration failed - Wrong fields provided."
+		goto ERROR
 	}
-	validator.SetValidationFunc("validpw", validpw)
-	if validator.Validate(*creds) != nil {
+	if validator.Validate(*user) != nil {
 		log.Printf("[WARN] Invalid password format received.")
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		message = "Registration failed - invalid password"
+		goto ERROR
 	}
 
-	_, err = registerUser(creds)
-	if err != nil {
+	if _, err := registerUser(*user); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		message = "Registration failed - " + err.Error()
+		goto ERROR
 	}
+
+	//
 	log.Printf("[INFO] User signup from %s successful.", r.RemoteAddr)
-	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(StandardResponse{
+		Message: "Registration successful!",
+		Error:   false,
+	}); err != nil {
+		log.Printf("[ERROR] JSON encoding failed: %v", err)
+	}
+	return
+
+ERROR:
+	w.WriteHeader(http.StatusBadRequest)
+	if err := json.NewEncoder(w).Encode(StandardResponse{
+		Message: message,
+		Error:   true,
+	}); err != nil {
+		log.Printf("[ERROR] JSON encoding failed: %v", err)
+	}
+	return
 }
 
-// Register a user to the database.
-// Returns user global ID.
-func registerUser(creds *Credentials) (string, error) {
-	// Check email uniqueness.
-	unique := checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), creds.Email)
-	if !unique {
-		return "", errors.New(getDbTag(&Credentials{}, "Email") + " is not unique!")
-	}
-
+// Register a user to the database. Returns user global ID.
+func registerUser(user User) (string, error) {
 	// Hash password and store new credentials to database.
-	hash := hashPw(creds.Pw)
+	user.Password = string(hashPw(user.Password))
 
-	// Make credentials insert statement for query.
-	stmt := fmt.Sprintf(INSERT_FULL, TABLE_USERS,
-		getDbTag(&Credentials{}, "Email"),
-		getDbTag(&Credentials{}, "Pw"),
-		getDbTag(&Credentials{}, "Fname"),
-		getDbTag(&Credentials{}, "Lname"),
-		getDbTag(&Credentials{}, "Usertype"),
-		getDbTag(&Credentials{}, "PhoneNumber"),
-		getDbTag(&Credentials{}, "Organization"))
-
-	// Query full insert statement.
-	_, err := db.Exec(stmt, creds.Email, hash, creds.Fname, creds.Lname,
-		creds.Usertype, creds.PhoneNumber, creds.Organization)
-	if err != nil {
-		return "", err
+	registeredUser := GlobalUser{
+		FullName: user.FirstName + " " + user.LastName,
+		User:     user,
 	}
-
-	// Get new UUID from query
-	err = db.QueryRow(
-		fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
-			TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email).
-		Scan(&creds.Id)
-	// Query UUID
-	query := db.QueryRow(fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"),
-		TABLE_USERS, getDbTag(&Credentials{}, "Email")), creds.Email)
-	err = query.Scan(&creds.Id)
-	if err != nil {
-		return "", err
-	}
-	return mapUserToGlobal(creds.Id)
-
-}
-
-// Register local user to global ID mappings.
-func mapUserToGlobal(userId string) (string, error) {
-	// Check if ID exists in users, and is unique in idMappings.
-	if checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Id"), userId) {
-		return "", errors.New("No user with this ID!")
-	} else if !checkUnique(TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"), userId) {
-		return "", errors.New("ID already exists in ID mappings!")
-	}
-
-	// Insert new mapping to ID Mappings.
-	idMap := &IdMappings{Id: userId, GlobalId: TEAM_ID + userId}
-
-	// Insert new mapping to ID Mappings.
-	stmt := fmt.Sprintf(INSERT_DOUBLE, TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "GlobalId"), getDbTag(&IdMappings{}, "Id"))
-	_, err := db.Query(stmt, idMap.GlobalId, idMap.Id)
-	if err != nil {
-		return "", err
-	} else {
-		return idMap.GlobalId, nil
-	}
-}
-
-// ----
-// User exportation/importation
-// ----
-
-// Export user credentials. Exports all available details.
-// TODO Testing for after MVP.
-//
-// Content type: application/json
-// Success: 200, OK
-// Failure: 401, Unauthorized
-// Parameters: email, password
-// Returns: {
-// 	email, password, first name, last name, phone number, organisation, id (global)
-// }
-func exportUser(w http.ResponseWriter, r *http.Request) {
-	// Decode input into credentials and check necessary parameters.
-	inputCreds := &Credentials{}
-	err := json.NewDecoder(r.Body).Decode(inputCreds)
-	if err != nil || inputCreds.Pw == "" || inputCreds.Email == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	// SELECT - FROM idMappings INNER JOIN users WHERE Email = ?
-	stmt := fmt.Sprintf(SELECT_ROW,
-		fmt.Sprintf("(%s, %s, %s, %s, %s, %s, %s)",
-			getDbTag(&IdMappings{}, "GlobalId"),
-			getDbTag(&Credentials{}, "Email"),
-			getDbTag(&Credentials{}, "Pw"),
-			getDbTag(&Credentials{}, "Fname"),
-			getDbTag(&Credentials{}, "Lname"),
-			getDbTag(&Credentials{}, "PhoneNumer"),
-			getDbTag(&Credentials{}, "Organization")),
-		fmt.Sprintf(INNER_JOIN, TABLE_IDMAPPINGS, TABLE_USERS),
-		getDbTag(&Credentials{}, "Email"))
-	query := db.QueryRow(stmt, inputCreds.Email)
-
-	storedCreds := newUser()
-	err = query.Scan(getCols(storedCreds)...)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			fmt.Println()
-			w.WriteHeader(http.StatusUnauthorized)
-		} else {
-			fmt.Printf("Error occured! %v\n", err)
-			w.WriteHeader(http.StatusInternalServerError)
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// Check constraints on user
+		if !isUnique(tx, User{}, "Email", user.Email) {
+			return errors.New("Email already taken!")
 		}
-		return
-	}
 
-	// Check password hash and proceed to export.
-	if !comparePw(inputCreds.Pw, storedCreds.Pw) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-// ----
-// Password control
-// ----
-
-// Set new user credentials
-func newUser() *Credentials {
-	// return &Credentials{Usertype: USERTYPE_USER, PhoneNumber: "", Organization: ""}
-	// TODO: fix permissions later
-	return &Credentials{Usertype: USERTYPE_REVIEWER_PUBLISHER, PhoneNumber: "", Organization: ""}
-}
-
-// Checks if a password contains upper case, lower case, numbers, and special characters.
-func validpw(v interface{}, param string) error {
-	st := reflect.ValueOf(v)
-	if st.Kind() != reflect.String {
-		return errors.New("Value must be string!")
-	} else {
-		// Set password and character number.
-		pw := st.String()
-		restrictions := []string{"[a-z]", // Must contain lowercase.
-			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
-			"[A-Z]",                               // Must contain uppercase.
-			"[0-9]",                               // Must contain numerics.
-			"[" + SPECIAL_CHARS + "]"}             // Must contain special characters.
-		for _, restriction := range restrictions {
-			matcher := regexp.MustCompile(restriction)
-			if !matcher.MatchString(pw) {
-				return errors.New("Restriction not matched!")
-			}
+		// Make credentials insert transaction.
+		if err := gormDb.Create(&registeredUser).Error; err != nil {
+			return err
 		}
 		return nil
+	}); err != nil {
+		return "", err
 	}
-}
 
-// Hash a password
-func hashPw(pw string) []byte {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
-	return hash
-}
-
-// Compare password and hash for validity.
-func comparePw(pw string, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
+	// Return user's primary key (the UUID)
+	return registeredUser.ID, nil
 }

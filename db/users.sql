@@ -1,2 +1,5 @@
+CREATE DATABASE IF NOT EXISTS mydb;
+CREATE DATABASE IF NOT EXISTS testdb;
+
 GRANT ALL PRIVILEGES ON mydb . * TO 'myuser'@'%';
 GRANT ALL PRIVILEGES ON testdb . * TO 'myuser'@'%';

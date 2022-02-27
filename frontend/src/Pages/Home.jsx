@@ -1,35 +1,36 @@
 /**
  * Home.jsx
  * author: 190010714, 190019931
- * 
+ *
  * Home page for the whole website
  */
 
 import React from 'react';
 import { Button } from 'react-bootstrap';
-import  { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 
+// DEPRECATED - Replaced by @src/Pages/HomePage/HomePage
 class Home extends React.Component {
-    constructor(props){
+    constructor(props) {
         super(props);
 
         this.state = {
             userId: this.getUserID()
         }
 
-        this.logout= this.logout.bind(this);
+        this.logout = this.logout.bind(this);
     }
 
     componentDidMount() {
-        
+
     }
 
     getUserID() {
         let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
         console.log(cookies)
-        for(let i = 0; i < cookies.length; i++){    //For each cookie,
+        for (let i = 0; i < cookies.length; i++) {    //For each cookie,
             let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-            if(cookie[0].trim() == "userId"){       //  If userId key exists, extract the userId value
+            if (cookie[0].trim() == "userId") {       //  If userId key exists, extract the userId value
                 return cookie[1];
             }
         }
@@ -37,32 +38,32 @@ class Home extends React.Component {
     }
 
     logout() {
-        var cookies = document.cookie.split(';'); 
-    
+        var cookies = document.cookie.split(';');
+
         // The "expire" attribute of every cookie is set to "Thu, 01 Jan 1970 00:00:00 GMT".
         for (var i = 0; i < cookies.length; i++) {
             document.cookie = cookies[i] + "=;expires=" + new Date(0).toUTCString();  //Setting all cookies expiry date to be a past date.
         }
 
         this.setState({
-            userId : null
+            userId: null
         })
     }
 
     render() {
-    
+
         console.log(this.state.userId);
 
-        if(this.getUserID() === null) {
-            return (<Navigate to ='/login' replace />);
+        if (this.getUserID() === null) {
+            return (<Navigate to='/login' replace />);
         }
 
         return (
             <div className="text-center">
-                <br/>
+                <br />
                 You are logged in.
-                <br/>
-              <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
+                <br />
+                <Button variant="outline-danger" onClick={this.logout}>Logout</Button>{' '}
             </div>
         );
     }
