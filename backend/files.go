@@ -1,6 +1,6 @@
 // ================================================================================
 // files.go
-// Authors: 190010425
+// Authors: 190010425, 190014935
 // Created: November 23, 2021
 //
 // This file handles reading/writing code files along with their
@@ -67,6 +67,11 @@ func getFilesSubRoutes(r *mux.Router) {
 // -----
 // Router functions
 // -----
+
+// Get the path to the submissions directory.
+func getSubmissionDirectoryPath(s Submission) string {
+	return filepath.Join(FILESYSTEM_ROOT, fmt.Sprintf("%d-%d", s.ID, s.CreatedAt.Unix()))
+}
 
 // Retrieve code files from filesystem. Returns
 // file with comments and metadata. Recieves a request
@@ -206,12 +211,11 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// queries the submission name (for use in accessing the filesystem)
-		submission.ID = submissionID
-		if err := gormDb.Model(submission).Select("submissions.name").First(submission).Error; err != nil {
+		if err := tx.Select("Name, created_at, ID").First(submission, submissionID).Error; err != nil {
 			return err
 		}
 		// adds a file to the submission in the db provided the submission exists
-		if err := gormDb.Model(submission).Association("Files").Append(file); err != nil {
+		if err := tx.Model(submission).Association("Files").Append(file); err != nil {
 			return err
 		}
 		return nil
@@ -220,23 +224,15 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 	}
 
 	// Add file to filesystem creating dirs if you do not exist
-	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), submission.Name, file.Path)
-	fileDirPath := filepath.Dir(filePath)
+	filePath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID))
 
-	// creates all directories on the file's relative path in case any of them do not exist yet, opens file, and writes content
-	if err := os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+	// Create file path from its ID
+	if codeFile, err := os.Create(filePath); err != nil {
 		return 0, err
+	} else {
+		defer codeFile.Close()
+		codeFile.Write([]byte(file.Base64Value))
 	}
-	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	if err != nil {
-		return 0, err
-	}
-	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-		return 0, err
-	}
-
-	// closes files
-	codeFile.Close()
 
 	return file.ID, nil
 }
@@ -282,17 +278,22 @@ func getFileData(fileID uint) (*File, error) {
 			return err
 		}
 		// gets the file comments
-		comment := &Comment{}
-		comment.FileID = fileID
+		// Order comments by newest.
 		var comments []Comment
-		if err := gormDb.Model(comment).Preload("Comments").Where("comments.parent_id IS NULL").Find(&comments).Error; err != nil {
+		if err := gormDb.Model(&Comment{}).Order("created_at desc").
+			Preload("Comments").Where("comments.parent_id IS NULL").
+			Find(&comments, "file_id = ?", fileID).Error; err != nil {
 			return err
+		}
+		for _, comment := range comments {
+			if err := loadComments(tx, comment); err != nil {
+				return err
+			}
 		}
 		file.Comments = comments
 
 		// queries the submission name
-		submission.ID = file.SubmissionID
-		if err := gormDb.Model(submission).Select("submissions.name").Find(submission).Error; err != nil {
+		if err := gormDb.Select("Name, ID, created_at").Find(submission, file.SubmissionID).Error; err != nil {
 			return err
 		}
 		return nil
@@ -301,7 +302,7 @@ func getFileData(fileID uint) (*File, error) {
 	}
 
 	// builds path to the file using the queried submission name
-	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(file.SubmissionID), submission.Name, file.Path)
+	fullFilePath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID))
 
 	// gets file content
 	var err error
@@ -310,6 +311,20 @@ func getFileData(fileID uint) (*File, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+// Recursive functions for loading replies.
+func loadComments(tx *gorm.DB, c Comment) error {
+	for _, child := range c.Comments {
+		if err := tx.Preload("Comments").Order("created_at desc").
+			Where("comments.parent_id = ?", c.ID).Find(&child).Error; err != nil {
+			return err
+		} else if err := loadComments(tx, child); err != nil {
+			return err
+		}
+	}
+	return nil
+
 }
 
 // Get file content from filesystem.

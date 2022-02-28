@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -28,21 +29,8 @@ import (
 
 const (
 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
-	TEST_FILES_DIR     = "../filesystem/" // environment variable set to this value
-	TEST_PORT_FILES    = ":59216"
-	TEST_FILES_ADDRESS = "http://localhost:59216"
+	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
 )
-
-// Set up server used for files testing.
-func fileServerSetup() *http.Server {
-	router := mux.NewRouter()
-	getFilesSubRoutes(router)
-
-	return &http.Server{
-		Addr:    TEST_PORT_FILES,
-		Handler: router,
-	}
-}
 
 // NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
 // as to prevent adding a file with the same SubmissionID twice
@@ -82,21 +70,20 @@ func TestGetFile(t *testing.T) {
 	// Set up server and configures filesystem/db
 	testInit()
 	defer testEnd()
-
-	srv := fileServerSetup()
-	go srv.ListenAndServe()
-
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
 	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_FILE+"/{id}", getFile)
+
 	// adds a submission to the database and filesystem
-	authorID, err := registerUser(testAuthors[0])
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-	reviewerID, err := registerUser(testReviewers[0])
+	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -116,10 +103,11 @@ func TestGetFile(t *testing.T) {
 		}
 
 		// builds the request url inserting query parameters
-		urlString := fmt.Sprintf("%s%s/%d", TEST_FILES_ADDRESS, SUBROUTE_FILE, fileID)
-		fmt.Println(urlString)
-		req, err := http.NewRequest("GET", urlString, nil)
-		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
+		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
+		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+
 		if !assert.NoErrorf(t, err, "Error occurred in request: %v", err) {
 			return
 		}
@@ -136,10 +124,10 @@ func TestGetFile(t *testing.T) {
 
 		// tests that the file was retrieved with the correct information
 		switch {
-		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"):
-		case !assert.Equal(t, testFile.Name, file.Name, "file names do not match"):
-		case !assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"):
-		case !assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
+		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"),
+			!assert.Equal(t, testFile.Name, file.Name, "file names do not match"),
+			!assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"),
+			!assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
 			return
 		}
 
@@ -157,8 +145,9 @@ func TestUploadUserComment(t *testing.T) {
 	// Set up server and configures filesystem/db
 	testInit()
 	defer testEnd()
-	srv := fileServerSetup()
-	go srv.ListenAndServe()
+
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment)
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
@@ -168,7 +157,7 @@ func TestUploadUserComment(t *testing.T) {
 	testReply := testComments[1]
 
 	// Register submission author.
-	subAuthorID, err := registerUser(testAuthors[0])
+	subAuthorID, err := registerUser(testAuthors[0], USERTYPE_NIL)
 	if assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -183,12 +172,8 @@ func TestUploadUserComment(t *testing.T) {
 	}
 
 	// Register comment author and it's bearer token.
-	authorID, err := registerUser(testAuthor)
+	authorID, err := registerUser(testAuthor, USERTYPE_NIL)
 	if assert.NoErrorf(t, err, "error occurred while adding testAuthor: %v", err) {
-		return
-	}
-	token, err := createToken(authorID, "bearer")
-	if !assert.NoErrorf(t, err, "Token creation should not fail!") {
 		return
 	}
 
@@ -201,16 +186,12 @@ func TestUploadUserComment(t *testing.T) {
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s/%d%s", TEST_FILES_ADDRESS, SUBROUTE_FILE,
-			fileID, ENDPOINT_NEWCOMMENT),
-			bytes.NewBuffer(reqBody))
-		if !assert.NoErrorf(t, err, "Error creating request: %v", err) {
-			return
-		}
+		req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
+			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 
 		// sends a request to the server to post a user comment
-		req.Header.Set("Authorization", "Bearer "+token)
-		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
+		router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", testAuthor.ID)))
+		resp := w.Result()
 		assert.NoErrorf(t, err, "Error executing request: %v", err)
 		defer resp.Body.Close()
 		assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
@@ -224,9 +205,6 @@ func TestUploadUserComment(t *testing.T) {
 		assert.Equal(t, fileID, addedComment.FileID, "file IDs do not match")
 		assert.Equal(t, testComment.AuthorID, addedComment.AuthorID, "Comment author ID mismatch")
 		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
-
-		// clears environment
-		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
 	})
 
 	// upload a single user comment to a valid file in a valid submission
@@ -244,15 +222,12 @@ func TestUploadUserComment(t *testing.T) {
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		req, err := http.NewRequest("POST", fmt.Sprintf("%s%s/%d%s", TEST_FILES_ADDRESS, SUBROUTE_FILE,
-			fileID, ENDPOINT_NEWCOMMENT),
-			bytes.NewBuffer(reqBody))
-		req.Header.Set("Authorization", "Bearer "+token)
-		assert.NoErrorf(t, err, "Error creating request: %v", err)
+		req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
+			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+		router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", testAuthor.ID)))
 
 		// sends a request to the server to post a user comment
-		resp, err := sendSecureRequest(gormDb, req, TEAM_ID)
-		assert.NoErrorf(t, err, "Error executing request: %v", err)
+		resp := w.Result()
 		defer resp.Body.Close()
 		assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
@@ -267,9 +242,6 @@ func TestUploadUserComment(t *testing.T) {
 		assert.Equal(t, testReply.AuthorID, addedReply.AuthorID, "Comment author ID mismatch")
 		assert.Equal(t, commentID, *addedReply.ParentID, "Parent ID mismatch")
 		assert.Equal(t, testReply.Base64Value, addedReply.Base64Value, "Comment content does not match")
-
-		// clears environment
-		assert.NoError(t, srv.Shutdown(context.Background()), "HTTP server shutdown error")
 	})
 }
 
@@ -285,13 +257,13 @@ func TestAddFile(t *testing.T) {
 	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
 
-	authorID, err := registerUser(testAuthors[0])
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-	reviewerID, err := registerUser(testReviewers[0])
+	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -313,8 +285,7 @@ func TestAddFile(t *testing.T) {
 
 			// gets the submission name from the db
 			submission := &Submission{}
-			submission.ID = submissionID
-			if !assert.NoError(t, gormDb.Model(submission).Select("submissions.name").First(submission).Error,
+			if !assert.NoError(t, gormDb.Select("Name, created_at, ID").First(submission, submissionID).Error,
 				"Error retrieving submission name") {
 				return
 			}
@@ -328,7 +299,7 @@ func TestAddFile(t *testing.T) {
 			}
 
 			// gets the file content from the filesystem
-			filePath := filepath.Join(TEST_FILES_DIR, fmt.Sprint(submissionID), submission.Name, queriedFile.Path)
+			filePath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(queriedFile.ID))
 			fileBytes, err := ioutil.ReadFile(filePath)
 			if !assert.NoErrorf(t, err, "File read failure after added to filesystem: %v", err) {
 				return
@@ -372,14 +343,14 @@ func TestAddComment(t *testing.T) {
 	testReply := testComments[1]
 
 	// adds a submission for the test file to be added to
-	authorID, err := registerUser(testAuthors[0])
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
 	// Add reviewer to a submission.
-	reviewerID, err := registerUser(testReviewers[0])
+	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
@@ -398,7 +369,7 @@ func TestAddComment(t *testing.T) {
 	}
 
 	// adds a test user to author a comment
-	commentAuthorID, err := registerUser(testAuthor)
+	commentAuthorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "failed to add user to the database: %v", err) {
 		return
 	}
@@ -488,13 +459,13 @@ func TestGetFileData(t *testing.T) {
 	// configures the test submission fields
 	testSubmission.Files = []File{testFile}
 
-	authorID, err := registerUser(testAuthor)
+	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}
 	testSubmission.Authors = []GlobalUser{{ID: authorID}}
 
-	reviewerID, err := registerUser(testReviewer)
+	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
 	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
 		return
 	}

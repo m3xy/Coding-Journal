@@ -1,20 +1,16 @@
 package main
 
 import (
-	"errors"
 	"log"
-	"net"
-	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"fmt"
 	"os"
 
+	"github.com/go-playground/validator/v10"
 	uuid "github.com/satori/go.uuid"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -29,7 +25,7 @@ const (
 	USERTYPE_PUBLISHER          = 1
 	USERTYPE_REVIEWER           = 2
 	USERTYPE_REVIEWER_PUBLISHER = 3
-	USERTYPE_USER               = 4
+	USERTYPE_EDITOR             = 4
 
 	// Password related
 	HASH_COST = 8
@@ -40,16 +36,16 @@ var DB_PARAMS map[string]string = map[string]string{
 	"interpolateParams": "true",
 	"parseTime":         "true",
 }
+var validate *validator.Validate
 
 // User profile and personal information.
 type User struct {
 	ID           uint   `gorm:"primaryKey" json:"-"`
 	GlobalUserID string `json:"-"`
-	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"isemail"`
-	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw"`
-	FirstName    string `validate:"nonzero,max=32" json:"firstName"`
-	LastName     string `validate:"nonzero,max=32" json:"lastName"`
-	UserType     int    `gorm:"default:4" json:"userType"`
+	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"email,required"`
+	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw,required"`
+	FirstName    string `json:"firstName" validate:"required,max=32"`
+	LastName     string `json:"lastName" validate:"required,max=32"`
 	PhoneNumber  string `json:"phoneNumber,omitempty"`
 	Organization string `json:"organization,omitempty"`
 
@@ -60,11 +56,13 @@ type User struct {
 
 // User global identification.
 type GlobalUser struct {
-	ID                  string       `gorm:"not null;primaryKey;type:varchar(191)" json:"userId"`
-	FullName            string       `json:"fullName,omitempty"`
-	User                User         `json:"profile,omitempty"`
-	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-"`
-	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-"`
+	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
+	FullName string `json:"fullName,omitempty" validate:"required,max=118"`
+	UserType int    `gorm:"default:4" json:"userType"`
+	User     User   `json:"profile,omitempty"`
+
+	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-" validate:"dive"`
+	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-" validate:"dive"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"-"`
@@ -84,17 +82,17 @@ type Server struct {
 type Submission struct {
 	gorm.Model
 	// name of the submission
-	Name string `gorm:"not null;size:128;index" json:"name"`
+	Name string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
 	// license which the code is published under
-	License string `gorm:"size:64" json:"license"`
+	License string `gorm:"size:64" json:"license" validate:"max=118"`
 	// an array of the submission's files
-	Files []File `json:"files,omitempty"`
+	Files []File `json:"files,omitempty" validate:"dive"`
 	// an array of the submissions's authors
-	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty"`
+	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty" validate:"required,dive"`
 	// an array of the submission's reviewers
 	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
 	// tags for organizing/grouping code submissions
-	Categories []string `gorm:"-" json:"categories,omitempty"`
+	Categories []Category `gorm:"many2many:categories_submissions" json:"categories,omitempty"`
 	// metadata about the submission
 	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
@@ -171,8 +169,10 @@ type Comment struct {
 // stores submission tags (i.e. networking, java, python, etc.)
 // uniqueIndex:idx_first_second specifies the first and second column as a unique pair
 type Category struct {
-	Tag          string `gorm:"column;uniqueIndex:idx_first_second" json:"category"` // actual content of the tag
-	SubmissionID uint   `gorm:"uniqueIndex:idx_first_second" json:"-"`
+	Tag string `gorm:"primaryKey" json:"category"` // actual content of the tag
+
+	CreatedAt time.Time `json:"-"`
+	DeletedAt time.Time `json:"-"`
 }
 
 // ---- Database and reflect utilities ----
@@ -189,10 +189,14 @@ func gormInit(dbname string, logger logger.Interface) (*gorm.DB, error) {
 	if err != nil {
 		goto ERR
 	}
-	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Submission{}, &Category{}, &File{}, &Comment{})
+	err = db.AutoMigrate(&GlobalUser{}, &User{}, &Server{}, &Category{}, &Submission{}, &File{}, &Comment{})
 	if err != nil {
 		goto ERR
 	}
+
+	// Set up validation
+	validate = validator.New()
+	validate.RegisterValidation("ispw", ispw)
 	return db, nil
 
 ERR:
@@ -256,16 +260,6 @@ func isUnique(db *gorm.DB, table interface{}, varname string, val string) bool {
 	}
 }
 
-// Get the database tag for a struct.
-func getJsonTag(v interface{}, structVar string) string {
-	field, ok := reflect.TypeOf(v).Elem().FieldByName(structVar)
-	if !ok {
-		return ""
-	} else {
-		return field.Tag.Get("json")
-	}
-}
-
 // Get database parameters string to place into DSN from a map.
 func getDbParams(paramMap map[string]string) string {
 	params := ""
@@ -280,33 +274,23 @@ func getDbParams(paramMap map[string]string) string {
 	return params
 }
 
-// -- Validation
-
-func isemail(v interface{}, param string) error {
-	st := reflect.ValueOf(v)
-	if st.Kind() != reflect.String {
-		return errors.New("Email must be a string.")
+func getTagArray(categories []Category) []string {
+	arr := []string{}
+	for _, category := range categories {
+		arr = append(arr, category.Tag)
 	}
-	matcher := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+\\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
-	if !matcher.MatchString(st.String()) {
-		return errors.New("Wrong email format")
-	}
-	parts := strings.Split(st.String(), "@")
-	mx, err := net.LookupMX(parts[1])
-	if err != nil || len(mx) == 0 {
-		return errors.New("Email server invalid!")
-	}
-	return nil
+	return arr
 }
 
+// -- Validation -- //
+
 // Checks if a password contains upper case, lower case, numbers, and special characters.
-func ispw(v interface{}, param string) error {
-	st := reflect.ValueOf(v)
-	if st.Kind() != reflect.String {
-		return errors.New("Value must be string!")
+func ispw(fl validator.FieldLevel) bool {
+	if fl.Field().String() == "invalid" {
+		return false
 	} else {
 		// Set password and character number.
-		pw := st.String()
+		pw := fl.Field().String()
 		restrictions := []string{"[a-z]", // Must contain lowercase.
 			"^[" + A_NUMS + SPECIAL_CHARS + "]*$", // Must contain only some characters.
 			"[A-Z]",                               // Must contain uppercase.
@@ -315,22 +299,9 @@ func ispw(v interface{}, param string) error {
 		for _, restriction := range restrictions {
 			matcher := regexp.MustCompile(restriction)
 			if !matcher.MatchString(pw) {
-				return errors.New("Restriction not matched!")
+				return false
 			}
 		}
-		return nil
+		return true
 	}
-}
-
-// -- Password control --
-
-// Hash a password
-func hashPw(pw string) []byte {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
-	return hash
-}
-
-// Compare password and hash for validity.
-func comparePw(pw string, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }

@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 )
@@ -60,4 +62,64 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
+}
+
+// This function queries a submission in the local format from the db, and transforms
+// it into the supergroup compliant format
+//
+// Parameters:
+// 	submissionID (int) : the id of the submission to be converted to the supergroup-compliant
+// 		format
+// Returns:
+// 	(*SupergroupSubmission) : a supergroup compliant submission struct
+// 	(error) : an error if one occurs
+func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
+	// gets the submission struct which submissionID refers to
+	localSubmission, err := getSubmission(submissionID)
+	if err != nil {
+		return nil, err
+	}
+	categories := []string{}
+	fmt.Printf("%v\n", localSubmission.Categories)
+	for _, category := range localSubmission.Categories {
+		categories = append(categories, category.Tag)
+	}
+	// creates the Supergroup metadata struct
+	supergroupData := &SupergroupSubmissionData{
+		CreationDate: fmt.Sprint(localSubmission.CreatedAt),
+		Categories:   categories,
+		Abstract:     localSubmission.MetaData.Abstract,
+		License:      localSubmission.License,
+	}
+
+	// adds author names to an array
+	authorNames := []string{}
+	for _, author := range localSubmission.Authors {
+		authorNames = append(authorNames, author.FullName)
+	}
+	supergroupData.AuthorNames = authorNames
+
+	// creates the list of file structs using the file paths and files.go
+	var base64 string
+	var supergroupFile *SupergroupFile
+	supergroupFiles := []*SupergroupFile{}
+	for _, file := range localSubmission.Files {
+		fullFilePath := filepath.Join(getSubmissionDirectoryPath(*localSubmission), fmt.Sprint(file.ID))
+		base64, err = getFileContent(fullFilePath)
+		if err != nil {
+			return nil, err
+		}
+		supergroupFile = &SupergroupFile{
+			Name:        filepath.Base(file.Path),
+			Base64Value: base64,
+		}
+		supergroupFiles = append(supergroupFiles, supergroupFile)
+	}
+
+	// creates the supergroup submission to return
+	return &SupergroupSubmission{
+		Name:     localSubmission.Name,
+		Files:    supergroupFiles,
+		MetaData: supergroupData,
+	}, nil
 }

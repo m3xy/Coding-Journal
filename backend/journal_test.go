@@ -1,116 +1,64 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	TEST_PORT_JOURNAL = ":59214"
-)
-
-// Set up server used for journal testing.
-func journalServerSetup() *http.Server {
-	router := mux.NewRouter()
-	router.Use(journalMiddleWare)
-
-	journal := router.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
-	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
-	journal.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet)
-
-	// Setup testing HTTP server
-	return &http.Server{
-		Addr:    TEST_PORT_JOURNAL,
-		Handler: router,
-	}
-}
-
-// Test security key validation.
-func TestTokenValidation(t *testing.T) {
-	testInit()
-	srv := journalServerSetup()
-
-	// Start server.
-	go srv.ListenAndServe()
-
-	// Write valid security token response
-	t.Run("Valid token validation", func(t *testing.T) {
-		validReq, _ := http.NewRequest("GET", LOCALHOST+TEST_PORT_JOURNAL+SUBROUTE_JOURNAL+ENDPOINT_VALIDATE, nil)
-		res, err := sendSecureRequest(gormDb, validReq, TEAM_ID)
-		if err != nil {
-			t.Errorf("HTTP request error: %v\n", err)
-		} else if res.StatusCode != http.StatusOK {
-			t.Errorf("Response Status code should be OK, but is %d", res.StatusCode)
-		}
-	})
-
-	// Write invalid security token response
-	t.Run("Invalid token validation", func(t *testing.T) {
-		client := http.Client{}
-		invalidReq, _ := http.NewRequest("GET", LOCALHOST+TEST_PORT_JOURNAL+SUBROUTE_JOURNAL+ENDPOINT_VALIDATE, nil)
-		invalidReq.Header.Set(SECURITY_TOKEN_KEY, WRONG_SECURITY_TOKEN)
-		res, err := client.Do(invalidReq)
-		if err != nil {
-			t.Errorf("HTTP request error: %v\n", err)
-		} else if res.StatusCode != http.StatusUnauthorized {
-			t.Errorf("Response Status code should be 401, but is %d", res.StatusCode)
-		}
-	})
-}
-
 // Test user log in.
 func TestJournalLogIn(t *testing.T) {
 	// Set up test
 	testInit()
-	srv := journalServerSetup()
-
-	// Start server.
-	go srv.ListenAndServe()
+	defer testEnd()
 
 	// Populate database with valid users.
-	trialUsers := getGlobalCopies(testUsers)
-	for i := range trialUsers {
-		trialUsers[i].ID, _ = registerUser(trialUsers[i].User)
+	trialUsers := make([]GlobalUser, len(testUsers))
+	for i, u := range testUsers {
+		trialUsers[i] = GlobalUser{User: *u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
+		trialUsers[i].ID, _ = registerUser(trialUsers[i].User, USERTYPE_REVIEWER_PUBLISHER)
 	}
+
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, logIn)
 
 	// Test valid logins
 	t.Run("Valid logins", func(t *testing.T) {
 		for i := range testUsers {
 			// Create a request for user login.
-			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
-			loginMap[JSON_TAG_PW] = testUsers[i].Password
-			resp, err := sendJsonRequest(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
-			assert.Nil(t, err, "Request should not error.")
+			loginBody := JournalLoginPostBody{Email: testUsers[i].Email, Password: testUsers[i].Password}
+			reqBody, _ := json.Marshal(loginBody)
+			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response status should be %d", http.StatusOK)
 
 			// Get ID from user response.
-			respMap := make(map[string]string)
-			err = json.NewDecoder(resp.Body).Decode(&respMap)
-			assert.Nil(t, err, "Body unparsing should succeed")
-			storedId, exists := respMap[getJsonTag(&JournalLogInResponse{}, "ID")]
-			assert.True(t, exists, "ID should exist in response.")
-
+			var respMap JournalLogInResponse
+			if err := json.NewDecoder(resp.Body).Decode(&respMap); !assert.Nil(t, err, "Body unparsing should succeed") {
+				return
+			}
 			// Check if gotten
-			assert.Equal(t, trialUsers[i].ID, storedId, "ID must equal registration's ID.")
+			assert.Equal(t, trialUsers[i].ID, respMap.ID, "ID must equal registration's ID.")
 		}
 	})
 
 	// Test invalid password login.
 	t.Run("Invalid password logins", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&User{}, "Email")] = testUsers[i].Email
-			loginMap[JSON_TAG_PW] = VALID_PW // Ensure this pw is different from all test users.
+			loginMap := JournalLoginPostBody{Email: testUsers[i].Email, Password: VALID_PW}
 
-			resp, err := sendJsonRequest(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
-			assert.Nil(t, err, "Request should not error.")
+			reqBody, _ := json.Marshal(loginMap)
+			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+
 			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
 		}
 	})
@@ -118,19 +66,75 @@ func TestJournalLogIn(t *testing.T) {
 	// Test invalid email login.
 	t.Run("Invalid email logins", func(t *testing.T) {
 		for i := 1; i < len(testUsers); i++ {
-			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&User{}, "Email")] = testUsers[0].Email
-			loginMap[JSON_TAG_PW] = testUsers[i].Password
+			loginMap := JournalLoginPostBody{Email: testUsers[0].Email, Password: testUsers[i].Password}
 
-			resp, err := sendJsonRequest(SUBROUTE_JOURNAL+ENDPOINT_LOGIN, http.MethodPost, loginMap, TEST_PORT_JOURNAL)
-			assert.Nil(t, err, "Request should not error.")
+			reqBody, _ := json.Marshal(loginMap)
+			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+
 			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
 		}
 	})
+}
 
-	// Close server.
-	if err := srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
+// This tests converting from the local submission data format to the supergroup specified format
+func TestLocalToGlobal(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	// adds the submission and a file to the system
+	testSubmission := *testSubmissions[0].getCopy()
+	testFile := testFiles[0]
+	testAuthor := testAuthors[0]
+	testReviewer := testReviewers[0]
+
+	// registers authors and reviewers, and adds them to the test submission
+	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
+	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+		return
 	}
-	testEnd()
+	testSubmission.Authors = []GlobalUser{{ID: authorID}}
+
+	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
+	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+		return
+	}
+	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+
+	testSubmission.Files = []File{testFile}
+	submissionID, err := addSubmission(testSubmission.getCopy())
+	if !assert.NoErrorf(t, err, "Error occurred while adding submission: %v", err) {
+		return
+	}
+
+	// tests valid submission struct
+	t.Run("Valid Submission", func(t *testing.T) {
+		// gets the supergroup compliant submission
+		globalSubmission, err := localToGlobal(submissionID)
+		if !assert.NoErrorf(t, err, "Error occurred while converting submission format: %v", err) {
+			return
+		}
+
+		// compares submission fields
+		categories := make([]string, len(testSubmission.Categories))
+		for i, category := range testSubmission.Categories {
+			categories[i] = category.Tag
+		}
+		switch {
+		case !assert.Equal(t, testSubmission.Name, globalSubmission.Name, "Names do not match"),
+			!assert.Equal(t, testSubmission.License, globalSubmission.MetaData.License,
+				"Licenses do not match"),
+			!assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, globalSubmission.MetaData.AuthorNames[0],
+				"Authors do not match"),
+			!assert.Equal(t, categories, globalSubmission.MetaData.Categories,
+				"Tags do not match"),
+			!assert.Equal(t, testSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
+				"Abstracts do not match"),
+			// compares files
+			!assert.Equal(t, testFile.Name, globalSubmission.Files[0].Name, "File names do not match"),
+			!assert.Equal(t, testFile.Base64Value, globalSubmission.Files[0].Base64Value, "File content does not match"):
+			return
+		}
+	})
 }
