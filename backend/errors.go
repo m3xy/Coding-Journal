@@ -30,6 +30,26 @@ type NoSubmissionError struct {
 
 func (e *NoSubmissionError) Error() string { return fmt.Sprintf("Submission %d doesn't exist!", e.ID) }
 
+// handle the case where a user is not assigned as a reviewer for a given submission.
+type NotReviewerError struct {
+	UserID string
+	SubmissionID uint
+}
+
+func (e *NotReviewerError) Error() string {
+	return fmt.Sprintf("User: %s is not assigned as reviewer to submission %d", e.UserID, e.SubmissionID)
+}
+
+// Handle duplicate reviews.
+type DuplicateReviewError struct {
+	UserID string
+	SubmissionID uint
+}
+
+func (e *DuplicateReviewError) Error() string {
+	return fmt.Sprintf("Reviewer %s submitted multiple reviews for submission %d", e.UserID, e.SubmissionID)
+}
+
 // Handle duplicate files.
 type DuplicateFileError struct {
 	Path string

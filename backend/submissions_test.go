@@ -1,11 +1,11 @@
-// // ===========================
-// // submissions_test.go
-// // Authors: 190010425
-// // Created: November 18, 2021
-// //
-// // This file takes care of testing
-// // submissions.go
-// // ===========================
+// ===========================
+// submissions_test.go
+// Authors: 190010425
+// Created: November 18, 2021
+//
+// This file takes care of testing
+// submissions.go
+// ===========================
 
 package main
 
@@ -40,7 +40,7 @@ var testSubmissions []Submission = []Submission{
 		Categories: []Category{{Tag: "testtag"}},
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
-			Reviews:  []*Comment{},
+			Reviews:  []*Review{},
 		},
 	},
 	{
@@ -52,7 +52,7 @@ var testSubmissions []Submission = []Submission{
 		Categories: []Category{{Tag: "testtag"}},
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
-			Reviews:  []*Comment{},
+			Reviews:  []*Review{},
 		},
 	},
 }
@@ -308,8 +308,8 @@ func TestAddSubmission(t *testing.T) {
 		},
 		MetaData: &SubmissionData{
 			Abstract: "test", // Check that metadata is correctly stored.
-			Reviews: []*Comment{
-				{AuthorID: globalReviewers[0].ID, Base64Value: "test"},
+			Reviews: []*Review{
+				{ReviewerID: globalReviewers[0].ID, Approved:true, Base64Value: "test"},
 			},
 		},
 	}

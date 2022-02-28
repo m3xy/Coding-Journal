@@ -113,7 +113,7 @@ type SubmissionData struct {
 	// abstract for the submission, to be displayed upon opening of any given submission
 	Abstract string `json:"abstract"`
 	// reviewer comments on the overall submission
-	Reviews []*Comment `json:"reviews"`
+	Reviews []*Review `json:"reviews"`
 }
 
 // supergroup compliant structure for meta-data of the submission
@@ -150,6 +150,13 @@ type SupergroupFile struct {
 	// name of the file as a string
 	Name string `json:"filename"`
 	// file content as a base64 encoded string
+	Base64Value string `json:"base64Value"`
+}
+
+// Structure for submission reviews
+type Review struct {
+	ReviewerID string `json:"reviewerId"`
+	Approved bool `json:"approved"`
 	Base64Value string `json:"base64Value"`
 }
 
