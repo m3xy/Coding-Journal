@@ -108,7 +108,6 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 // in backend/README.md
 func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadSubmission request received from %v", r.RemoteAddr)
-
 	// parses the Json request body into a submission struct
 	resp := UploadSubmissionResponse{}
 	reqBody := UploadSubmissionBody{}

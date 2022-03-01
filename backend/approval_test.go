@@ -9,18 +9,18 @@
 package main 
 
 import (
-	// "bytes"
-	// "context"
-	// "encoding/json"
-	// "fmt"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
 	// "io/ioutil"
-	// "net/http"
-	// "net/http/httptest"
+	"net/http"
+	"net/http/httptest"
 	// "os"
 	// "path/filepath"
 	"testing"
 
-	// "github.com/gorilla/mux"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	// "gorm.io/gorm/clause"
 )
@@ -28,6 +28,142 @@ import (
 // ------------
 // Router Function Tests
 // ------------
+
+func TestUploadReview(t *testing.T) {
+	// configures main test environment
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	route := ENDPOINT_SUBMISSIONS+"/{id}"+ENPOINT_REVIEW
+	router.HandleFunc(route, uploadReview)
+
+	// adds a submission to the db with authors and reviewers
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+
+	submission := Submission{
+		Name:    "Test",
+		Authors: []GlobalUser{globalAuthors[0]},
+		Reviewers: []GlobalUser{globalReviewers[0]},
+		MetaData: &SubmissionData{
+			Abstract: "Test",
+		},
+	}
+
+	submissionID, err := addSubmission(&submission)
+	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+		return
+	}
+
+	t.Run("Single Approving Review", func(t *testing.T) {
+		// passes on no error
+		t.Run("Adds Review", func(t *testing.T) {
+			reqStruct := &UploadReviewBody{
+				Approved: true,
+				Base64Value: "test",
+			}
+			reqBody, err := json.Marshal(reqStruct)
+			if !assert.NoError(t, err, "Error while marshalling review upload body!") {
+				return
+			}
+
+			// sends the request to upload a review
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", globalReviewers[0].ID)))
+			resp := w.Result()
+
+			// makes sure the request succeeded
+			if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "request did not succeed!") {
+				return
+			}
+
+			// gets the submission metadata and checks that it matches that which was sent
+			queriedMetaData, err := getSubmissionMetaData(submissionID)
+			if !assert.NoError(t, err, "Error while getting submission metadata!") {
+				return
+			}
+			queriedReview := queriedMetaData.Reviews[0]
+
+			// compares reviews in queried metadata with that which was added
+			switch {
+			case !assert.Equal(t, globalReviewers[0].ID, queriedReview.ReviewerID, "Reviewer IDs do not match"),
+				!assert.Equal(t, reqStruct.Approved, queriedReview.Approved, "Review approval does not match"),
+				!assert.Equal(t, reqStruct.Base64Value, queriedReview.Base64Value, "Review content does not match"):
+				return
+			}
+		})
+
+		// uploads the same review as above, should error -> test passes on err
+		t.Run("Adds duplicate review", func(t *testing.T) {
+			reqStruct := &UploadReviewBody{
+				Approved: true,
+				Base64Value: "test",
+			}
+			reqBody, err := json.Marshal(reqStruct)
+			if !assert.NoError(t, err, "Error while marshalling review upload body!") {
+				return
+			}
+
+			// sends the request to upload a review
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req) // no context set here
+			resp := w.Result()
+
+			// makes sure the request succeeded
+			if !assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "duplicate review added without proper error code!") {
+				return
+			}
+		})
+	})
+
+	// deals with error cases that occur before the review is added to the submission
+	t.Run("Request Validation", func(t *testing.T) {
+		// uploads a given review and returns the status code
+		uploadReview := func(reqStruct *UploadReviewBody, reviewerID string, submissionID uint) int {
+			reqBody, err := json.Marshal(reqStruct)
+			if !assert.NoError(t, err, "Error while marshalling review upload body!") {
+				return -1
+			}
+			// sends the request to upload a review
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", reviewerID)))
+			resp := w.Result()
+			return resp.StatusCode
+		}
+
+		t.Run("User ID not in context", func(t *testing.T) {
+			reqStruct := &UploadReviewBody{
+				Approved: true,
+				Base64Value: "test",
+			}
+			// makes sure the request failed StatusBadRequest
+			if !assert.Equalf(t, http.StatusUnauthorized, uploadReview(reqStruct, "", submissionID), 
+				"unauthenticated user added review without proper error code!") {
+				return
+			}
+		})
+
+		t.Run("Review no content", func(t *testing.T) {
+			reqStruct := &UploadReviewBody{
+				Approved: true,
+			}
+			// makes sure the request failed StatusBadRequest
+			if !assert.Equalf(t, http.StatusBadRequest, uploadReview(reqStruct, globalReviewers[0].ID, submissionID), 
+				"empty review added without proper error code!") {
+				return
+			}
+		})
+	})
+}
+
+
 
 // ------------
 // Helper Function Tests
@@ -87,6 +223,7 @@ func TestAddReview(t *testing.T) {
 			}
 		})
 
+		// succeeds only if the previous test succeeds
 		t.Run("Add duplicate Review", func(t *testing.T) {
 			if !assert.Equal(t, addReview(validReview, submissionID),
 				&DuplicateReviewError{SubmissionID:submissionID, UserID:validReview.ReviewerID}, 
@@ -106,7 +243,7 @@ func TestAddReview(t *testing.T) {
 			Approved: true,
 			Base64Value: "test",
 		}
-		if !assert.Error(t, addReview(invalidReview, submissionID), "No error !") {
+		if !assert.Error(t, addReview(invalidReview, submissionID), "No error occurred while adding review for non-reviewer user!") {
 			return
 		}
 	})

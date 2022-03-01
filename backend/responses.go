@@ -67,6 +67,12 @@ type UploadSubmissionBody struct {
 	Files     []File   `json:"files"`
 }
 
+// POST /submission/{id}/review
+type UploadReviewBody struct {
+	Approved bool `json:"approved" validate:"required"`
+	Base64Value string `json:"base64Value" validate:"required"`
+}
+
 // --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`
