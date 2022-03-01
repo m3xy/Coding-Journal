@@ -325,6 +325,42 @@ interface GlobalUser {
 }
 ```
 
+## Approval
+
+### Review Upload
+
+Uploads a review for a given reviewer of a submission
+
+1. Endpoint
+
+    The endpoint to upload a review is **POST** `/submission/{id}/review` where ID is the submission ID as a uint
+
+2. Request
+
+    1. Headers 
+
+    2. Body - the request body is shown below
+
+```typescript
+interface UploadReviewBody {
+	approved: bool;
+	base64Value: string;
+}
+```
+
+3. Response
+
+    1. Status:
+
+        - 200 - everything happened as expected
+        - 400 - fields missing from request body, bad formatting, or duplicate review upload
+        - 401 - user is not logged in or registered as a reviewer for the given submission
+        - 500 - any other miscellaneous errors
+
+    2. Body:
+
+## Comments
+
 ### User Comment Upload
 
 Uploads a user comment/comment reply to a given file
