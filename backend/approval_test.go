@@ -71,8 +71,10 @@ func TestUploadReview(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "userId", globalReviewers[0].ID)
-			ctx = context.WithValue(ctx, "userType", globalReviewers[0].UserType)
+			ctx := context.WithValue(req.Context(), "data", RequestContext{
+				ID: globalReviewers[0].ID,
+				UserType: globalReviewers[0].UserType,
+			})
 			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
 
@@ -112,8 +114,10 @@ func TestUploadReview(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "userId", globalReviewers[0].ID)
-			ctx = context.WithValue(ctx, "userType", globalReviewers[0].UserType)
+			ctx := context.WithValue(req.Context(), "data", RequestContext{
+				ID: globalReviewers[0].ID,
+				UserType: globalReviewers[0].UserType,
+			})
 			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
 
@@ -136,8 +140,10 @@ func TestUploadReview(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "userId", reviewerID)
-			ctx = context.WithValue(ctx, "userType", userType)
+			ctx := context.WithValue(req.Context(), "data", RequestContext{
+				ID: reviewerID,
+				UserType: userType,
+			})
 			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
 

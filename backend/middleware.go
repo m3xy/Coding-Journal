@@ -9,6 +9,12 @@ const (
 	SECURITY_TOKEN_KEY = "X-FOREIGNJOURNAL-SECURITY-TOKEN"
 )
 
+// request context object for logged in users
+type RequestContext struct {
+	ID string 
+	UserType int
+}
+
 // Middleware for user authentication and security key verification.
 func journalMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -27,8 +33,11 @@ func jwtMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		} else {
 			if !isUnique(gormDb, &GlobalUser{}, "id", id) {
-				ctx := context.WithValue(r.Context(), "userId", id)
-				ctx = context.WithValue(ctx, "userType", userType)
+				ctx := context.WithValue(r.Context(), "data", RequestContext{
+					ID: id,
+					UserType: userType,
+				})
+
 				next.ServeHTTP(w, r.WithContext(ctx))
 			} else {
 				next.ServeHTTP(w, r)

@@ -14,7 +14,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"fmt"
 
 	"github.com/gorilla/mux"
 )
@@ -33,42 +32,51 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 	resp := &StandardResponse{}
 	reqBody := &UploadReviewBody{}
 
-	// gets the submission ID from the vars
+	// gets the submission ID from the vars and user details from request context
 	params := mux.Vars(r)
 	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
 	submissionID := uint(submissionID64)
 	if err != nil {
+		log.Printf("[ERROR] Could not parse submission id from URL parameters")
 		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
+	// gets context struct
+	} else if reqContext, ok := r.Context().Value("data").(RequestContext); !ok {
+		log.Printf("[ERROR] Could not get context struct")
+		resp = &StandardResponse{Message: "Unable to get request context.", Error: true}
+		w.WriteHeader(http.StatusInternalServerError)
+
 	// decodes request body
 	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil {
+		log.Printf("[ERROR] Could not decode request body")
 		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
 	// validates reqBody format
 	} else if err := validate.Struct(reqBody); err != nil {
+		log.Printf("[ERROR] Could not validate request body")
 		resp = &StandardResponse{Message: "Request body could not be validated.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
 	// checks that the client is logged in
-	} else if r.Context().Value("userId") == nil {
+	} else if reqContext.ID == "" {
 		// User is not validated - error out.
+		log.Printf("[ERROR] Client is not logged in")
 		resp = &StandardResponse{Message: "Must be logged in to make this query.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
 	// checks that the client has the proper permisssions
-	} else if userType := r.Context().Value("userType"); 
-		userType == nil || !(userType == USERTYPE_REVIEWER || userType == USERTYPE_REVIEWER_PUBLISHER) {
+	} else if reqContext.UserType != USERTYPE_REVIEWER && reqContext.UserType != USERTYPE_REVIEWER_PUBLISHER {
+		log.Printf("[ERROR] Client does not have the correct permissions for this request")
 		resp = &StandardResponse{Message: "The client must have reviewer permissions to upload a review.", Error: true}
-		fmt.Println(userType)
 		w.WriteHeader(http.StatusUnauthorized)
 
 	// adds review and handles error cases
 	} else {
 		// builds review to add now that all fields have been validated
 		review := &Review{
-			ReviewerID: r.Context().Value("userId").(string),
+			ReviewerID: reqContext.ID,
 			Approved: reqBody.Approved,
 			Base64Value: reqBody.Base64Value,
 		}
