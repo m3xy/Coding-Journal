@@ -74,7 +74,10 @@ func TestUploadReview(t *testing.T) {
 			// sends the request to upload a review
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", globalReviewers[0].ID)))
+
+			ctx := context.WithValue(req.Context(), "userId", globalReviewers[0].ID)
+			ctx = context.WithValue(ctx, "userType", globalReviewers[0].UserType)
+			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
 
 			// makes sure the request succeeded
@@ -112,11 +115,14 @@ func TestUploadReview(t *testing.T) {
 			// sends the request to upload a review
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req) // no context set here
+
+			ctx := context.WithValue(req.Context(), "userId", globalReviewers[0].ID)
+			ctx = context.WithValue(ctx, "userType", globalReviewers[0].UserType)
+			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
 
 			// makes sure the request succeeded
-			if !assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "duplicate review added without proper error code!") {
+			if !assert.Equalf(t, http.StatusBadRequest, resp.StatusCode, "duplicate review added without proper error code!") {
 				return
 			}
 		})
@@ -125,7 +131,7 @@ func TestUploadReview(t *testing.T) {
 	// deals with error cases that occur before the review is added to the submission
 	t.Run("Request Validation", func(t *testing.T) {
 		// uploads a given review and returns the status code
-		uploadReview := func(reqStruct *UploadReviewBody, reviewerID string, submissionID uint) int {
+		uploadReview := func(reqStruct *UploadReviewBody, reviewerID string, userType int, submissionID uint) int {
 			reqBody, err := json.Marshal(reqStruct)
 			if !assert.NoError(t, err, "Error while marshalling review upload body!") {
 				return -1
@@ -133,18 +139,22 @@ func TestUploadReview(t *testing.T) {
 			// sends the request to upload a review
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", reviewerID)))
+
+			ctx := context.WithValue(req.Context(), "userId", reviewerID)
+			ctx = context.WithValue(ctx, "userType", userType)
+			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
+
 			return resp.StatusCode
 		}
 
 		t.Run("User ID not in context", func(t *testing.T) {
 			reqStruct := &UploadReviewBody{
 				Approved: true,
-				Base64Value: "test",
+				Base64Value: "hello",
 			}
-			// makes sure the request failed StatusBadRequest
-			if !assert.Equalf(t, http.StatusUnauthorized, uploadReview(reqStruct, "", submissionID), 
+			// makes sure the request failed StatusUnauthorized
+			if !assert.Equalf(t, http.StatusUnauthorized, uploadReview(reqStruct, "", USERTYPE_REVIEWER, submissionID), 
 				"unauthenticated user added review without proper error code!") {
 				return
 			}
@@ -155,7 +165,7 @@ func TestUploadReview(t *testing.T) {
 				Approved: true,
 			}
 			// makes sure the request failed StatusBadRequest
-			if !assert.Equalf(t, http.StatusBadRequest, uploadReview(reqStruct, globalReviewers[0].ID, submissionID), 
+			if !assert.Equalf(t, http.StatusBadRequest, uploadReview(reqStruct, globalReviewers[0].ID, globalReviewers[0].UserType, submissionID), 
 				"empty review added without proper error code!") {
 				return
 			}

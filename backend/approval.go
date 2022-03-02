@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"fmt"
 
 	"github.com/gorilla/mux"
 )
@@ -53,7 +54,14 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 	// checks that the client is logged in
 	} else if r.Context().Value("userId") == nil {
 		// User is not validated - error out.
-		resp = &StandardResponse{Message: "The client is unauthorized from making this query.", Error: true}
+		resp = &StandardResponse{Message: "Must be logged in to make this query.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	// checks that the client has the proper permisssions
+	} else if userType := r.Context().Value("userType"); 
+		userType == nil || !(userType == USERTYPE_REVIEWER || userType == USERTYPE_REVIEWER_PUBLISHER) {
+		resp = &StandardResponse{Message: "The client must have reviewer permissions to upload a review.", Error: true}
+		fmt.Println(userType)
 		w.WriteHeader(http.StatusUnauthorized)
 
 	// adds review and handles error cases

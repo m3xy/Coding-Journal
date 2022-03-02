@@ -92,7 +92,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
-
+		globalAuthors[i].UserType = USERTYPE_PUBLISHER
 	}
 	globalReviewers := make([]GlobalUser, len(testReviewers))
 	for i, user := range testReviewers {
@@ -100,7 +100,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
-
+		globalReviewers[i].UserType = USERTYPE_REVIEWER
 	}
 	return globalAuthors, globalReviewers, nil
 }
