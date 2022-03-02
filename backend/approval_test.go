@@ -13,16 +13,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	// "io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	// "os"
-	// "path/filepath"
 	"testing"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	// "gorm.io/gorm/clause"
 )
 
 // ------------

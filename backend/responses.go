@@ -76,6 +76,7 @@ type UploadReviewBody struct {
 // --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`
+	UserType int `json:"userType" validate:"min=0,max=4"`
 	Scope string
 	jwt.StandardClaims
 }

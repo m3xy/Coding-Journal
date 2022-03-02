@@ -50,7 +50,7 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get User ID from local credentials check.
-	uuid, status := GetLocalUserID(user)
+	uuid, _, status := GetLocalUserID(user)
 	if status != http.StatusOK {
 		w.WriteHeader(status)
 		return
