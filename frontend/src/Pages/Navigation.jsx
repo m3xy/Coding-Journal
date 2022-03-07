@@ -145,18 +145,20 @@ function Navigation() {
 							</Dropdown.Toggle>
 							<Dropdown.Menu variant="dark" align="end">
 								<Dropdown.Item
-									onClick={() => {
-										navigate("/profile")
-									}}>
+									onClick={() => { navigate("/profile") }}>
 									{" "}
 									Profile{" "}
 								</Dropdown.Item>
 								<Dropdown.Item
-									onClick={() => {
-										navigate("/submissions")
-									}}>
+									onClick={() => { navigate("/submissions") }}>
 									{" "}
 									Submissions{" "}
+								</Dropdown.Item>
+								<Dropdown.Item
+									onClick={() => { JwtService.rmUser(); navigate("/")}}
+								>
+									{" "}
+									Log Out{" "}	
 								</Dropdown.Item>
 							</Dropdown.Menu>
 						</Dropdown>
