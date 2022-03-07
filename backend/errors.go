@@ -50,6 +50,13 @@ func (e *DuplicateReviewError) Error() string {
 	return fmt.Sprintf("Reviewer %s submitted multiple reviews for submission %d", e.UserID, e.SubmissionID)
 }
 
+// handles case where a review is uploaded to an already approved submission
+type SubmissionApprovedError struct {
+	SubmissionID uint
+}
+
+func (e *SubmissionApprovedError) Error() string { return fmt.Sprintf("Cannot upload review to already approved submission: %d", e.SubmissionID) }
+
 // Handle duplicate files.
 type DuplicateFileError struct {
 	Path string

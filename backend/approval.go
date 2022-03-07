@@ -72,11 +72,15 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 		if err := addReview(review, submissionID); err != nil {
 			switch err.(type) {
 			case *NotReviewerError:
-				resp = &StandardResponse{Message: "User is not a reviewer", Error: true}
+				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusUnauthorized)
 
 			case *DuplicateReviewError:
-				resp = &StandardResponse{Message: "Reviewers can only upload one review each.", Error: true}
+				resp = &StandardResponse{Message: err.Error(), Error: true}
+				w.WriteHeader(http.StatusBadRequest)
+
+			case *SubmissionApprovedError:
+				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusBadRequest)
 
 			default: // Unexpected error - error out as server error.
@@ -115,6 +119,10 @@ func addReview(review *Review, submissionID uint) error {
 		return err
 	}
 
+	// checks that the given submission has not been approved yet (as approved submissions cannot have new reviews submitted)
+	if submission.Approved == true {
+		return &SubmissionApprovedError{SubmissionID: submissionID}
+	}
 	// checks that the reviewer is assigned to the given submission (implicitly checks usertype)
 	isReviewer := false
 	for _, reviewer := range submission.Reviewers {
@@ -125,7 +133,6 @@ func addReview(review *Review, submissionID uint) error {
 	if !isReviewer {
 		return &NotReviewerError{UserID: review.ReviewerID, SubmissionID: submissionID}
 	}
-
 	// checks that the reviewer has not already uploaded a review (loop is ok here because the number of reviews is small)
 	for _, currReview := range submission.MetaData.Reviews {
 		if review.ReviewerID == currReview.ReviewerID {
@@ -136,4 +143,14 @@ func addReview(review *Review, submissionID uint) error {
 	// adds the review to the given submission
 	submission.MetaData.Reviews = append(submission.MetaData.Reviews, review)
 	return addMetaData(submission)
+}
+
+// approves a given submission by ID
+//
+// Params:
+// 	submissionID (uint) : the submissions unique ID
+// Return:
+// 	(error) : an error if one occurs, nil otherwise
+func approveSubmission(submissionID uint) error {
+	return nil
 }

@@ -26,7 +26,7 @@ import (
 // ------------
 
 func TestUploadReview(t *testing.T) {
-	// configures main test environment
+	// wipes the database and filesystem
 	testInit()
 	defer testEnd()
 
@@ -44,7 +44,7 @@ func TestUploadReview(t *testing.T) {
 	submission := Submission{
 		Name:    "Test",
 		Authors: []GlobalUser{globalAuthors[0]},
-		Reviewers: []GlobalUser{globalReviewers[0]},
+		Reviewers: []GlobalUser{globalReviewers[0], globalReviewers[1]},
 		MetaData: &SubmissionData{
 			Abstract: "Test",
 		},
@@ -55,6 +55,7 @@ func TestUploadReview(t *testing.T) {
 		return
 	}
 
+	// uses globalReviewers[0]
 	t.Run("Single Approving Review", func(t *testing.T) {
 		// passes on no error
 		t.Run("Adds Review", func(t *testing.T) {
@@ -128,7 +129,7 @@ func TestUploadReview(t *testing.T) {
 		})
 	})
 
-	// deals with error cases that occur before the review is added to the submission
+	// deals with error cases that occur before the review is added to the submission (uses globalReviewers[1])
 	t.Run("Request Validation", func(t *testing.T) {
 		// uploads a given review and returns the status code
 		uploadReview := func(reqStruct *UploadReviewBody, reviewerID string, userType int, submissionID uint) int {
@@ -167,14 +168,13 @@ func TestUploadReview(t *testing.T) {
 				Approved: true,
 			}
 			// makes sure the request failed StatusBadRequest
-			if !assert.Equalf(t, http.StatusBadRequest, uploadReview(reqStruct, globalReviewers[0].ID, globalReviewers[0].UserType, submissionID), 
+			if !assert.Equalf(t, http.StatusBadRequest, uploadReview(reqStruct, globalReviewers[1].ID, globalReviewers[1].UserType, submissionID), 
 				"empty review added without proper error code!") {
 				return
 			}
 		})
 	})
 }
-
 
 
 // ------------
@@ -195,7 +195,7 @@ func TestAddReview(t *testing.T) {
 	submission := Submission{
 		Name:    "Test",
 		Authors: []GlobalUser{globalAuthors[0]},
-		Reviewers: []GlobalUser{globalReviewers[0]},
+		Reviewers: []GlobalUser{globalReviewers[0], globalReviewers[1]},
 		MetaData: &SubmissionData{
 			Abstract: "Test",
 		},
@@ -251,13 +251,11 @@ func TestAddReview(t *testing.T) {
 
 	t.Run("Add non-reviewer review", func(t *testing.T) {
 		invalidReview := &Review{
-			ReviewerID: globalReviewers[1].ID,
+			ReviewerID: globalReviewers[2].ID,
 			Approved: true,
 			Base64Value: "test",
 		}
-		if !assert.Error(t, addReview(invalidReview, submissionID), "No error occurred while adding review for non-reviewer user!") {
-			return
-		}
+		assert.Error(t, addReview(invalidReview, submissionID), "No error occurred while adding review for non-reviewer user!")
 	})
 
 	t.Run("Non-existant submission", func(t *testing.T) {
@@ -266,8 +264,21 @@ func TestAddReview(t *testing.T) {
 			Approved: true,
 			Base64Value: "test",
 		}
-		if !assert.Error(t, addReview(validReview, 0), "No error adding review to invalid submission!") {
+		assert.Error(t, addReview(validReview, 0), "No error adding review to invalid submission!")
+	})
+
+	// uploading reviews to already approved submissions is not allowed behaviour
+	t.Run("Submission Approved", func(t *testing.T) {
+		// approves submission
+		if !assert.NoError(t, gormDb.Model(&Submission{}).Where("ID = ?", submissionID).Update("approved", true).Error, 
+			"submission unable to be marked approved") {
 			return
 		}
+		validReview := &Review{
+			ReviewerID: globalReviewers[0].ID,
+			Approved: true,
+			Base64Value: "test",
+		}
+		assert.Error(t, addReview(validReview, submissionID), "No error adding review to already approved submission!")
 	})
 }
