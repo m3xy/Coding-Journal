@@ -128,6 +128,7 @@ func addReview(review *Review, submissionID uint) error {
 	for _, reviewer := range submission.Reviewers {
 		if reviewer.ID == review.ReviewerID {
 			isReviewer = true
+			break
 		}
 	}
 	if !isReviewer {
@@ -145,12 +146,36 @@ func addReview(review *Review, submissionID uint) error {
 	return addMetaData(submission)
 }
 
-// approves a given submission by ID
+// approves or dissaproves a given submission by ID
 //
 // Params:
+//	status (bool) : indicates whether submission should be marked accepted or rejected
 // 	submissionID (uint) : the submissions unique ID
 // Return:
 // 	(error) : an error if one occurs, nil otherwise
-func approveSubmission(submissionID uint) error {
+func updateSubmissionStatus(status bool, submissionID uint) error {
+	// checks that all of the submission's reviewers have uploaded reviews
+	submission, err := getSubmission(submissionID)
+	if err != nil {
+		return err
+	}
+	// checks that all reviewers have uploaded reviews (O(n^2) here but number of reviewers is small)
+	var seenReviewer bool
+	for _, reviewer := range submission.Reviewers {
+		seenReviewer = false
+		for _, review := range submission.MetaData.Reviews {
+			if reviewer.ID == review.ReviewerID {
+				seenReviewer = true
+				break
+			}
+		}
+		if !seenReviewer {
+			return &MissingReviewsError{SubmissionID: submissionID}
+		}
+	}
+	// updates the submission to be approved/dissaproved
+	if err := gormDb.Model(&Submission{}).Where("ID = ?", submissionID).Update("approved", status).Error; err != nil {
+		return err
+	}
 	return nil
 }

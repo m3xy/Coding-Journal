@@ -282,3 +282,58 @@ func TestAddReview(t *testing.T) {
 		assert.Error(t, addReview(validReview, submissionID), "No error adding review to already approved submission!")
 	})
 }
+
+func TestUpdateSubmissionStatus(t *testing.T) {
+	// configures main test environment
+	testInit()
+	defer testEnd()
+
+	// adds a submission to the db with authors and reviewers
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+
+	submission := Submission{
+		Name:    "Test",
+		Authors: []GlobalUser{globalAuthors[0]},
+		Reviewers: []GlobalUser{globalReviewers[0]},
+		MetaData: &SubmissionData{
+			Abstract: "Test",
+		},
+	}
+
+	submissionID, err := addSubmission(&submission)
+	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+		return
+	}
+
+	// runs first so that there are no uploaded reviews
+	t.Run("Update status missing reviews", func(t *testing.T) {
+		assert.Error(t, updateSubmissionStatus(true, submissionID), "no error for updating submission status of unreviewed submission")
+	})
+
+	t.Run("Update status valid", func(t *testing.T) {
+		// adds the reviewers review to the submission
+		validReview := &Review{
+			ReviewerID: globalReviewers[0].ID,
+			Approved: true,
+			Base64Value: "test",
+		}
+		if !assert.NoError(t, addReview(validReview, submissionID), "Review Addition shouldn't error!") {
+			return
+		}
+
+		t.Run("Approve", func(t *testing.T) {
+			assert.NoError(t, updateSubmissionStatus(true, submissionID), "status update should not error")
+		})
+		// resets the submission status
+		if !assert.NoError(t, gormDb.Model(&Submission{}).Where("ID = ?", submissionID).Update("approved", nil).Error, 
+			"Error while resetting submission status") {
+			return
+		}
+		t.Run("Disapprove", func(t *testing.T) {
+			assert.NoError(t, updateSubmissionStatus(false, submissionID), "status update should not error")
+		})
+	})
+}
