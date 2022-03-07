@@ -20,6 +20,7 @@ import (
 
 const (
 	ENPOINT_REVIEW = "/review"
+	ENDPOINT_APPROVE = "/approve"
 )
 
 // ------------
@@ -45,20 +46,15 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// decodes request body
-	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil {
-		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
-		w.WriteHeader(http.StatusBadRequest)
-
-	// validates reqBody format
-	} else if err := validate.Struct(reqBody); err != nil {
-		resp = &StandardResponse{Message: "Request body could not be validated.", Error: true}
-		w.WriteHeader(http.StatusBadRequest)
-
 	// checks that the client has the proper permisssions
 	} else if ctx.UserType != USERTYPE_REVIEWER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER {
 		resp = &StandardResponse{Message: "The client must have reviewer permissions to upload a review.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
+
+	// decodes request body and validates it
+	} else if json.NewDecoder(r.Body).Decode(reqBody) != nil || validate.Struct(reqBody) != nil {
+		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
 
 	// adds review and handles error cases
 	} else {
@@ -97,6 +93,62 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if !resp.Error {
 		log.Print("[INFO] uploadReview request successful\n")
+	}
+}
+
+
+// router function for updating submission status
+func updateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] updateSubmissionStatus request received from %v", r.RemoteAddr)
+	resp := &StandardResponse{}
+	reqBody := &UpdateSubmissionStatusBody{}
+
+	// gets the submission ID from the vars and user details from request context
+	params := mux.Vars(r)
+	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
+	submissionID := uint(submissionID64)
+	if err != nil {
+		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	// checks that the client has the proper permisssions
+	} else if ctx.UserType != USERTYPE_EDITOR {
+		resp = &StandardResponse{Message: "The client must have editor permissions to update submission status.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	// decodes request body and validates it
+	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
+		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// adds review and handles error cases
+	} else {
+		// changes the submission status
+		if err := updateSubmissionStatusHelper(reqBody.Status, submissionID); err != nil {
+			switch err.(type) {
+			case *MissingReviewsError:
+				resp = &StandardResponse{Message: err.Error(), Error: true}
+				w.WriteHeader(http.StatusConflict)
+
+			default: // Unexpected error - error out as server error.
+				log.Printf("[ERROR] could not change submission status: %v\n", err)
+				resp = &StandardResponse{Message: "Internal Server Error - could not change submission status", Error: true}
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+	}
+
+	// Return response body after function successful.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if !resp.Error {
+		log.Print("[INFO] updateSubmissionStatus request successful\n")
 	}
 }
 
@@ -153,7 +205,7 @@ func addReview(review *Review, submissionID uint) error {
 // 	submissionID (uint) : the submissions unique ID
 // Return:
 // 	(error) : an error if one occurs, nil otherwise
-func updateSubmissionStatus(status bool, submissionID uint) error {
+func updateSubmissionStatusHelper(status bool, submissionID uint) error {
 	// checks that all of the submission's reviewers have uploaded reviews
 	submission, err := getSubmission(submissionID)
 	if err != nil {

@@ -73,6 +73,11 @@ type UploadReviewBody struct {
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
+// POST /submission/{id}/approve
+type UpdateSubmissionStatusBody struct {
+	Status bool `json:"status" validate:"required"`
+}
+
 // --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`

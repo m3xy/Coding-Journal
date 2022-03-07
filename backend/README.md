@@ -359,6 +359,38 @@ interface UploadReviewBody {
 
     2. Body:
 
+### Update Submission Status
+
+Changes the status of a submission to either approved or disapproved
+
+1. Endpoint
+
+    The endpoint to upload a review is **POST** `/submission/{id}/approve` where ID is the submission ID as a uint
+
+2. Request
+
+    1. Headers 
+
+    2. Body - the request body is shown below
+
+```typescript
+interface UpdateSubmissionStatusBody {
+    status: bool;
+}
+```
+
+3. Response
+
+    1. Status:
+
+        - 200 - everything happened as expected
+        - 400 - fields missing from request body, bad request body format, or submissionID not set properly in the URL
+        - 401 - user is not logged in or registered as an editor (in practice this means the context is not set for the request)
+        - 409 - not all reviewers have uploaded reviews yet. This is not allowed behaviour
+        - 500 - any other miscellaneous errors
+
+    2. Body:
+
 ## Comments
 
 ### User Comment Upload

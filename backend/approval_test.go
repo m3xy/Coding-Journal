@@ -176,6 +176,121 @@ func TestUploadReview(t *testing.T) {
 	})
 }
 
+func TestUpdateSubmissionStatus(t *testing.T) {
+	// wipes the database and filesystem
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	route := ENDPOINT_SUBMISSIONS+"/{id}"+ENDPOINT_APPROVE
+	router.HandleFunc(route, updateSubmissionStatus)
+
+	// adds a submission to the db with authors and reviewers
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+	// adds a test editor
+	editorID, err := registerUser(User{Email: "editor@test.net", 
+		Password: "dlbjDs2!", FirstName: "Paul", LastName: "Editman"}, USERTYPE_EDITOR)
+	if !assert.NoError(t, err, "Error adding test editor") {
+		return
+	}
+
+	submission := Submission{
+		Name:    "Test",
+		Authors: []GlobalUser{globalAuthors[0]},
+		Reviewers: []GlobalUser{globalReviewers[0]},
+		MetaData: &SubmissionData{
+			Abstract: "Test",
+		},
+	}
+
+	submissionID, err := addSubmission(&submission)
+	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+		return
+	}
+
+	// function to format and send test requests
+	changeStatus := func(submissionID uint, editorID string, userType int, reqStruct *UpdateSubmissionStatusBody) int {
+		reqBody, err := json.Marshal(reqStruct)
+		if !assert.NoError(t, err, "Error while marshalling request body!") {
+			return -1
+		}
+		// sends the request to upload a review
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENDPOINT_APPROVE), bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+
+		ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ID: editorID,
+			UserType: userType,
+		})
+		router.ServeHTTP(w, req.WithContext(ctx))
+		resp := w.Result()
+		return resp.StatusCode
+	}
+
+	// cases where the helper function gets called
+	t.Run("Change Status", func(t *testing.T){
+		t.Run("Review not added", func(t *testing.T) {
+			reqStruct := &UpdateSubmissionStatusBody{Status:true}
+			assert.Equal(t, http.StatusConflict, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 409 Conflict")
+		})
+		
+		// adds a review from the one reviewer to allow for submission approval
+		validReview := &Review{
+			ReviewerID: globalReviewers[0].ID,
+			Approved: true,
+			Base64Value: "test",
+		}
+		if !assert.NoError(t, addReview(validReview, submissionID), "Review Addition shouldn't error!") {
+			return
+		}
+
+		t.Run("Valid approval", func(t *testing.T) {
+			reqStruct := &UpdateSubmissionStatusBody{Status:true}
+			assert.Equal(t, http.StatusOK, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 200")
+			submission := &Submission{}
+			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
+				return
+			}
+			assert.Equal(t, true, submission.Approved, "Submission status not updated properly")
+		})
+	})
+
+	// tests error cases having to do with the request itself
+	t.Run("Validate Request", func(t *testing.T) {
+		t.Run("Context Not Set", func(t *testing.T) {
+			// context invalid
+			reqStruct := &UpdateSubmissionStatusBody{Status:true}
+			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID, "", -1, reqStruct), "Wrong error code, was expecting 401")
+
+			// context not set at all
+			reqBody, err := json.Marshal(reqStruct)
+			if !assert.NoError(t, err, "Error while marshalling request body!") {
+				return
+			}
+			// sends the request to upload a review
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENDPOINT_APPROVE), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			assert.Equal(t, http.StatusUnauthorized, w.Result().StatusCode, "Wrong error code, was expecting 401")
+		})
+
+		t.Run("Non-editor user type", func(t *testing.T){
+			reqStruct := &UpdateSubmissionStatusBody{Status:true}
+			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID, globalReviewers[0].ID, USERTYPE_REVIEWER, reqStruct), "Wrong error code, was expecting 401")
+		})
+
+		t.Run("Bad Request body", func(t *testing.T){
+			reqStruct := &UpdateSubmissionStatusBody{}
+			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 400")
+			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID, editorID, USERTYPE_EDITOR, nil), "Wrong error code, was expecting 400")
+		})
+	})
+}
+
 
 // ------------
 // Helper Function Tests
@@ -283,7 +398,7 @@ func TestAddReview(t *testing.T) {
 	})
 }
 
-func TestUpdateSubmissionStatus(t *testing.T) {
+func TestUpdateSubmissionStatusHelper(t *testing.T) {
 	// configures main test environment
 	testInit()
 	defer testEnd()
@@ -310,7 +425,7 @@ func TestUpdateSubmissionStatus(t *testing.T) {
 
 	// runs first so that there are no uploaded reviews
 	t.Run("Update status missing reviews", func(t *testing.T) {
-		assert.Error(t, updateSubmissionStatus(true, submissionID), "no error for updating submission status of unreviewed submission")
+		assert.Error(t, updateSubmissionStatusHelper(true, submissionID), "no error for updating submission status of unreviewed submission")
 	})
 
 	t.Run("Update status valid", func(t *testing.T) {
@@ -325,7 +440,13 @@ func TestUpdateSubmissionStatus(t *testing.T) {
 		}
 
 		t.Run("Approve", func(t *testing.T) {
-			assert.NoError(t, updateSubmissionStatus(true, submissionID), "status update should not error")
+			assert.NoError(t, updateSubmissionStatusHelper(true, submissionID), "status update should not error")
+			submission := &Submission{}
+			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
+				return
+			}
+			assert.Equal(t, true, submission.Approved, "Submission status not updated properly")
+
 		})
 		// resets the submission status
 		if !assert.NoError(t, gormDb.Model(&Submission{}).Where("ID = ?", submissionID).Update("approved", nil).Error, 
@@ -333,7 +454,12 @@ func TestUpdateSubmissionStatus(t *testing.T) {
 			return
 		}
 		t.Run("Disapprove", func(t *testing.T) {
-			assert.NoError(t, updateSubmissionStatus(false, submissionID), "status update should not error")
+			assert.NoError(t, updateSubmissionStatusHelper(false, submissionID), "status update should not error")
+			submission := &Submission{}
+			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
+				return
+			}
+			assert.Equal(t, false, submission.Approved, "Submission status not updated properly")
 		})
 	})
 }
