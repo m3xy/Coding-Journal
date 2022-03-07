@@ -7,6 +7,7 @@
 import React from "react"
 import { Dropdown } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
+import JwtService from "../../../Web/jwt.service"
 
 const LoggedInDropdown = ({user}) => {
 	const navigate = useNavigate()
