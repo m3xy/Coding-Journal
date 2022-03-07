@@ -131,16 +131,16 @@ function Navigation() {
 							<Modal.Title>
 								Search submissions, authors, tags...
 							</Modal.Title>
-							<Modal.Body>{searchForm}</Modal.Body>
 						</Modal.Header>
+						<Modal.Body>{searchForm}</Modal.Body>
 					</Modal>
 				</Nav>
 
 				{user !== null ? (
 					/* Logged in component - Full Name with drop-down Menu */
 					!loading ? (
-						<Dropdown id="user-nav-dropdown">
-							<Dropdown.Toggle as={loginToggle}>
+						<Dropdown>
+							<Dropdown.Toggle>
 								{user.firstName + " " + user.lastName}
 							</Dropdown.Toggle>
 							<Dropdown.Menu variant="dark" align="end">
