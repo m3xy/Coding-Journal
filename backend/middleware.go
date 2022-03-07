@@ -11,8 +11,8 @@ const (
 
 // request context object for logged in users
 type RequestContext struct {
-	ID string 
-	UserType int
+	ID string `validate:"required"`
+	UserType int `validate:"required"`
 }
 
 // Middleware for user authentication and security key verification.
@@ -37,7 +37,6 @@ func jwtMiddleware(next http.Handler) http.Handler {
 					ID: id,
 					UserType: userType,
 				})
-
 				next.ServeHTTP(w, r.WithContext(ctx))
 			} else {
 				next.ServeHTTP(w, r)

@@ -134,7 +134,11 @@ func TestUploadSubmission(t *testing.T) {
 				return false
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", globalAuthors[0].ID)))
+			ctx := context.WithValue(req.Context(), "data", RequestContext{
+				ID: globalAuthors[0].ID,
+				UserType: globalAuthors[0].UserType,
+			})
+			router.ServeHTTP(w, req.WithContext(ctx))
 			resp := w.Result()
 
 			// Check success and response.
@@ -180,7 +184,11 @@ func TestUploadSubmission(t *testing.T) {
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			if authed {
-				router.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), "userId", globalAuthors[0].ID)))
+				ctx := context.WithValue(req.Context(), "data", RequestContext{
+					ID: globalAuthors[0].ID,
+					UserType: globalAuthors[0].UserType,
+				})
+				router.ServeHTTP(w, req.WithContext(ctx))
 			} else {
 				router.ServeHTTP(w, req)
 			}

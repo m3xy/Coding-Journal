@@ -111,11 +111,20 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 	// parses the Json request body into a submission struct
 	resp := UploadSubmissionResponse{}
 	reqBody := UploadSubmissionBody{}
+
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		resp.Message = "Incorrect submission fields."
 		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
-	} else if r.Context().Value("userId") == nil {
+
+	// gets context struct
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		log.Printf("[ERROR] Could not validate request body")
+		resp.Message = "Request body could not be validated."
+		resp.Error = true
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if (ctx.UserType != USERTYPE_PUBLISHER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER) {
 		// User is not validated - error out.
 		resp.Message = "The client is unauthorized from making this query."
 		resp.Error = true
