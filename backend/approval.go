@@ -37,38 +37,26 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
 	submissionID := uint(submissionID64)
 	if err != nil {
-		log.Printf("[ERROR] Could not parse submission id from URL parameters")
 		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct
-	} else if reqContext, ok := r.Context().Value("data").(RequestContext); !ok {
-		log.Printf("[ERROR] Could not get context struct")
-		resp = &StandardResponse{Message: "Unable to get request context.", Error: true}
-		w.WriteHeader(http.StatusInternalServerError)
+	// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
 
 	// decodes request body
 	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil {
-		log.Printf("[ERROR] Could not decode request body")
 		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
 	// validates reqBody format
 	} else if err := validate.Struct(reqBody); err != nil {
-		log.Printf("[ERROR] Could not validate request body")
 		resp = &StandardResponse{Message: "Request body could not be validated.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// checks that the client is logged in
-	} else if reqContext.ID == "" {
-		// User is not validated - error out.
-		log.Printf("[ERROR] Client is not logged in")
-		resp = &StandardResponse{Message: "Must be logged in to make this query.", Error: true}
-		w.WriteHeader(http.StatusUnauthorized)
-
 	// checks that the client has the proper permisssions
-	} else if reqContext.UserType != USERTYPE_REVIEWER && reqContext.UserType != USERTYPE_REVIEWER_PUBLISHER {
-		log.Printf("[ERROR] Client does not have the correct permissions for this request")
+	} else if ctx.UserType != USERTYPE_REVIEWER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER {
 		resp = &StandardResponse{Message: "The client must have reviewer permissions to upload a review.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
@@ -76,7 +64,7 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// builds review to add now that all fields have been validated
 		review := &Review{
-			ReviewerID: reqContext.ID,
+			ReviewerID: ctx.ID,
 			Approved: reqBody.Approved,
 			Base64Value: reqBody.Base64Value,
 		}
@@ -84,12 +72,10 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 		if err := addReview(review, submissionID); err != nil {
 			switch err.(type) {
 			case *NotReviewerError:
-				log.Printf("[ERROR] %v\n", err.Error())
 				resp = &StandardResponse{Message: "User is not a reviewer", Error: true}
 				w.WriteHeader(http.StatusUnauthorized)
 
 			case *DuplicateReviewError:
-				log.Printf("[ERROR] %v\n", err.Error())
 				resp = &StandardResponse{Message: "Reviewers can only upload one review each.", Error: true}
 				w.WriteHeader(http.StatusBadRequest)
 
@@ -105,7 +91,6 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		return
 	} else if !resp.Error {
 		log.Print("[INFO] uploadReview request successful\n")
 	}

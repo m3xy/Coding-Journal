@@ -156,7 +156,6 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		return
 	} else if !resp.Error {
 		log.Print("[INFO] uploadSubmission request successful\n")
 	}
