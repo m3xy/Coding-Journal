@@ -119,14 +119,14 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct
+		// gets context struct
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		log.Printf("[ERROR] Could not validate request body")
 		resp.Message = "Request body could not be validated."
 		resp.Error = true
 		w.WriteHeader(http.StatusUnauthorized)
 
-	} else if (ctx.UserType != USERTYPE_PUBLISHER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER) {
+	} else if ctx.UserType != USERTYPE_PUBLISHER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER {
 		// User is not validated - error out.
 		resp.Message = "The client is unauthorized from making this query."
 		resp.Error = true
@@ -176,25 +176,98 @@ func ControllerUploadSubmission(body UploadSubmissionBody) (uint, error) {
 			return 0, err
 		}
 	}
+	submission := adaptBodyToSubmission(&body)
+
+	if submissionID, err := addSubmission(submission); err != nil {
+		return 0, err
+	} else {
+		return submissionID, nil
+	}
+}
+
+// Adapt an upload submission body to a submission structure.
+func adaptBodyToSubmission(b *UploadSubmissionBody) *Submission {
 	authors, reviewers, categories := []GlobalUser{}, []GlobalUser{}, []Category{}
-	for _, author := range body.Authors {
+	for _, author := range b.Authors {
 		authors = append(authors, GlobalUser{ID: author})
 	}
-	for _, reviewer := range body.Reviewers {
+	for _, reviewer := range b.Reviewers {
 		reviewers = append(reviewers, GlobalUser{ID: reviewer})
 	}
-	for _, category := range body.Tags {
+	for _, category := range b.Tags {
 		categories = append(categories, Category{Tag: category})
 	}
-	submission := &Submission{
-		Name: body.Name, License: body.License,
-		Files: body.Files, Categories: categories,
+	return &Submission{
+		Name: b.Name, License: b.License,
+		Files: b.Files, Categories: categories,
 		Authors: authors, Reviewers: reviewers,
 		MetaData: &SubmissionData{
 			Abstract: "test abstract",
 		},
 	}
+}
 
+// Router function to upload new submissions by a Zip file with the file contents.
+func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
+	resp := UploadSubmissionResponse{}
+	reqBody := UploadSubmissionByZipBody{}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		resp.Message = "Incorrect submission fields"
+		resp.Error = true
+		w.WriteHeader(http.StatusBadRequest)
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok ||
+		validate.Struct(ctx) != nil {
+		resp.Message = "The client is unauthorized from making such request - not logged in."
+		resp.Error = true
+		w.WriteHeader(http.StatusUnauthorized)
+	} else if ut := ctx.UserType; ut != USERTYPE_PUBLISHER && ut != USERTYPE_REVIEWER_PUBLISHER {
+		resp.Message = "The client is unauthorized from making such request - not a publisher."
+		resp.Error = true
+		w.WriteHeader(http.StatusUnauthorized)
+	} else if submissionID, err := ControllerUploadSubmissionByZip(&reqBody); err != nil {
+		switch err.(type) {
+		case validator.ValidationErrors:
+			resp.Message = fmt.Sprintf("Bad fields inserted - %v", err.(validator.ValidationErrors).Error())
+			w.WriteHeader(http.StatusBadRequest)
+		case *WrongPermissionsError:
+			resp.Message = fmt.Sprintf("User %s does not have valid permissions.", err.(*WrongPermissionsError).userID)
+			w.WriteHeader(http.StatusUnauthorized)
+		case *BadUserError:
+			resp.Message = fmt.Sprintf("User %s does not exist in the system.", err.(*BadUserError).userID)
+			w.WriteHeader(http.StatusUnauthorized)
+		default:
+			resp.Message = "Internal server error - Undisclosed."
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		resp.Error = true
+	} else {
+		resp.Message = "Submission creation successful!"
+		resp.SubmissionID = submissionID
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] Error formatting response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller for the UploadSubmissionByZip POST route.
+func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error) {
+	if r == nil {
+		return 0, errors.New("Submission is empty")
+	}
+	files, err := getFileArrayFromZipBase64(r.ZipBase64Value)
+	if err != nil {
+		return 0, err
+	}
+
+	submission := adaptBodyToSubmission(&UploadSubmissionBody{
+		Name: r.Name, License: r.License,
+		Authors: r.Authors, Reviewers: r.Reviewers,
+		Abstract: r.Abstract, Tags: r.Tags,
+		Files: files,
+	})
 	if submissionID, err := addSubmission(submission); err != nil {
 		return 0, err
 	} else {
