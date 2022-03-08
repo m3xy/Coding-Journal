@@ -16,7 +16,6 @@ import "./App.css"
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom"
 import { Container } from "react-bootstrap"
 import {
-	Navigation,
 	Login,
 	Register,
 	About,
@@ -28,6 +27,7 @@ import {
 	Comment,
 	Submissions
 } from "../Pages"
+import Navigation from "../Components/Navbar"
 import HomePage from "../Pages/HomePage/HomePage"
 
 function App() {
