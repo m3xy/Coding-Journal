@@ -423,39 +423,63 @@ func TestUpdateSubmissionStatusHelper(t *testing.T) {
 		return
 	}
 
+	// resets the submission's approval status to nil and uploads a new review with status given as a parameter
+	resetSubmission := func(approved bool) {		
+		// resets the submission status and reviews
+		if !assert.NoError(t, gormDb.Model(&Submission{}).Where("ID = ?", submissionID).Update("approved", nil).Error, 
+			"Error while resetting submission status") {
+			return
+		}
+		// resets metadata file and hence reviews
+		if !assert.NoError(t, addMetaData(&submission), "could not reset reviews") {
+			return
+		}
+		// adds the reviewers review to the submission
+		review := &Review{
+			ReviewerID: globalReviewers[0].ID,
+			Approved: approved,
+			Base64Value: "test",
+		}
+		if !assert.NoError(t, addReview(review, submissionID), "Review Addition shouldn't error!") {
+			return
+		}
+	}
+
 	// runs first so that there are no uploaded reviews
 	t.Run("Update status missing reviews", func(t *testing.T) {
 		assert.Error(t, updateSubmissionStatusHelper(true, submissionID), "no error for updating submission status of unreviewed submission")
 	})
 
 	t.Run("Update status valid", func(t *testing.T) {
-		// adds the reviewers review to the submission
-		validReview := &Review{
-			ReviewerID: globalReviewers[0].ID,
-			Approved: true,
-			Base64Value: "test",
-		}
-		if !assert.NoError(t, addReview(validReview, submissionID), "Review Addition shouldn't error!") {
-			return
-		}
-
-		t.Run("Approve", func(t *testing.T) {
+		t.Run("Approve Valid", func(t *testing.T) {
+			resetSubmission(true)
 			assert.NoError(t, updateSubmissionStatusHelper(true, submissionID), "status update should not error")
 			submission := &Submission{}
 			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
 				return
 			}
 			assert.Equal(t, true, submission.Approved, "Submission status not updated properly")
-
 		})
-		// resets the submission status
-		if !assert.NoError(t, gormDb.Model(&Submission{}).Where("ID = ?", submissionID).Update("approved", nil).Error, 
-			"Error while resetting submission status") {
-			return
-		}
+
+		t.Run("Approve Invalid", func(t *testing.T) {
+			resetSubmission(false)
+			assert.Error(t, updateSubmissionStatusHelper(true, submissionID), "should not be able to approve submission with disapproving reviews")
+		})
+
 		t.Run("Disapprove", func(t *testing.T) {
+			// with approving reviews
+			// resetSubmission(true)
 			assert.NoError(t, updateSubmissionStatusHelper(false, submissionID), "status update should not error")
 			submission := &Submission{}
+			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
+				return
+			}
+			assert.Equal(t, false, submission.Approved, "Submission status not updated properly")
+
+			// with disapproving reviews
+			resetSubmission(false) 
+			assert.NoError(t, updateSubmissionStatusHelper(false, submissionID), "status update should not error")
+			submission = &Submission{}
 			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
 				return
 			}
