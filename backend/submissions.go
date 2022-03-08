@@ -416,7 +416,9 @@ func addMetaData(s *Submission) error {
 		return err
 	} else {
 		defer f.Close()
-		if err := json.NewEncoder(f).Encode(s.MetaData); err != nil {
+		if err := f.Truncate(0); err != nil {
+			return err
+		} else if err := json.NewEncoder(f).Encode(s.MetaData); err != nil {
 			return err
 		}
 	}

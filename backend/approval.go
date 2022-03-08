@@ -71,11 +71,7 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusUnauthorized)
 
-			case *DuplicateReviewError:
-				resp = &StandardResponse{Message: err.Error(), Error: true}
-				w.WriteHeader(http.StatusBadRequest)
-
-			case *SubmissionApprovedError:
+			case *DuplicateReviewError, *SubmissionApprovedError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusBadRequest)
 
@@ -131,7 +127,7 @@ func updateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 		// changes the submission status
 		if err := updateSubmissionStatusHelper(reqBody.Status, submissionID); err != nil {
 			switch err.(type) {
-			case *MissingReviewsError:
+			case *MissingReviewsError, *MissingApprovalError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusConflict)
 
@@ -211,18 +207,20 @@ func updateSubmissionStatusHelper(status bool, submissionID uint) error {
 	if err != nil {
 		return err
 	}
-	// checks that all reviewers have uploaded reviews (O(n^2) here but number of reviewers is small)
-	var seenReviewer bool
+
+	// maps reviewer ID to review approval status
+	reviews := make(map[string]bool)
+	for _, review := range submission.MetaData.Reviews {
+		reviews[review.ReviewerID] = review.Approved
+	}
+	// checks that each reviewer has submitted a review
 	for _, reviewer := range submission.Reviewers {
-		seenReviewer = false
-		for _, review := range submission.MetaData.Reviews {
-			if reviewer.ID == review.ReviewerID {
-				seenReviewer = true
-				break
-			}
-		}
-		if !seenReviewer {
+		// all reviewers must submit reviews before the submission status is changed
+		if approved, ok := reviews[reviewer.ID]; !ok {
 			return &MissingReviewsError{SubmissionID: submissionID}
+		// cannot approve a submission if any reviewer has not yet approved it
+		} else if !approved && status {
+			return &MissingApprovalError{SubmissionID: submissionID}
 		}
 	}
 	// updates the submission to be approved/dissaproved

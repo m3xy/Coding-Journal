@@ -57,12 +57,18 @@ type SubmissionApprovedError struct {
 
 func (e *SubmissionApprovedError) Error() string { return fmt.Sprintf("Cannot upload review to already approved submission: %d", e.SubmissionID) }
 
-// handle case where an editor tries to approve a submission without all reviews being submitted first
+// handle case where an editor tries to change status of a submission without all reviews being submitted first
 type MissingReviewsError struct {
 	SubmissionID uint
 }
-
 func (e *MissingReviewsError) Error() string { return fmt.Sprintf("Cannot change status of submission: %d as it is missing reviews", e.SubmissionID) }
+
+// handle case where an editor tries to approve a submission without all reviews being approving reviews
+type MissingApprovalError struct {
+	SubmissionID uint
+}
+func (e *MissingApprovalError) Error() string { return fmt.Sprintf("Cannot change status of submission: %d as not all reviewers approve", e.SubmissionID) }
+
 
 // Handle duplicate files.
 type DuplicateFileError struct {
