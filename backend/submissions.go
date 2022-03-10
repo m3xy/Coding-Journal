@@ -210,11 +210,12 @@ func adaptBodyToSubmission(b *UploadSubmissionBody) *Submission {
 
 // Router function to upload new submissions by a Zip file with the file contents.
 func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
-	resp := UploadSubmissionResponse{}
-	reqBody := UploadSubmissionByZipBody{}
+	log.Print("[INFO] POST Upload Submission started")
+	var resp UploadSubmissionResponse
+	var reqBody UploadSubmissionByZipBody
 
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		resp.Message = "Incorrect submission fields"
+		resp.Message = "Could not decode body to correct format - " + err.Error()
 		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok ||
@@ -256,7 +257,11 @@ func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
 // Controller for the UploadSubmissionByZip POST route.
 func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error) {
 	if r == nil {
+		log.Printf("[WARN] Empty body given - returning.")
 		return 0, errors.New("Submission is empty")
+	}
+	if err := validate.Struct(r); err != nil {
+		return 0, err
 	}
 	files, err := getFileArrayFromZipBase64(r.ZipBase64Value)
 	if err != nil {
@@ -341,17 +346,11 @@ func addSubmission(submission *Submission) (uint, error) {
 	if submission == nil {
 		return 0, errors.New("Submission is empty.")
 	}
-	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+	err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Database operations
 		categories := submission.Categories
 		submission.Categories = []Category{}
-		if err := tx.Omit(clause.Associations).Create(submission).Error; err != nil {
-			return err
-		} else if err := addAuthors(tx, submission.Authors, submission.ID); err != nil {
-			return err
-		} else if err := addReviewers(tx, submission.Reviewers, submission.ID); err != nil {
-			return err
-		} else if err := tx.Model(&submission).Association("Categories").Append(categories); err != nil {
+		if err := createSubmissionToDb(tx, categories, submission); err != nil {
 			return err
 		}
 
@@ -364,18 +363,34 @@ func addSubmission(submission *Submission) (uint, error) {
 		// Add files and metadata to the system.
 		if err := addFiles(tx, submission); err != nil {
 			return err
-		} else if err := addMetaData(submission); err != nil {
+		}
+		if err := addMetaData(submission); err != nil {
 			return err
 		}
 		return nil
-	}); err != nil {
-		// An error has occured - db has rolled back, now filesystem is rolled back.
-		if submission != nil {
-			_ = os.RemoveAll(getSubmissionDirectoryPath(*submission))
-		}
+	})
+	if err != nil {
+		_ = os.RemoveAll(getSubmissionDirectoryPath(*submission))
 		return 0, err
 	}
 	return submission.ID, nil
+}
+
+// Add submission's clauses to a submission.
+func createSubmissionToDb(tx *gorm.DB, categories []Category, submission *Submission) error {
+	if err := tx.Omit(clause.Associations).Create(submission).Error; err != nil {
+		return err
+	}
+	if err := addAuthors(tx, submission.Authors, submission.ID); err != nil {
+		return err
+	}
+	if err := addReviewers(tx, submission.Reviewers, submission.ID); err != nil {
+		return err
+	}
+	if err := tx.Model(&submission).Association("Categories").Append(categories); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Add collection of files to a new submission.

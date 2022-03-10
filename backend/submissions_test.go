@@ -12,6 +12,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +25,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm/clause"
+)
+
+const (
+	TEST_ZIP_PATH = "../testing/test.zip"
 )
 
 // data to use in the tests
@@ -555,5 +560,70 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	t.Run("Invalid Submission ID", func(t *testing.T) {
 		_, err := getSubmissionMetaData(400)
 		assert.Errorf(t, err, "No error was thrown for invalid submission")
+	})
+}
+
+// Test RouteUploadSubmissionByZip - executes similarly to UploadSubmission,
+// with zip file instead of file array.
+func TestRouteUploadSubmissionByZip(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	authors, _, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+
+	// Create mux router, give handler, and valid context.
+	route := ENDPOINT_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
+	router := mux.NewRouter()
+	router.HandleFunc(route, PostUploadSubmissionByZip)
+	reqCtx := RequestContext {
+		ID: authors[0].ID,
+		UserType: authors[0].UserType,
+	}
+
+	t.Run("Valid decoded zip file", func (t *testing.T) {
+		// Get test Zip file's base 64 value.
+		content, err := ioutil.ReadFile(TEST_ZIP_PATH)
+		if !assert.NoErrorf(t, err, "Zip file failed to open: %v", err) {
+			return
+		}
+
+		// Valid Zip file for a submission
+		testFileZipSubmission := UploadSubmissionByZipBody{
+			Name: "Test",
+			Authors: []string{authors[0].ID},
+			Tags: []string{"testtag"},
+			ZipBase64Value: base64.URLEncoding.EncodeToString(content),
+		}
+
+		// Send request body and get response.
+		reqBody, err := json.Marshal(testFileZipSubmission)
+		if !assert.NoErrorf(t, err, "JSON marshalling shouldn't error.") {
+			return
+		}
+		req := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		ctx := context.WithValue(req.Context(), "data", reqCtx)
+		RequestLoggerMiddleware(router).ServeHTTP(w, req.WithContext(ctx))
+		res := w.Result()
+
+		// Check result
+		var body UploadSubmissionResponse
+		switch {
+		case !assert.NoError(t, json.NewDecoder(res.Body).Decode(&body), "Response is not under the right format"),
+		!assert.Equalf(t, http.StatusOK, res.StatusCode, "Should succeed, but got \"%s\"", body.Message):
+			return
+		}
+	})
+
+	t.Run("Empty Zip content", func (t *testing.T) {
+	})
+
+	t.Run("Invalid body", func (t *testing.T) {
+	})
+
+	t.Run("Illegal file paths", func (t *testing.T) {
 	})
 }

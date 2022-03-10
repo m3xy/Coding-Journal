@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
+	"time"
 )
 
 const (
@@ -43,5 +45,47 @@ func jwtMiddleware(next http.Handler) http.Handler {
 			}
 		}
 		return
+	})
+}
+
+// Struct and implementation for logger's response writer.
+type StatusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+func (sw *StatusResponseWriter) WriteHeader (statusCode int) {
+	sw.statusCode = statusCode
+	sw.ResponseWriter.WriteHeader(statusCode)
+}
+
+// Logged for incoming requests.
+// Format: user user_type [method] [time] [code] host path query
+func RequestLoggerMiddleware (next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		user, usertype := "-", "-"
+		if  ctx, ok := r.Context().Value("data").(RequestContext);
+		ok && validate.Struct(ctx) == nil {
+			user = ctx.ID
+			userMap := map[int]string {0: "user", 1: "publisher", 2: "reviewer",
+			3: "reviewer-publisher", 4: "editor"}
+			usertype = userMap[ctx.UserType]
+		}
+
+		// Create response writer with given status.
+		sw := &StatusResponseWriter{
+			ResponseWriter: w,
+			statusCode: http.StatusOK,
+		}
+
+		// Log the request's final result.
+		defer func() {
+			log.Printf("%s %v [%s] [%v] [%d] %s %s %s",
+				user, usertype,
+				r.Method, time.Since(start), sw.statusCode,
+				r.Host, r.URL.Path, r.URL.RawQuery,
+			)
+		}()
+		next.ServeHTTP(sw, r)
 	})
 }

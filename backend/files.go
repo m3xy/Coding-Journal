@@ -273,16 +273,18 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 	if err != nil {
 		return nil, err
 	} else if reader, err = zip.OpenReader(zipPath); err != nil {
-		os.Remove(zipPath)
+		log.Printf("[ERROR] Failed to open reader for zip file - %v", err)
+		// os.Remove(zipPath)
 		return nil, err
 	}
-	defer os.Remove(zipPath)
+	// defer os.Remove(zipPath)
 	defer reader.Close()
 
 	files := make([]File, len(reader.File))
 	for i, file := range reader.File {
 		rc, err := file.Open()
 		if err != nil {
+			log.Printf("[ERROR] Failed to open file contained in the zip - %v", err)
 			return nil, err
 		}
 		buf := new(bytes.Buffer)
@@ -298,21 +300,25 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 
 // Unzip a file to some temporary folder. Returns folder path.
 func TmpStoreZip(base64value string) (string, error) {
-	if err := validate.Var(base64value, "base64"); err != nil {
-		return "", errors.New("argument given must be base 64")
-	}
+	zipBytes, err := base64.URLEncoding.DecodeString(base64value)
 
-	zipBytes, _ := base64.URLEncoding.DecodeString(base64value)
+	if err != nil {
+		log.Printf("[ERROR] Base 64 value given is invalid/corrupt.")
+		return "", err
+	}
 	f, err := os.CreateTemp("/tmp", "*.zip")
 	if err != nil {
 		log.Printf("[ERROR] Cannot create temp file! %v", err)
 		return "", err
 	}
+	defer f.Close()
 	path := f.Name()
 	writer := bufio.NewWriter(f)
 	if _, err = writer.Write(zipBytes); err != nil {
+		log.Printf("[ERROR] ZIP file creation failed: %v", err)
 		goto ROLLBACK
 	}
+	log.Printf("[INFO] Created ZIP file at path %s", path)
 	return path, nil
 
 ROLLBACK:
