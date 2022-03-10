@@ -50,12 +50,12 @@ func (e *DuplicateReviewError) Error() string {
 	return fmt.Sprintf("Reviewer %s submitted multiple reviews for submission %d", e.UserID, e.SubmissionID)
 }
 
-// handles case where a review is uploaded to an already approved submission
-type SubmissionApprovedError struct {
+// handles case where a review is uploaded or reviewer is assigned to an already approved submission
+type SubmissionStatusFinalisedError struct {
 	SubmissionID uint
 }
 
-func (e *SubmissionApprovedError) Error() string { return fmt.Sprintf("Cannot upload review to already approved submission: %d", e.SubmissionID) }
+func (e *SubmissionStatusFinalisedError) Error() string { return fmt.Sprintf("Cannot perform this action on approved/disapproved submission: %d", e.SubmissionID) }
 
 // handle case where an editor tries to change status of a submission without all reviews being submitted first
 type MissingReviewsError struct {

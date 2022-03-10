@@ -67,6 +67,11 @@ type UploadSubmissionBody struct {
 	Files     []File   `json:"files"`
 }
 
+// POST /submission/{id}/assignreviewers
+type AssignReviewersBody struct {
+	Reviewers []string `json:"reviewers" validate:"min=1"`
+}
+
 // POST /submission/{id}/review
 type UploadReviewBody struct {
 	Approved bool `json:"approved" validate:"required"`

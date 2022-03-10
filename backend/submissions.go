@@ -56,8 +56,9 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submissions/create - Create a submission.
 	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
-	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, uploadReview).Methods(http.MethodPost, http.MethodOptions)
-	submissions.HandleFunc("/{id}"+ENDPOINT_APPROVE, updateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc("/{id}"+ENDPOINT_APPROVE, RouteAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, RouteUploadReview).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc("/{id}"+ENDPOINT_APPROVE, RouteUpdateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ------
