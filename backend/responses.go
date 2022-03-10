@@ -83,6 +83,17 @@ type UpdateSubmissionStatusBody struct {
 	Status bool `json:"status" validate:"required"`
 }
 
+// POST /submissions/upload/zip
+type UploadSubmissionByZipBody struct {
+	Name		   string	`json:"name" validate:"required"`
+	License		   string	`json:"license"`
+	Abstract	   string	`json:"abstract"`
+	Tags		   []string `json:"tags"`
+	Authors		   []string `json:"authors" validate:"required"`
+	Reviewers	   []string `json:"reviewers"`
+	ZipBase64Value string	`json:"zipBase64" validate:"base64"`
+}
+
 // --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`
