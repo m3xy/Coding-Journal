@@ -327,6 +327,38 @@ interface GlobalUser {
 
 ## Approval
 
+### Assigning Reviewers 
+
+Editor assigns reviewers to a given submission
+
+1. Endpoint
+
+    The endpoint to upload a review is **POST** `/submission/{id}/assignreviewers` where ID is the submission ID as a uint
+
+2. Request
+
+    1. Headers 
+
+    2. Body - the request body is shown below
+
+```typescript
+interface AssignReviewersBody {
+    Reviewers: []string
+}
+```
+
+3. Response
+
+    1. Status:
+
+        - 200 - if the request fully succeeds
+        - 400 - if the request is malformatted or one of the given userIDs does not have reviewer permissions
+        - 401 - if the client does not have editor permissions
+        - 409 - if the submission status has been finalised (i.e. approved/dissaproved)
+        - 500 - unexpected error
+
+    2. Body:
+
 ### Review Upload
 
 Uploads a review for a given reviewer of a submission
@@ -355,7 +387,7 @@ interface UploadReviewBody {
         - 200 - everything happened as expected
         - 400 - fields missing from request body, bad formatting, or duplicate review upload
         - 401 - user is not logged in or registered as a reviewer for the given submission
-        - 500 - any other miscellaneous errors
+        - 500 - unexpected error
 
     2. Body:
 

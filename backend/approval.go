@@ -15,10 +15,12 @@ import (
 	"net/http"
 	"strconv"
 
+	"gorm.io/gorm"
 	"github.com/gorilla/mux"
 )
 
 const (
+	ENDPOINT_ASSIGN_REVIEWERS = "/assignreviewers"
 	ENPOINT_REVIEW = "/review"
 	ENDPOINT_APPROVE = "/approve"
 )
@@ -27,9 +29,70 @@ const (
 // Router Functions
 // ------------
 
+// router function to allow journal editors to assign reviewers to a given submission
+// uses addReviewers in submissions.go
+func RouteAssignReviewers(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] AssignReviewers request received from %v", r.RemoteAddr)
+	resp := &StandardResponse{}
+	reqBody := &AssignReviewersBody{}
+
+	// gets the submission ID from the vars and user details from request context
+	params := mux.Vars(r)
+	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
+	submissionID := uint(submissionID64)
+	if err != nil {
+		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	// checks that the client has the proper permisssions (i.e. is an editor)
+	} else if ctx.UserType != USERTYPE_EDITOR {
+		resp = &StandardResponse{Message: "The client must have editor permissions to assign reviewers.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	// decodes request body and validates it
+	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
+		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// adds reviewers and handles error cases
+	} else {
+		if err := assignReviewers(reqBody.Reviewers, submissionID); err != nil {
+			switch err.(type) {
+			// one of the reviewers is not registered as a user, or does not have proper permissions
+			case *BadUserError, *WrongPermissionsError: 
+				resp = &StandardResponse{Message: err.Error(), Error: true}
+				w.WriteHeader(http.StatusBadRequest)
+
+			case *SubmissionStatusFinalisedError:
+				resp = &StandardResponse{Message: err.Error(), Error: true}
+				w.WriteHeader(http.StatusConflict)
+
+			default: // Unexpected error - error out as server error.
+				log.Printf("[ERROR] could not change submission status: %v\n", err)
+				resp = &StandardResponse{Message: "Internal Server Error - could not change submission status", Error: true}
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+	}
+
+	// Return response body after function successful.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if !resp.Error {
+		log.Print("[INFO] AssignReviewers request successful\n")
+	}
+}
+
+
 // router function for reviewer review upload
-func uploadReview(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] uploadReview request received from %v", r.RemoteAddr)
+func RouteUploadReview(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] RouteUploadReview request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &UploadReviewBody{}
 
@@ -71,7 +134,7 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusUnauthorized)
 
-			case *DuplicateReviewError, *SubmissionApprovedError:
+			case *DuplicateReviewError, *SubmissionStatusFinalisedError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusBadRequest)
 
@@ -88,13 +151,13 @@ func uploadReview(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if !resp.Error {
-		log.Print("[INFO] uploadReview request successful\n")
+		log.Print("[INFO] RouteUploadReview request successful\n")
 	}
 }
 
 
 // router function for updating submission status
-func updateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
+func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] updateSubmissionStatus request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &UpdateSubmissionStatusBody{}
@@ -125,7 +188,7 @@ func updateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	// adds review and handles error cases
 	} else {
 		// changes the submission status
-		if err := updateSubmissionStatusHelper(reqBody.Status, submissionID); err != nil {
+		if err := updateSubmissionStatus(reqBody.Status, submissionID); err != nil {
 			switch err.(type) {
 			case *MissingReviewsError, *MissingApprovalError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
@@ -153,6 +216,27 @@ func updateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 // Helper Functions
 // ------------
 
+func assignReviewers(reviewerIDs []string, submissionID uint) error {
+	// builds array of reviewers
+	reviewers := make([]GlobalUser, len(reviewerIDs))
+	for i, reviewerID := range reviewerIDs {
+		reviewers[i] = GlobalUser{ ID: reviewerID }
+	}
+	// begins a transaction and checks that the submission has not been approved or disapproved yet
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		submission := &Submission{}
+		if err := tx.Model(&Submission{}).Select("approved").Find(&submission, submissionID).Error; err != nil {
+			return err
+		} else if submission.Approved != nil {
+			return &SubmissionStatusFinalisedError{SubmissionID: submissionID}
+		}
+		return addReviewers(tx, reviewers, submissionID)
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 // adds a review to a given submission's metadata 
 // 
 // Params:
@@ -168,8 +252,8 @@ func addReview(review *Review, submissionID uint) error {
 	}
 
 	// checks that the given submission has not been approved yet (as approved submissions cannot have new reviews submitted)
-	if submission.Approved == true {
-		return &SubmissionApprovedError{SubmissionID: submissionID}
+	if submission.Approved != nil && *submission.Approved == true {
+		return &SubmissionStatusFinalisedError{SubmissionID: submissionID}
 	}
 	// checks that the reviewer is assigned to the given submission (implicitly checks usertype)
 	isReviewer := false
@@ -201,7 +285,7 @@ func addReview(review *Review, submissionID uint) error {
 // 	submissionID (uint) : the submissions unique ID
 // Return:
 // 	(error) : an error if one occurs, nil otherwise
-func updateSubmissionStatusHelper(status bool, submissionID uint) error {
+func updateSubmissionStatus(status bool, submissionID uint) error {
 	// checks that all of the submission's reviewers have uploaded reviews
 	submission, err := getSubmission(submissionID)
 	if err != nil {

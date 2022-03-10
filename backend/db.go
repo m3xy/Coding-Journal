@@ -85,7 +85,8 @@ type Submission struct {
 	Name string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
 	// license which the code is published under
 	License string `gorm:"size:64" json:"license" validate:"max=118"`
-	Approved bool `json:"approved" gorm:"default:"NULL"`
+	// pointer to allow nil values as neither approved nor dissaproved
+	Approved *bool `json:"approved" gorm:"default:"NULL"`
 	// an array of the submission's files
 	Files []File `json:"files,omitempty" validate:"dive"`
 	// an array of the submissions's authors
