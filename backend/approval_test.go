@@ -328,7 +328,7 @@ func TestRouteUpdateSubmissionStatus(t *testing.T) {
 
 	// Create mux router
 	router := mux.NewRouter()
-	route := ENDPOINT_SUBMISSIONS+"/{id}"+ENDPOINT_APPROVE
+	route := ENDPOINT_SUBMISSIONS+"/{id}"+ENDPOINT_CHANGE_STATUS
 	router.HandleFunc(route, RouteUpdateSubmissionStatus)
 
 	// adds a submission to the db with authors and reviewers
@@ -364,7 +364,7 @@ func TestRouteUpdateSubmissionStatus(t *testing.T) {
 			return -1
 		}
 		// sends the request to upload a review
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENDPOINT_APPROVE), bytes.NewBuffer(reqBody))
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 		w := httptest.NewRecorder()
 
 		ctx := context.WithValue(req.Context(), "data", RequestContext{
@@ -417,7 +417,7 @@ func TestRouteUpdateSubmissionStatus(t *testing.T) {
 				return
 			}
 			// sends the request to upload a review
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENDPOINT_APPROVE), bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", ENDPOINT_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			assert.Equal(t, http.StatusUnauthorized, w.Result().StatusCode, "Wrong error code, was expecting 401")
