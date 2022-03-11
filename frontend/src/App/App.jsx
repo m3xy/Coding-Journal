@@ -30,12 +30,13 @@ import {
 } from "../Pages"
 import HomePage from "../Pages/HomePage/HomePage"
 
+function App() {
     return(
         <Container fluid="true">
             <Router>
                 <Navigation />
                 <Routes>
-                    <Route path="/" element = {<Home />} />
+                    <Route path="/" element = {<HomePage />} />
                     <Route path="/login" element = {<Login />} />
                     <Route path="/register" element = {<Register />} />
                     <Route path="/about" element = {<About />} />

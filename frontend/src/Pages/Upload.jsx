@@ -8,9 +8,10 @@
 import React from "react";
 import DragAndDrop from "./DragAndDrop";
 import  axiosInstance from "../Web/axiosInstance";
-import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel, Container, Row, Col, InputGroup, FormControl} from "react-bootstrap";
+import {Form, Button, Card, ListGroup, CloseButton, FloatingLabel, Container, Row, Col, InputGroup, FormControl, Tabs, Tab} from "react-bootstrap";
+import JwtService from "../Web/jwt.service"
 
-const  uploadEndpoint = '/upload'
+const  uploadEndpoint = '/submissions/create'
 
 class Upload extends React.Component {
 
@@ -31,6 +32,10 @@ class Upload extends React.Component {
         this.setSubmissionName = this.setSubmissionName.bind(this);
         this.setSubmissionAbstract = this.setSubmissionAbstract.bind(this);
         this.tagsInput = React.createRef();
+    }
+
+    componentDidMount() {
+        console.log(JwtService.getUserID());
     }
 
     dropFiles(e) {
@@ -56,12 +61,7 @@ class Upload extends React.Component {
      * @param {Array.<File>} files Submission files
      * @returns
      */
-    uploadSubmission(authors, submissionName, submissionAbstract, files) {
-
-        // if(userId === null) {
-        //     console.log("not logged in!");
-        //     return;
-        // }
+    uploadSubmission(authors, submissionName, submissionAbstract, files, categories) {
 
         console.log(authors);
         // const authorID = JSON.parse(userId).userId;  //Extract author's userId
@@ -69,10 +69,11 @@ class Upload extends React.Component {
         
         const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
             return new Promise((resolve, reject) => {
+                files[i].path = files[i].webkitRelativePath;
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = function(e) {
-                    files[i] = e.target.result;
+                    files[i].base64Value = e.target.result;
                     resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
                 }
                 reader.onerror = function() {
@@ -108,19 +109,23 @@ class Upload extends React.Component {
         Promise.all(filePromises)
                .then(() => {
                    let data = {
-                       author: authors[0],
-                       name: submissionName,
-                       content: files[0]
+                        name: submissionName,
+                        license: submissionAbstract,
+                        files: files,
+                        authors: authors,
+                        reviewers: [{userId: null}],
+                        categories: categories
                    }
                    console.log(data)
+                   console.log(data.files[0].name)
                    axiosInstance.post(uploadEndpoint, data)
                                 .then((response) => {
                                     console.log(response);
-                                    console.log("Submission ID: " + response.data["id"]);
-                                    var codePage = window.open("/code");
-                                    codePage.submissionId = response.data["id"];
-                                    codePage.submissionName = response.data["name"];
-                                    codePage.submission = files[0];
+                                    // console.log("Submission ID: " + response.data["id"]);
+                                    // var codePage = window.open("/code");
+                                    // codePage.submissionId = response.data["id"];
+                                    // codePage.submissionName = response.data["name"];
+                                    // codePage.submission = files[0];
                                 })
                                 .catch((error) => {
                                     console.log(error);
@@ -136,15 +141,7 @@ class Upload extends React.Component {
             return;
         }
 
-        let userId = null;                          //Preparing to get userId from session cookie
-        let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
-        for(let i = 0; i < cookies.length; i++){    //For each cookie,
-            let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-            if(cookie[0].trim() == "userId"){       //  If userId key exists, extract the userId value
-                userId = cookie[1].trim();
-                break;
-            }
-        }
+        let userId = JwtService.getUserID();        //Preparing to get userId
 
         if(userId === null){                        //If user has not logged in, disallow submit
             console.log("Not logged in");
@@ -163,9 +160,10 @@ class Upload extends React.Component {
         //    console.log(error);
         // });
         
-        this.state.authors.push(userId);
-        this.uploadSubmission(this.state.authors, this.state.submissionName, this.state.submissionAbstract, this.state.files);
+        this.state.authors.push({userId: userId});
+        this.uploadSubmission(this.state.authors, this.state.submissionName, this.state.submissionAbstract, this.state.files, this.state.tags);
 
+        //Clearing form
         document.getElementById("formFile").files = new DataTransfer().files;
         document.getElementById("submissionName").value = "";
         this.setState({
@@ -208,14 +206,13 @@ class Upload extends React.Component {
                 }
             }
 
+            console.log(files[i]);
             fileList.push(files[i]);
             formFileList.items.add(files[i]);
         }
         
         document.getElementById("formFile").files = formFileList.files;
-        this.setState({
-            files: fileList
-        });
+        this.setState({ files: fileList });
         
     }
 
@@ -274,47 +271,52 @@ class Upload extends React.Component {
                         <DragAndDrop handleDrop={this.handleDrop}>
                             <Card>
                                 <Form onSubmit={this.handleSubmit}>
-                                    <Card.Header className="text-center"><h5>Upload Submission</h5></Card.Header>
-                                    <Row>
-                                        <Form.Group className="mb-3" controlId="submissionName">
-                                            <Form.Label>Submission name</Form.Label>
-                                            <Form.Control type="text" placeholder="My_Submission" required onChange={this.setSubmissionName}/>
-                                        </Form.Group>
-                                        <Form.Group className="mb-3" controlId="submissionAbstract">
-                                            <Form.Label>Submission abstract</Form.Label>
-                                            <Form.Control as="textarea" rows={3} placeholder="My Abstract" required onChange={this.setSubmissionAbstract}/>
-                                        </Form.Group>
-                                    </Row>
-                                    <Row>
-                                        <Form.Group controlId="formFile" className="mb-3">
-                                            <Form.Label>Submission files</Form.Label>
-                                            <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later */}
-                                        </Form.Group>
-                                        <Card.Body>
+                                    <Card.Header className="text-center"><h5>Submission Upload</h5></Card.Header>
+                                    <Tabs justify defaultActiveKey="details" id="profileTabs" className="mb-3">
+                                        <Tab eventKey="details" title="Details">
+                                            <Row>
+                                            <Form.Group className="mb-3" controlId="submissionName">
+                                                <Form.Label>Name</Form.Label>
+                                                <Form.Control type="text" placeholder="Name" required onChange={this.setSubmissionName}/>
+                                            </Form.Group>
+                                            <Form.Group className="mb-3" controlId="submissionAbstract">
+                                                <Form.Label>Abstract</Form.Label>
+                                                <Form.Control as="textarea" rows={3} placeholder="Abstract" required onChange={this.setSubmissionAbstract}/>
+                                            </Form.Group>
+                                            </Row>
+                                            <Row>
+                                            <InputGroup className="mb-3">
+                                                <FormControl
+                                                    placeholder="Add tags here"
+                                                    aria-label="Tags"
+                                                    aria-describedby="addTag"
+                                                    ref = {this.tagsInput}
+                                                />
+                                                <Button variant="outline-secondary" id="addTag" onClick={ () => {if(this.state.tags.includes(this.tagsInput.current.value)) return; this.setState({tags:[ ...this.state.tags, this.tagsInput.current.value]}); this.tagsInput.current.value = ""} }>
+                                                Add
+                                                </Button>
+                                            </InputGroup>
+                                            <Col>
+                                                {tags}
+                                            </Col>
+                                        </Row>
+				                        </Tab>
+                                    <Tab eventKey="files" title="Files">
+                                        <Row>
+                                            <Form.Group controlId="formFile" className="mb-3">
+                                                <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later */}
+                                            </Form.Group>
+                                            <Card.Body>
 
-                                            {this.state.files.length > 0 ? (
-                                                <ListGroup>{files}</ListGroup>
-                                            ) : (
-                                                <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><br/><br/></Card.Text>
-                                            )}
-                                        </Card.Body>
-                                    </Row>
-                                    <Row>
-                                    <InputGroup className="mb-3">
-                                        <FormControl
-                                            placeholder="Add tags here"
-                                            aria-label="Tags"
-                                            aria-describedby="addTag"
-                                            ref = {this.tagsInput}
-                                        />
-                                        <Button variant="outline-secondary" id="addTag" onClick={ () => {if(this.state.tags.includes(this.tagsInput.current.value)) return; this.setState({tags:[ ...this.state.tags, this.tagsInput.current.value]}); this.tagsInput.current.value = ""} }>
-                                        Add
-                                        </Button>
-                                    </InputGroup>
-                                    <Col>
-                                        {tags}
-                                    </Col>
-                                    </Row>
+                                                {this.state.files.length > 0 ? (
+                                                    <ListGroup>{files}</ListGroup>
+                                                ) : (
+                                                    <Card.Text className="text-center" style={{color:"grey"}}><i>Drag and Drop <br/>here</i><br/><br/></Card.Text>
+                                                )}
+                                            </Card.Body>
+                                        </Row>
+                                    </Tab>
+                                    </Tabs>
                                     <Card.Footer className="text-center"><Button variant="outline-secondary" type="submit">Upload</Button>{' '}</Card.Footer>
                                 </Form>
                                 </Card>
