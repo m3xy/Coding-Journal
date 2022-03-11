@@ -594,7 +594,6 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 		testFileZipSubmission := UploadSubmissionByZipBody{
 			Name: "Test",
 			Authors: []string{authors[0].ID},
-			Tags: []string{"testtag"},
 			ZipBase64Value: base64.URLEncoding.EncodeToString(content),
 		}
 
@@ -612,18 +611,73 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 		// Check result
 		var body UploadSubmissionResponse
 		switch {
-		case !assert.NoError(t, json.NewDecoder(res.Body).Decode(&body), "Response is not under the right format"),
-		!assert.Equalf(t, http.StatusOK, res.StatusCode, "Should succeed, but got \"%s\"", body.Message):
+		case !assert.NoError(t, json.NewDecoder(res.Body).Decode(&body), "Response is not under the right format"):
+			fallthrough
+		case !assert.Equalf(t, http.StatusOK, res.StatusCode, "Should succeed, but got \"%s\"", body.Message):
 			return
+		}
+
+		// Check submission exists in database
+		var submission Submission
+		err = gormDb.Preload(clause.Associations).First(&submission, body.SubmissionID).Error
+		if !assert.NoErrorf(t, err, "Submission fetch should not fail!") {
+			return
+		}
+
+		// Check if files are in the filesystem.
+		path := getSubmissionDirectoryPath(submission)
+		for _, file := range submission.Files {
+			_, err := os.Stat(filepath.Join(path, fmt.Sprintf("%d", file.ID)))
+			if !assert.NoErrorf(t, err, "File stat shouldn't fail/ file should exist!") {
+				return
+			}
 		}
 	})
 
 	t.Run("Empty Zip content", func (t *testing.T) {
+		// Valid Zip file for a submission
+		emptyZipSubmission := UploadSubmissionByZipBody{
+			Name: "Test",
+			Authors: []string{authors[0].ID},
+		}
+
+		// Send request body and get response.
+		reqBody, err := json.Marshal(emptyZipSubmission)
+		if !assert.NoErrorf(t, err, "JSON marshalling shouldn't error.") {
+			return
+		}
+		req := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		ctx := context.WithValue(req.Context(), "data", reqCtx)
+		RequestLoggerMiddleware(router).ServeHTTP(w, req.WithContext(ctx))
+		res := w.Result()
+
+		if !assert.Equal(t, http.StatusBadRequest, res.StatusCode, "Empty zip uploads should be rejected") {
+			return
+		}
 	})
 
-	t.Run("Invalid body", func (t *testing.T) {
-	})
+	t.Run("Invalid zip", func (t *testing.T) {
+		// Valid Zip file for a submission
+		emptyZipSubmission := UploadSubmissionByZipBody{
+			Name: "Test",
+			Authors: []string{authors[0].ID},
+			ZipBase64Value: "ADbasdflADA==",
+		}
 
-	t.Run("Illegal file paths", func (t *testing.T) {
+		// Send request body and get response.
+		reqBody, err := json.Marshal(emptyZipSubmission)
+		if !assert.NoErrorf(t, err, "JSON marshalling shouldn't error.") {
+			return
+		}
+		req := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		ctx := context.WithValue(req.Context(), "data", reqCtx)
+		RequestLoggerMiddleware(router).ServeHTTP(w, req.WithContext(ctx))
+		res := w.Result()
+
+		if !assert.Equal(t, http.StatusBadRequest, res.StatusCode, "Empty zip uploads should be rejected") {
+			return
+		}
 	})
 }

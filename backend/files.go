@@ -266,7 +266,10 @@ func getFileContent(filePath string) (string, error) {
 	return string(fileData), nil
 }
 
+// Unzip a zip file into a file array, from the zip's base 64.
+// Returns the array of files.
 func getFileArrayFromZipBase64(base64value string) ([]File, error) {
+	// Decode zip to temporary file for reading.
 	var reader *zip.ReadCloser
 	zipPath, err := TmpStoreZip(base64value)
 	if err != nil {
