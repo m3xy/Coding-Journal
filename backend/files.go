@@ -24,7 +24,6 @@ package main
 
 import (
 	"archive/zip"
-	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -274,12 +273,13 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 		return nil, err
 	} else if reader, err = zip.OpenReader(zipPath); err != nil {
 		log.Printf("[ERROR] Failed to open reader for zip file - %v", err)
-		// os.Remove(zipPath)
+		os.Remove(zipPath)
 		return nil, err
 	}
-	// defer os.Remove(zipPath)
+	defer os.Remove(zipPath)
 	defer reader.Close()
 
+	// Iterate file-per-file unzip.
 	files := make([]File, len(reader.File))
 	for i, file := range reader.File {
 		rc, err := file.Open()
@@ -313,8 +313,7 @@ func TmpStoreZip(base64value string) (string, error) {
 	}
 	defer f.Close()
 	path := f.Name()
-	writer := bufio.NewWriter(f)
-	if _, err = writer.Write(zipBytes); err != nil {
+	if  err := os.WriteFile(path, zipBytes, 0666); err != nil {
 		log.Printf("[ERROR] ZIP file creation failed: %v", err)
 		goto ROLLBACK
 	}
