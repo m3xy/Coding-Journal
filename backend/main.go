@@ -92,10 +92,11 @@ func setupCORSsrv() *http.Server {
 	getUserSubroutes(router)        // Users subroutes
 	getSubmissionsSubRoutes(router) // Submissions and files routes
 
+
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
 		Addr:         PORT,
-		Handler:      c.Handler(router),
+		Handler:	  RequestLoggerMiddleware(c.Handler(router)),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
