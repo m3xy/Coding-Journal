@@ -22,7 +22,7 @@ import (
 const (
 	ENDPOINT_ASSIGN_REVIEWERS = "/assignreviewers"
 	ENPOINT_REVIEW = "/review"
-	ENDPOINT_APPROVE = "/approve"
+	ENDPOINT_CHANGE_STATUS = "/approve"
 )
 
 // ------------

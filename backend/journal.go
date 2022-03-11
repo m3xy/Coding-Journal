@@ -6,12 +6,27 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
+	"bytes"
 
 	"github.com/gorilla/mux"
 )
 
+const (
+	ENDPOINT_EXPORT_SUBMISSION = "/export" // on submissions sub-router
+)
+
+var journalURLs map[int]string = map[int]string{
+	23: "https://cs3099user23.host.cs.st-andrews.ac.uk/api/v1/supergroup",
+	5:  "cs3099user05.host.cs.st-andrews.ac.uk/api/v1/supergroup",
+	13: "https://cs3099user13.host.cs.st-andrews.ac.uk/api/v1/supergroup",
+	26: "https://cs3099user26.host.cs.st-andrews.ac.uk/api/v1/supergroup",
+	2:  "https://cs3099user02.host.cs.st-andrews.ac.uk/api/v1/supergroup",
+	20: "https://cs3099user20.host.cs.st-andrews.ac.uk/api/v1/supergroup",
+}
+
 // Set of all supergroup-appliant controllers and routes
-// Authors: 190014935
+// Authors: 190014935, 190010425
 
 func getJournalSubroute(r *mux.Router) {
 	journal := r.PathPrefix(SUBROUTE_JOURNAL).Subrouter()
@@ -64,6 +79,84 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
 }
 
+
+// router function to export submissions
+// POST /submission/{id}/export/{groupNumber}
+func RouteExportSubmission(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] ExportSubmission request received from %v", r.RemoteAddr)
+	resp := &StandardResponse{}
+
+	// gets submission ID and group number
+	params := mux.Vars(r)
+	submissionID64, err1 := strconv.ParseUint(params["id"], 10, 32)
+	submissionID := uint(submissionID64)
+	groupNumber, err2 := strconv.Atoi(params["groupNumber"])
+	if err1 != nil {
+		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+	
+	// checks that group number is valid (note that our group numbers go in intervals of 3 starting at 2 i.e. 2, 5, 8, 11...)
+	} else if _, ok := journalURLs[groupNumber]; !ok || err2 != nil {
+		resp = &StandardResponse{Message: fmt.Sprintf("Given group number: %d invalid", groupNumber), Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	// checks that the client has the proper permisssions (i.e. is an editor)
+	} else if ctx.UserType != USERTYPE_EDITOR {
+		resp = &StandardResponse{Message: "The client must have editor permissions to export submissions.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+	
+	// gets supergroup compliant submission and exports it
+	} else {
+		// gets the supergroup compliant submission
+		globalSubmission, err := localToGlobal(submissionID)
+		if err != nil {
+			switch err.(type) {
+			case *NoSubmissionError:
+				resp = &StandardResponse{Message: "Bad Request - Submission does not exist", Error: true}
+				w.WriteHeader(http.StatusBadRequest)
+			default:
+				log.Printf("[ERROR] could not export submission: %v\n", err)
+				resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}
+
+		// makes request to export the submission
+		reqBody, err := json.Marshal(globalSubmission)
+		if err != nil {
+			log.Printf("[ERROR] could not export submission: %v\n", err)
+			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		req, err := http.NewRequest(http.MethodPost, journalURLs[groupNumber]+SUBROUTE_JOURNAL+"/submission", bytes.NewBuffer(reqBody))
+		if err != nil {
+			log.Printf("[ERROR] could not export submission: %v\n", err)
+			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		globalResp, err := sendSecureRequest(gormDb, req, groupNumber)
+		if err != nil {
+			log.Printf("[ERROR] could not export submission: %v\n", err)
+			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		w.WriteHeader(globalResp.StatusCode)
+	}
+
+	// Return response body after function successful.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if !resp.Error {
+		log.Print("[INFO] AssignReviewers request successful\n")
+	}
+}
+
 // This function queries a submission in the local format from the db, and transforms
 // it into the supergroup compliant format
 //
@@ -80,7 +173,6 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 		return nil, err
 	}
 	categories := []string{}
-	fmt.Printf("%v\n", localSubmission.Categories)
 	for _, category := range localSubmission.Categories {
 		categories = append(categories, category.Tag)
 	}

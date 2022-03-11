@@ -94,7 +94,8 @@ func setForeignServers(db *gorm.DB) error {
 }
 
 // Send a given request using needed authentication.
-func sendSecureRequest(db *gorm.DB, req *http.Request, groupNb int) (*http.Response, error) {
+// defined this way to allow for mocking out the function during testing
+var sendSecureRequest = func(db *gorm.DB, req *http.Request, groupNb int) (*http.Response, error) {
 	if req == nil {
 		return nil, errors.New("Request nil!")
 	}
