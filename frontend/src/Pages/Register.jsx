@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { Form, Button, Container, Row, Col } from "react-bootstrap";
 import axiosInstance from "../Web/axiosInstance";
 import { useNavigate } from "react-router-dom";
+import JwtService from "../Web/jwt.service.js";
 import "regenerator-runtime/runtime";
 
 const registerEndpoint = "/auth/register";
@@ -19,6 +20,15 @@ function Register() {
   const [lastName, setLastName] = useState();
   const [email, setEmail] = useState();
   const [password, setPassword] = useState();
+
+	const onRegisterSuccessful = () => {
+		axiosInstance.post("/auth/login", { email: email, password: password})
+			.then((response) => {
+				JwtService.setUser(response.data.access_token, response.data.refresh_token)
+				navigate("/")
+			}).
+			catch((error) => {console.log(error); navigate("/login")})
+	}
 
   function registerUser(firstName, lastName, email, password) {
     let data = {
@@ -31,12 +41,8 @@ function Register() {
     // Send register request to backend.
     axiosInstance
       .post(registerEndpoint, data)
-      .then(() => {
-        navigate("/");
-      })
-      .catch((error) => {
-        console.log(error);
-      });
+      .then(() => { onRegisterSuccessful() })
+      .catch((error) => { console.log(error) })
   }
 
   async function handleSubmit(e) {

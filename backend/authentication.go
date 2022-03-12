@@ -22,7 +22,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"gopkg.in/validator.v2"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -112,16 +112,19 @@ func PostAuthLogIn(w http.ResponseWriter, r *http.Request) {
 func ControllerAuthLogin(credentials AuthLoginPostBody) (AuthLogInResponse, int) {
 	// Get where to fetch user from given group number.
 	var uuid string
+	var permissions int
 	if credentials.GroupNumber == TEAM_ID {
-		userID, status := GetLocalUserID(JournalLoginPostBody{Email: credentials.Email, Password: credentials.Password})
+		userID, userType, status := GetLocalUserID(JournalLoginPostBody{Email: credentials.Email, Password: credentials.Password})
 		if status != http.StatusOK {
 			return AuthLogInResponse{}, status
 		}
 		uuid = userID
+		permissions = userType
 	} else if userID, err := GetForeignUserID(credentials); err != nil {
 		return AuthLogInResponse{}, http.StatusUnauthorized
 	} else {
 		uuid = userID
+		permissions = USERTYPE_NIL
 	}
 
 	// Get tokens from successful login.
@@ -130,10 +133,10 @@ func ControllerAuthLogin(credentials AuthLoginPostBody) (AuthLogInResponse, int)
 		RedirectUrl: "/user",
 		Expires:     3600,
 	}
-	if resp.AccessToken, err = createToken(uuid, "bearer"); err != nil {
+	if resp.AccessToken, err = createToken(uuid, permissions, "bearer"); err != nil {
 		return AuthLogInResponse{}, http.StatusInternalServerError
 	}
-	if resp.RefreshToken, err = createToken(uuid, "refresh"); err != nil {
+	if resp.RefreshToken, err = createToken(uuid, permissions, "refresh"); err != nil {
 		return AuthLogInResponse{}, http.StatusInternalServerError
 	}
 	return resp, http.StatusOK
@@ -181,25 +184,36 @@ func GetForeignUserID(credentials AuthLoginPostBody) (string, error) {
 }
 
 // Get a local user ID's from the given credentials.
-func GetLocalUserID(credentials JournalLoginPostBody) (string, int) {
+func GetLocalUserID(credentials JournalLoginPostBody) (string, int, int) {
 	var user struct {
 		GlobalUserID string
 		Email        string
 		Password     string
 	}
+	// struct to get user permissions
+	var globalUser struct {
+		UserType int
+	}
+
 	res := gormDb.Model(&User{}).Limit(1).Find(&user, "Email = ?", credentials.Email)
 	switch {
 	case res.Error != nil:
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
-		return "", http.StatusInternalServerError
+		return "", -1, http.StatusInternalServerError
 	case res.RowsAffected == 0:
 		log.Printf("[WARN] User not found: %s", credentials.Email)
-		return "", http.StatusUnauthorized
+		return "", -1, http.StatusUnauthorized
 	case credentials.Email != user.Email || !comparePw(credentials.Password, user.Password):
 		log.Printf("[WARN] User's password invalid: %s", user.GlobalUserID)
-		return "", http.StatusUnauthorized
+		return "", -1, http.StatusUnauthorized
 	}
-	return user.GlobalUserID, http.StatusOK
+	// gets the user type provided a local user exists
+	res = gormDb.Model(&GlobalUser{}).Limit(1).Find(&globalUser, "id = ?", user.GlobalUserID)
+	if res.Error != nil {
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		return "", -1, http.StatusInternalServerError
+	}
+	return user.GlobalUserID, globalUser.UserType, http.StatusOK
 }
 
 // -- Token Control -- //
@@ -214,19 +228,19 @@ func GetToken(w http.ResponseWriter, r *http.Request) {
 	var body interface{}
 
 	// Validate refresh token, and create new tokens.
-	if ok, user := validateWebToken(refreshToken, "refresh"); !ok {
+	if ok, user, userType := validateWebToken(refreshToken, "refresh"); !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		body = StandardResponse{
 			Message: "Given refresh token is invalid!",
 			Error:   true,
 		}
-	} else if token, err := createToken(user, "bearer"); err != nil {
+	} else if token, err := createToken(user, userType, "bearer"); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		body = StandardResponse{
 			Message: "Access token creation failed!",
 			Error:   true,
 		}
-	} else if newRefresh, err := createToken(user, "refresh"); err != nil {
+	} else if newRefresh, err := createToken(user, userType, "refresh"); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		body = StandardResponse{
 			Message: "Refresh token creation failed!",
@@ -249,31 +263,32 @@ func GetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 // Validate the user's access token.
-func validateWebToken(accessToken string, scope string) (bool, string) {
+func validateWebToken(accessToken string, scope string) (bool, string, int) {
 	tokenSplit := strings.Split(accessToken, " ")
 	if len(tokenSplit) != 2 || strings.ToLower(tokenSplit[0]) != scope {
-		return false, "-"
+		return false, "-", -1
 	}
 	token, err := jwt.ParseWithClaims(tokenSplit[1], &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return []byte(JwtSecret), nil
 	})
 	if err != nil {
-		return false, "-"
+		return false, "-", -1
 	}
 	if claims, ok := token.Claims.(*JwtClaims); !ok {
-		return false, "-"
+		return false, "-", -1
 	} else if claims.Scope != "scope" {
-		return false, "-"
+		return false, "-", -1
 	} else {
-		return true, claims.ID
+		return true, claims.ID, claims.UserType
 	}
 
 }
 
 // Create a token with given scope.
-func createToken(ID string, scope string) (string, error) {
+func createToken(ID string, userType int, scope string) (string, error) {
 	claims := JwtClaims{
 		ID:    ID,
+		UserType: userType,
 		Scope: scope,
 		StandardClaims: jwt.StandardClaims{
 			Issuer: "CS3099User11_Project_Code",
@@ -310,13 +325,13 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 		message = "Registration failed - Wrong fields provided."
 		goto ERROR
 	}
-	if validator.Validate(*user) != nil {
+	if validate.Struct(*user) != nil {
 		log.Printf("[WARN] Invalid password format received.")
 		message = "Registration failed - invalid password"
 		goto ERROR
 	}
 
-	if _, err := registerUser(*user); err != nil {
+	if _, err := registerUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		message = "Registration failed - " + err.Error()
 		goto ERROR
@@ -344,11 +359,12 @@ ERROR:
 }
 
 // Register a user to the database. Returns user global ID.
-func registerUser(user User) (string, error) {
+func registerUser(user User, UserType int) (string, error) {
 	// Hash password and store new credentials to database.
 	user.Password = string(hashPw(user.Password))
 
 	registeredUser := GlobalUser{
+		UserType: UserType,
 		FullName: user.FirstName + " " + user.LastName,
 		User:     user,
 	}
@@ -369,4 +385,17 @@ func registerUser(user User) (string, error) {
 
 	// Return user's primary key (the UUID)
 	return registeredUser.ID, nil
+}
+
+// -- Password control --
+
+// Hash a password
+func hashPw(pw string) []byte {
+	hash, _ := bcrypt.GenerateFromPassword([]byte(pw), HASH_COST)
+	return hash
+}
+
+// Compare password and hash for validity.
+func comparePw(pw string, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw)) == nil
 }

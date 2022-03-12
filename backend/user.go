@@ -26,7 +26,7 @@ func getUserSubroutes(r *mux.Router) {
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
-	return tx.Select("GlobalUserID", "Email", "FirstName", "LastName", "UserType", "PhoneNumber", "Organization", "CreatedAt")
+	return tx.Select("GlobalUserID", "Email", "FirstName", "LastName", "PhoneNumber", "Organization", "CreatedAt")
 }
 
 /*

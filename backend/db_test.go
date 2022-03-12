@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	"gorm.io/gorm/logger"
 
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,15 +26,18 @@ const (
 
 var testUsers []User = []User{
 	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", FirstName: "test",
-		LastName: "test", PhoneNumber: "0574349206", UserType: USERTYPE_USER},
+		LastName: "test", PhoneNumber: "0574349206"},
 	{Email: "john.doe@hello.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg", UserType: USERTYPE_USER},
+		LastName: "Doe", Organization: "TestOrg"},
 	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe", UserType: USERTYPE_PUBLISHER},
+		LastName: "Doe"},
 }
 
 var testObjects []GlobalUser = []GlobalUser{
-	{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"},
+	{ID: "1", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "2", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "3", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "4", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
 var wrongCredsUsers []User = []User{
@@ -78,49 +77,108 @@ func testInit() {
 }
 
 // Get a copy of a user object.
-func (u *User) getCopy() User {
-	return User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
-		LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
-}
-func (u *GlobalUser) getCopy() GlobalUser {
-	return GlobalUser{ID: u.ID, FullName: u.FullName}
-}
-
-// Get a copy of a user array.
-func getUserCopies(uc []User) []User {
-	res := make([]User, len(uc))
-	for i, u := range uc {
-		res[i] = u.getCopy()
+func (u *User) getCopy() *User {
+	if u != nil {
+		return &User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
+			LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+	} else {
+		return nil
 	}
-	return res
 }
-func getGlobalCopies(gc []User) []GlobalUser {
-	res := make([]GlobalUser, len(gc))
-	for i, u := range gc {
-		res[i] = GlobalUser{User: u.getCopy()}
+func (g *GlobalUser) getCopy() *GlobalUser {
+	if g != nil {
+		return &GlobalUser{
+			ID: g.ID, FullName: g.ID, User: *g.User.getCopy(), UserType: g.UserType,
+		}
+	} else {
+		return nil
 	}
-	return res
-
 }
-func getObjectCopies(gc []GlobalUser) []GlobalUser {
-	res := make([]GlobalUser, len(gc))
-	for i, u := range gc {
-		res[i] = u.getCopy()
+func (s *Submission) getCopy() *Submission {
+	if s != nil {
+		var authors []GlobalUser = nil
+		var reviewers []GlobalUser = nil
+		var categories []Category = nil
+		var files []File = nil
+		if s.Authors != nil {
+			authors = []GlobalUser{}
+			for _, author := range s.Authors {
+				authors = append(authors, *author.getCopy())
+			}
+		}
+		if s.Reviewers != nil {
+			reviewers = []GlobalUser{}
+			for _, reviewer := range s.Reviewers {
+				reviewers = append(reviewers, *reviewer.getCopy())
+			}
+		}
+		if s.Categories != nil {
+			categories = make([]Category, len(s.Categories))
+			copy(categories, s.Categories)
+		}
+		if s.Files != nil {
+			files = make([]File, len(s.Files))
+			copy(files, s.Files)
+		}
+
+		submission := &Submission{
+			Name: s.Name, License: s.License,
+			Files: files, Categories: categories,
+			MetaData: &SubmissionData{Abstract: s.MetaData.Abstract, Reviews: s.MetaData.Reviews},
+			Authors:  authors, Reviewers: reviewers,
+		}
+		return submission
+	} else {
+		return nil
 	}
-	return res
 }
-
-func testingServerSetup() *http.Server {
-	router := mux.NewRouter()
-
-	// Call authentication endpoints.
-	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet)
-	router.HandleFunc("/users/{"+getJsonTag(&GlobalUser{}, "ID")+"}", getUserProfile).Methods(http.MethodGet)
-
-	// Setup testing HTTP server
-	return &http.Server{
-		Addr:    TEST_PORT,
-		Handler: router,
+func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
+	if s != nil {
+		var metadata SupergroupSubmissionData
+		var codeVersions []SupergroupCodeVersion
+		var files []SupergroupFile
+		var authors []SuperGroupAuthor
+		var categories []string
+		
+		// copies metadata
+		if s.MetaData.Categories != nil {
+			categories := make([]string, len(s.MetaData.Categories))
+			copy(categories, s.MetaData.Categories)
+		}
+		if s.MetaData.Authors != nil {
+			authors = make([]SuperGroupAuthor, len(s.MetaData.Authors))
+			copy(authors, s.MetaData.Authors)
+		}
+		metadata = SupergroupSubmissionData{
+			CreationDate: s.MetaData.CreationDate,
+			Abstract: s.MetaData.Abstract,
+			License: s.MetaData.License,
+			Categories: categories,
+			Authors: authors,
+		}
+		// copies code versions
+		var codeVersionCopy SupergroupCodeVersion
+		codeVersions = make([]SupergroupCodeVersion, len(s.CodeVersions))
+		for _, codeVersion := range s.CodeVersions {
+			if codeVersion.Files != nil {
+				files = make([]SupergroupFile, len(codeVersion.Files))
+				copy(files, codeVersion.Files)
+			}
+			codeVersionCopy = SupergroupCodeVersion{
+				TimeStamp: codeVersion.TimeStamp,
+				Files: files,
+			}
+			codeVersions = append(codeVersions, codeVersionCopy)
+			files = nil
+		}
+		// constructs the final copy of the supergroup submission
+		return &SupergroupSubmission{
+			Name: s.Name,
+			MetaData: metadata,
+			CodeVersions: codeVersions,
+		}
+	} else {
+		return nil
 	}
 }
 
@@ -131,22 +189,6 @@ func testEnd() {
 	}
 	getDB, _ := gormDb.DB()
 	getDB.Close()
-}
-
-// Send a secure request in a JSON body from a given interface.
-func sendJsonRequest(endpoint string, method string, data interface{}, port ...string) (*http.Response, error) {
-	usedPort := TEST_PORT
-	if len(port) > 0 {
-		usedPort = port[0]
-	}
-	var req *http.Request
-	if data != nil {
-		jsonDat, _ := json.Marshal(data)
-		req, _ = http.NewRequest(method, LOCALHOST+usedPort+endpoint, bytes.NewBuffer(jsonDat))
-	} else {
-		req, _ = http.NewRequest(method, LOCALHOST+usedPort+endpoint, nil)
-	}
-	return sendSecureRequest(gormDb, req, TEAM_ID)
 }
 
 // Set up authentication on a test server.
@@ -197,7 +239,10 @@ func TestIsUnique(t *testing.T) {
 
 	// Add an element to table
 	// Add test users to database
-	trialObjects := getObjectCopies(testObjects)
+	trialObjects := make([]GlobalUser, len(testObjects))
+	for i, u := range testObjects {
+		trialObjects[i] = GlobalUser{ID: u.ID, FullName: u.FullName}
+	}
 	if err := gormDb.Create(&trialObjects).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)
 		return

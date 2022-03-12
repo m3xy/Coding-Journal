@@ -11,7 +11,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
-	"gopkg.in/validator.v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -93,10 +92,11 @@ func setupCORSsrv() *http.Server {
 	getUserSubroutes(router)        // Users subroutes
 	getSubmissionsSubRoutes(router) // Submissions and files routes
 
+
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
 		Addr:         PORT,
-		Handler:      c.Handler(router),
+		Handler:	  RequestLoggerMiddleware(c.Handler(router)),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
@@ -118,10 +118,6 @@ func setup(db *gorm.DB, logpath string) error {
 	if err != nil {
 		goto RETURN
 	}
-
-	// Set validation functions
-	validator.SetValidationFunc("ispw", ispw)
-	validator.SetValidationFunc("isemail", isemail)
 
 	// Check for filesystem existence.
 	/* if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {

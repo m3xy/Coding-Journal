@@ -56,9 +56,48 @@ type NewCommentPostBody struct {
 	Base64Value string `json:"base64Value"`
 }
 
+// POST /submissions/create body
+type UploadSubmissionBody struct {
+	Name      string   `json:"name" validate:"required"`
+	License   string   `json:"license" `
+	Abstract  string   `json:"abstract"`
+	Tags      []string `json:"tags"`
+	Authors   []string `json:"authors" validate:"required"`
+	Reviewers []string `json:"reviewers"`
+	Files     []File   `json:"files"`
+}
+
+// POST /submission/{id}/assignreviewers
+type AssignReviewersBody struct {
+	Reviewers []string `json:"reviewers" validate:"min=1"`
+}
+
+// POST /submission/{id}/review
+type UploadReviewBody struct {
+	Approved bool `json:"approved" validate:"required"`
+	Base64Value string `json:"base64Value" validate:"required"`
+}
+
+// POST /submission/{id}/approve
+type UpdateSubmissionStatusBody struct {
+	Status bool `json:"status" validate:"required"`
+}
+
+// POST /submissions/upload/zip
+type UploadSubmissionByZipBody struct {
+	Name		   string	`json:"name" validate:"required"`
+	License		   string	`json:"license"`
+	Abstract	   string	`json:"abstract"`
+	Tags		   []string `json:"tags"`
+	Authors		   []string `json:"authors" validate:"required"`
+	Reviewers	   []string `json:"reviewers"`
+	ZipBase64Value string	`json:"base64" validate:"base64url,required"`
+}
+
 // --- JWT Claim types --- //
 type JwtClaims struct {
 	ID    string `json:"userId"`
+	UserType int `json:"userType" validate:"min=0,max=4"`
 	Scope string
 	jwt.StandardClaims
 }

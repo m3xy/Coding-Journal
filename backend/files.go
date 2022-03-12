@@ -1,6 +1,6 @@
 // ================================================================================
 // files.go
-// Authors: 190010425
+// Authors: 190010425, 190014935
 // Created: November 23, 2021
 //
 // This file handles reading/writing code files along with their
@@ -23,6 +23,9 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -67,6 +70,11 @@ func getFilesSubRoutes(r *mux.Router) {
 // -----
 // Router functions
 // -----
+
+// Get the path to the submissions directory.
+func getSubmissionDirectoryPath(s Submission) string {
+	return filepath.Join(FILESYSTEM_ROOT, fmt.Sprintf("%d-%d", s.ID, s.CreatedAt.Unix()))
+}
 
 // Retrieve code files from filesystem. Returns
 // file with comments and metadata. Recieves a request
@@ -126,61 +134,6 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(response)
 }
 
-// upload comment router function. Takes in a POST request and
-// uses it to add a comment to the given file
-//
-// Response Codes:
-// 	200 : comment was added succesfully
-// 	401 : if the request does not have the proper security token
-// 	400 : if the comment was not sent in the proper format
-// 	500 : if something else goes wrong in the backend
-// Response Body: {ID: <comment ID>}
-func uploadUserComment(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
-	w.Header().Set("Content-Type", "application/json")
-
-	// Initialise message, response, and parameters.
-	var message string
-	var encodable interface{}
-	req := &NewCommentPostBody{}
-
-	// Check function parameters in path and body.
-	fileID64, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 32)
-	if err != nil {
-		message = "File ID given is not a number."
-		w.WriteHeader(http.StatusBadRequest)
-		goto RETURN
-	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		message = "Request format is invalid."
-		w.WriteHeader(http.StatusBadRequest)
-		goto RETURN
-	}
-
-	// Get author ID from request, and add comment.
-	if commentID, err := addComment(&Comment{
-		AuthorID: r.Context().Value("userId").(string), FileID: uint(fileID64),
-		ParentID: req.ParentID, Base64Value: req.Base64Value,
-	}); err != nil {
-		message = "Comment creation failed."
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		encodable = NewCommentResponse{ID: commentID}
-		goto RETURN
-	}
-
-RETURN:
-	// Encode response - set as error if empty
-	if encodable != nil {
-		encodable = StandardResponse{Message: message, Error: true}
-	} else if err := json.NewEncoder(w).Encode(encodable); err != nil {
-		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
-	}
-	return
-}
-
 // -----
 // Helper Functions
 // -----
@@ -206,12 +159,11 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// queries the submission name (for use in accessing the filesystem)
-		submission.ID = submissionID
-		if err := gormDb.Model(submission).Select("submissions.name").First(submission).Error; err != nil {
+		if err := tx.Select("Name, created_at, ID").First(submission, submissionID).Error; err != nil {
 			return err
 		}
 		// adds a file to the submission in the db provided the submission exists
-		if err := gormDb.Model(submission).Association("Files").Append(file); err != nil {
+		if err := tx.Model(submission).Association("Files").Append(file); err != nil {
 			return err
 		}
 		return nil
@@ -220,49 +172,17 @@ func addFileTo(file *File, submissionID uint) (uint, error) {
 	}
 
 	// Add file to filesystem creating dirs if you do not exist
-	filePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(submissionID), submission.Name, file.Path)
-	fileDirPath := filepath.Dir(filePath)
+	filePath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID))
 
-	// creates all directories on the file's relative path in case any of them do not exist yet, opens file, and writes content
-	if err := os.MkdirAll(fileDirPath, DIR_PERMISSIONS); err != nil {
+	// Create file path from its ID
+	if codeFile, err := os.Create(filePath); err != nil {
 		return 0, err
+	} else {
+		defer codeFile.Close()
+		codeFile.Write([]byte(file.Base64Value))
 	}
-	codeFile, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY, FILE_PERMISSIONS)
-	if err != nil {
-		return 0, err
-	}
-	if _, err = codeFile.Write([]byte(file.Base64Value)); err != nil {
-		return 0, err
-	}
-
-	// closes files
-	codeFile.Close()
 
 	return file.ID, nil
-}
-
-// Add a root-level comment to a file
-//
-// Params:
-//	comment (*Comment) : The comment struct to add to the file
-//	fileID (uint) : the id of the file to add a comment to
-// Returns:
-//	(uint) : the id of the added comment
-//	(error) : an error if one occurs, nil otherwise
-func addComment(comment *Comment) (uint, error) {
-	// Check parameters.
-	if comment == nil {
-		return 0, errors.New("Comment cannot be nil")
-	} else if comment.AuthorID == "" {
-		return 0, errors.New("The author must exist.")
-	}
-	// adds the comment to the comments table with foreign key fileId and parentID
-	file := &File{}
-	file.ID = comment.FileID
-	if err := gormDb.Model(file).Association("Comments").Append(comment); err != nil {
-		return 0, err
-	}
-	return comment.ID, nil
 }
 
 // helper function to return a file object given its ID
@@ -282,17 +202,22 @@ func getFileData(fileID uint) (*File, error) {
 			return err
 		}
 		// gets the file comments
-		comment := &Comment{}
-		comment.FileID = fileID
+		// Order comments by newest.
 		var comments []Comment
-		if err := gormDb.Model(comment).Preload("Comments").Where("comments.parent_id IS NULL").Find(&comments).Error; err != nil {
+		if err := gormDb.Model(&Comment{}).Order("created_at desc").
+			Preload("Comments").Where("comments.parent_id IS NULL").
+			Find(&comments, "file_id = ?", fileID).Error; err != nil {
 			return err
+		}
+		for _, comment := range comments {
+			if err := loadComments(tx, comment); err != nil {
+				return err
+			}
 		}
 		file.Comments = comments
 
 		// queries the submission name
-		submission.ID = file.SubmissionID
-		if err := gormDb.Model(submission).Select("submissions.name").Find(submission).Error; err != nil {
+		if err := gormDb.Select("Name, ID, created_at").Find(submission, file.SubmissionID).Error; err != nil {
 			return err
 		}
 		return nil
@@ -301,7 +226,7 @@ func getFileData(fileID uint) (*File, error) {
 	}
 
 	// builds path to the file using the queried submission name
-	fullFilePath := filepath.Join(FILESYSTEM_ROOT, fmt.Sprint(file.SubmissionID), submission.Name, file.Path)
+	fullFilePath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID))
 
 	// gets file content
 	var err error
@@ -310,6 +235,20 @@ func getFileData(fileID uint) (*File, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+// Recursive functions for loading replies.
+func loadComments(tx *gorm.DB, c Comment) error {
+	for _, child := range c.Comments {
+		if err := tx.Preload("Comments").Order("created_at desc").
+			Where("comments.parent_id = ?", c.ID).Find(&child).Error; err != nil {
+			return err
+		} else if err := loadComments(tx, child); err != nil {
+			return err
+		}
+	}
+	return nil
+
 }
 
 // Get file content from filesystem.
@@ -325,4 +264,66 @@ func getFileContent(filePath string) (string, error) {
 	}
 	// if no error occurred, assigns file.Base64Value a value
 	return string(fileData), nil
+}
+
+// Unzip a zip file into a file array, from the zip's base 64.
+// Returns the array of files.
+func getFileArrayFromZipBase64(base64value string) ([]File, error) {
+	// Decode zip to temporary file for reading.
+	var reader *zip.ReadCloser
+	zipPath, err := TmpStoreZip(base64value)
+	if err != nil {
+		return nil, err
+	} else if reader, err = zip.OpenReader(zipPath); err != nil {
+		log.Printf("[ERROR] Failed to open reader for zip file - %v", err)
+		os.Remove(zipPath)
+		return nil, err
+	}
+	defer os.Remove(zipPath)
+	defer reader.Close()
+
+	// Iterate file-per-file unzip.
+	files := make([]File, len(reader.File))
+	for i, file := range reader.File {
+		rc, err := file.Open()
+		if err != nil {
+			log.Printf("[ERROR] Failed to open file contained in the zip - %v", err)
+			return nil, err
+		}
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(rc)
+		files[i] = File{
+			Name:        file.FileInfo().Name(),
+			Path:        file.FileHeader.Name,
+			Base64Value: base64.URLEncoding.EncodeToString(buf.Bytes()),
+		}
+	}
+	return files, nil
+}
+
+// Unzip a file to some temporary folder. Returns folder path.
+func TmpStoreZip(base64value string) (string, error) {
+	zipBytes, err := base64.URLEncoding.DecodeString(base64value)
+
+	if err != nil {
+		log.Printf("[ERROR] Base 64 value given is invalid/corrupt.")
+		return "", err
+	}
+	f, err := os.CreateTemp("/tmp", "*.zip")
+	if err != nil {
+		log.Printf("[ERROR] Cannot create temp file! %v", err)
+		return "", err
+	}
+	defer f.Close()
+	path := f.Name()
+	if  err := os.WriteFile(path, zipBytes, 0666); err != nil {
+		log.Printf("[ERROR] ZIP file creation failed: %v", err)
+		goto ROLLBACK
+	}
+	log.Printf("[INFO] Created ZIP file at path %s", path)
+	return path, nil
+
+ROLLBACK:
+	os.Remove(path)
+	return "", err
 }
