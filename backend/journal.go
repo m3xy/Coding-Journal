@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"bytes"
+	"errors"
 
 	"github.com/gorilla/mux"
 )
 
 const (
 	ENDPOINT_EXPORT_SUBMISSION = "/export" // on submissions sub-router
+	ENDPOINT_IMPORT_SUBMISSION = "/submission" // on the journal sub-router
 )
 
 var journalURLs map[int]string = map[int]string{
@@ -33,6 +35,7 @@ func getJournalSubroute(r *mux.Router) {
 
 	journal.Use(journalMiddleWare)
 	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
+	journal.HandleFunc(ENDPOINT_IMPORT_SUBMISSION, PostImportSubmission).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ----------
@@ -83,11 +86,10 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
 }
 
-
 // router function to export submissions
 // POST /submission/{id}/export/{groupNumber}
 func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] ExportSubmission request received from %v", r.RemoteAddr)
+	log.Printf("[INFO] ExportSubmission request received from %v\n", r.RemoteAddr)
 	resp := &StandardResponse{}
 
 	// gets submission ID and group number from URL
@@ -157,7 +159,62 @@ func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if !resp.Error {
-		log.Print("[INFO] AssignReviewers request successful\n")
+		log.Print("[INFO] ExportSubmission request successful\n")
+	}
+}
+
+// router function to import submissions from another Journal
+// POST /journal/submission
+func PostImportSubmission(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] ImportSubmission request received from %v\n", r.RemoteAddr)
+	resp := &StandardResponse{}
+	reqBody := &SupergroupSubmission{}
+
+	if r.Body == nil {
+		resp = &StandardResponse{Message: "Request body empty.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// decodes request body and validates it
+	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
+		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+	
+	} else {
+		// converts reqBody (a supergroup-compliant submission) to a local format
+		localSubmission, err := globalToLocal(reqBody)
+		if err != nil {
+			log.Printf("[ERROR] could not export submission: %v\n", err)
+			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+		// adds the local submission to the db
+		if submissionID, err := addSubmission(localSubmission); err != nil {
+			switch err.(type) {
+			case *DuplicateFileError:
+				resp = &StandardResponse{Message: err.Error(), Error: true}
+				w.WriteHeader(http.StatusBadRequest)
+
+			case *BadUserError, *WrongPermissionsError:
+				resp = &StandardResponse{Message: err.Error(), Error: true}
+				w.WriteHeader(http.StatusUnauthorized)
+
+			default: // Unexpected error - error out as server error.
+				log.Printf("[ERROR] could not import submission: %v\n", err)
+				resp = &StandardResponse{Message: "Internal Server Error - could not import submission", Error: true}
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		} else {
+			log.Printf("[INFO] Submission imported has ID: %d", submissionID)
+		}
+	}
+
+	// Return response body after function successful.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if !resp.Error {
+		log.Print("[INFO] ImportSubmission request successful\n")
 	}
 }
 
@@ -192,8 +249,8 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 		categories = append(categories, category.Tag)
 	}
 	// creates the Supergroup metadata struct
-	supergroupData := &SupergroupSubmissionData{
-		CreationDate: fmt.Sprint(localSubmission.CreatedAt),
+	supergroupData := SupergroupSubmissionData{
+		CreationDate: localSubmission.CreatedAt,
 		Abstract:     localSubmission.MetaData.Abstract,
 		License:      localSubmission.License,
 		Categories:   categories,
@@ -227,3 +284,49 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 		},
 	}, nil
 }
+
+
+// This function takes in a supergroup compliant submission, and uses it to construct a valid
+// local-format submission
+//
+// Parameters:
+// 	globalSubmission (SupergroupSubmission) : The supergroup compliant submission to be converted
+// Returns:
+// 	(*Submission) : a local submission struct
+// 	(error) : an error if one occurs
+func globalToLocal(globalSubmission *SupergroupSubmission) (*Submission, error) {
+	if globalSubmission == nil {
+		return nil, errors.New("global submission cannot be nil")
+	}
+	// builds the array of local file objects from the global submission's files
+	files := []File{}
+	for _, file := range globalSubmission.CodeVersions[0].Files {
+		files = append(files, File{
+			Path: file.Name,
+			Name: file.Name,
+			Base64Value: file.Base64Value,
+		})
+	}
+	// builds the array of authors
+	authors := []GlobalUser{}
+	for _, author := range globalSubmission.MetaData.Authors {
+		authors = append(authors, GlobalUser{ID: author.ID})
+	}
+	// builds the array of tags
+	categories := []Category{}
+	for _, category := range globalSubmission.MetaData.Categories {
+		categories = append(categories, Category{Tag: category})
+	}
+
+	// constructs and returns the final submission
+	return &Submission{
+		Name: globalSubmission.Name,
+		License: globalSubmission.MetaData.License,
+		Files: files,
+		Authors: authors,
+		Reviewers: []GlobalUser{},
+		Categories: categories,
+		MetaData: &SubmissionData{Abstract: globalSubmission.MetaData.Abstract},
+	}, nil
+}
+

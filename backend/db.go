@@ -155,14 +155,14 @@ type Category struct {
 // Supergroup compliant code submissions (never stored in db)
 type SupergroupSubmission struct {
 	Name string `json:"name"`
-	MetaData *SupergroupSubmissionData `json:"metadata"`
+	MetaData SupergroupSubmissionData `json:"metadata"`
 	CodeVersions []SupergroupCodeVersion `json:"codeVersions"`
 }
 
 // supergroup compliant structure for meta-data of the submission
 type SupergroupSubmissionData struct {
 	// date the code submission was created
-	CreationDate string `json:"creationDate"`
+	CreationDate time.Time `json:"creationDate"`
 	// abstract for the submission, to be displayed upon opening of any given submission
 	Abstract string `json:"abstract"`
 	// license which the code is published under

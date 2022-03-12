@@ -132,6 +132,55 @@ func (s *Submission) getCopy() *Submission {
 		return nil
 	}
 }
+func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
+	if s != nil {
+		var metadata SupergroupSubmissionData
+		var codeVersions []SupergroupCodeVersion
+		var files []SupergroupFile
+		var authors []SuperGroupAuthor
+		var categories []string
+		
+		// copies metadata
+		if s.MetaData.Categories != nil {
+			categories := make([]string, len(s.MetaData.Categories))
+			copy(categories, s.MetaData.Categories)
+		}
+		if s.MetaData.Authors != nil {
+			authors = make([]SuperGroupAuthor, len(s.MetaData.Authors))
+			copy(authors, s.MetaData.Authors)
+		}
+		metadata = SupergroupSubmissionData{
+			CreationDate: s.MetaData.CreationDate,
+			Abstract: s.MetaData.Abstract,
+			License: s.MetaData.License,
+			Categories: categories,
+			Authors: authors,
+		}
+		// copies code versions
+		var codeVersionCopy SupergroupCodeVersion
+		codeVersions = make([]SupergroupCodeVersion, len(s.CodeVersions))
+		for _, codeVersion := range s.CodeVersions {
+			if codeVersion.Files != nil {
+				files = make([]SupergroupFile, len(codeVersion.Files))
+				copy(files, codeVersion.Files)
+			}
+			codeVersionCopy = SupergroupCodeVersion{
+				TimeStamp: codeVersion.TimeStamp,
+				Files: files,
+			}
+			codeVersions = append(codeVersions, codeVersionCopy)
+			files = nil
+		}
+		// constructs the final copy of the supergroup submission
+		return &SupergroupSubmission{
+			Name: s.Name,
+			MetaData: metadata,
+			CodeVersions: codeVersions,
+		}
+	} else {
+		return nil
+	}
+}
 
 // Close database at the end of test.
 func testEnd() {

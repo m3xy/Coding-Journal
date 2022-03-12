@@ -8,11 +8,16 @@ import (
 	"testing"
 	"fmt"
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
+
+// ---------
+// Handler Function Tests
+// ---------
 
 // Test user log in.
 func TestJournalLogIn(t *testing.T) {
@@ -189,6 +194,114 @@ func TestExportSubmission(t *testing.T) {
 	})
 }
 
+// Tests the ability of this journal to import submissions from another journal
+func TestImportSubmission(t *testing.T) {
+	// wipes the database and filesystem
+	testInit()
+	defer testEnd()
+
+	// init server
+	router := mux.NewRouter()
+	route := SUBROUTE_JOURNAL+"/submission"
+	router.HandleFunc(route, PostImportSubmission)
+
+	// registers a test author
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
+	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+		return
+	}
+
+	// test supergroup submission
+	globalMetadata := SupergroupSubmissionData{
+		CreationDate: time.Now(),
+		Abstract: "abstract",
+		License: "MIT",
+		Categories: []string{"python", "sorting"},
+		Authors: []SuperGroupAuthor{
+			{ID: authorID, Journal: "11"},
+		},
+	}
+	globalCodeVersion := SupergroupCodeVersion{
+		TimeStamp: time.Now(),
+		Files: []SupergroupFile{
+			{Name: "hello", Base64Value:"Goodbye"},
+		},
+	}
+	globalSub := &SupergroupSubmission{
+		Name: "test",
+		MetaData: globalMetadata,
+		CodeVersions: []SupergroupCodeVersion{globalCodeVersion},
+	}
+
+	// utility function to send POST requests to tell the local server to import global submissions
+	testImportSubmission := func(globalSub *SupergroupSubmission) *http.Response {
+		// builds request to the backend
+		reqBody, err := json.Marshal(globalSub)
+		if !assert.NoError(t, err, "error occurred while marshalling request body") {
+			return nil
+		}
+		req := httptest.NewRequest(http.MethodPost, SUBROUTE_JOURNAL+"/submission", bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		return resp
+	}
+
+	t.Run("Import Valid Submission", func(t *testing.T) {
+		resp := testImportSubmission(globalSub.getCopy())
+		assert.Equalf(t, http.StatusOK, resp.StatusCode, "Returned Wrong status code!")
+	})
+
+	// makes sure the errors occur in the right places
+	t.Run("Request verification", func(t *testing.T) {
+		t.Run("Author Wrong Permissions", func(t *testing.T) {
+			// registers a test author with wrong permissions
+			authorID, err := registerUser(testAuthors[1], USERTYPE_REVIEWER)
+			if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+				return
+			}
+			newGlobalSub := globalSub.getCopy()
+			newGlobalSub.MetaData.Authors = []SuperGroupAuthor{
+				{ID: authorID, Journal: "11"},
+			}
+			resp := testImportSubmission(newGlobalSub)
+			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Returned Wrong status code!")
+		})
+		
+		t.Run("Unregistered Author", func(t *testing.T) {
+			newGlobalSub := globalSub.getCopy()
+			newGlobalSub.MetaData.Authors = []SuperGroupAuthor{
+				{ID: "aiargiajradkgj430293", Journal: "11"},
+			}
+			resp := testImportSubmission(newGlobalSub)
+			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Returned Wrong status code!")
+		})
+
+		t.Run("Empty request", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, SUBROUTE_JOURNAL+"/submission", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+			assert.Equalf(t, http.StatusBadRequest, resp.StatusCode, "Returned Wrong status code!")
+		})
+
+		t.Run("Duplicate File Error", func(t *testing.T) {
+			newGlobalSub := globalSub.getCopy()
+			file := SupergroupFile{
+				Name: "name",
+				Base64Value: "file",
+			}
+			newGlobalSub.CodeVersions[0].Files = []SupergroupFile{file,file}
+			resp := testImportSubmission(newGlobalSub)
+			assert.Equalf(t, http.StatusBadRequest, resp.StatusCode, "Returned Wrong status code!")
+		})
+	})
+}
+
+// ---------
+// Helper Function Tests
+// ---------
+
 // This tests converting from the local submission data format to the supergroup specified format
 func TestLocalToGlobal(t *testing.T) {
 	testInit()
@@ -219,7 +332,6 @@ func TestLocalToGlobal(t *testing.T) {
 		return
 	}
 
-	// tests valid submission struct
 	t.Run("Valid Submission", func(t *testing.T) {
 		// gets the supergroup compliant submission
 		globalSubmission, err := localToGlobal(submissionID)
@@ -247,4 +359,83 @@ func TestLocalToGlobal(t *testing.T) {
 			return
 		}
 	})
+
+	t.Run("Non-existant Submission", func(t *testing.T) {
+		_, err := localToGlobal(submissionID+1)
+		assert.Error(t, err, "did not err on non-existant submission conversion")
+		assert.IsType(t, &NoSubmissionError{}, err, "Incorrect type of error returned")
+	})
 }
+
+// This tests converting from the supergroup submission data format to the local format
+func TestGlobalToLocal(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	// registers a test author
+	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
+	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+		return
+	}
+
+	// test supergroup submission
+	globalMetadata := SupergroupSubmissionData{
+		CreationDate: time.Now(),
+		Abstract: "abstract",
+		License: "MIT",
+		Categories: []string{"python", "sorting"},
+		Authors: []SuperGroupAuthor{
+			{ID: authorID, Journal: "11"},
+		},
+	}
+	globalCodeVersion := SupergroupCodeVersion{
+		TimeStamp: time.Now(),
+		Files: []SupergroupFile{
+			{Name: "hello", Base64Value:"Goodbye"},
+		},
+	}
+	globalSub := &SupergroupSubmission{
+		Name: "test",
+		MetaData: globalMetadata,
+		CodeVersions: []SupergroupCodeVersion{globalCodeVersion},
+	}
+
+	testGlobalToLocal := func(globalSub *SupergroupSubmission) {
+		localSubmission, err := globalToLocal(globalSub)
+		if !assert.NoErrorf(t, err, "Error occurred while converting submission format!") {
+			return
+		}
+		// builds a comparable array of categories
+		categories := []string{}
+		for _, category := range localSubmission.Categories {
+			categories = append(categories, category.Tag)
+		}
+		switch {
+		case !assert.Equal(t, localSubmission.Name, globalSub.Name, "Names do not match"),
+			!assert.Equal(t, localSubmission.License, globalSub.MetaData.License,
+				"Licenses do not match"),
+			!assert.Equal(t, localSubmission.Authors[0].ID, globalSub.MetaData.Authors[0].ID,
+				"Authors do not match"),
+			!assert.Equal(t, globalSub.MetaData.Categories, categories, "Tags do not match"),
+			!assert.Equal(t, localSubmission.MetaData.Abstract, globalSub.MetaData.Abstract,
+				"Abstracts do not match"),
+			// compares files
+			!assert.Equal(t, globalCodeVersion.Files[0].Name, localSubmission.Files[0].Name, 
+				"File names do not match"),
+			!assert.Equal(t, globalCodeVersion.Files[0].Base64Value, localSubmission.Files[0].Base64Value, 
+				"File content does not match"):
+			return
+		}
+	}
+
+	t.Run("Valid Submission", func(t *testing.T) {
+		testGlobalToLocal(globalSub)
+	})
+
+	t.Run("nil submission", func(t *testing.T) {
+		_, err := globalToLocal(nil)
+		assert.Error(t, err, "did not err on nil submission conversion")
+	})
+}
+
+
