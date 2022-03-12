@@ -92,7 +92,7 @@ func TestExportSubmission(t *testing.T) {
 	// Create local server
 	router := mux.NewRouter()
 	route := ENDPOINT_SUBMISSIONS+"/{id}"+ENDPOINT_EXPORT_SUBMISSION+"/{groupNumber}"
-	router.HandleFunc(route, RouteExportSubmission)
+	router.HandleFunc(route, PostExportSubmission)
 
 	// Create mock global server
 	globalRouter := mux.NewRouter()
@@ -236,15 +236,14 @@ func TestLocalToGlobal(t *testing.T) {
 		case !assert.Equal(t, testSubmission.Name, globalSubmission.Name, "Names do not match"),
 			!assert.Equal(t, testSubmission.License, globalSubmission.MetaData.License,
 				"Licenses do not match"),
-			!assert.Equal(t, testAuthor.FirstName+" "+testAuthor.LastName, globalSubmission.MetaData.AuthorNames[0],
+			!assert.Equal(t, testSubmission.Authors[0].ID, globalSubmission.MetaData.Authors[0].ID,
 				"Authors do not match"),
-			!assert.Equal(t, categories, globalSubmission.MetaData.Categories,
-				"Tags do not match"),
+			!assert.Equal(t, categories, globalSubmission.MetaData.Categories, "Tags do not match"),
 			!assert.Equal(t, testSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
 				"Abstracts do not match"),
 			// compares files
-			!assert.Equal(t, testFile.Name, globalSubmission.Files[0].Name, "File names do not match"),
-			!assert.Equal(t, testFile.Base64Value, globalSubmission.Files[0].Base64Value, "File content does not match"):
+			!assert.Equal(t, testFile.Name, globalSubmission.CodeVersions[0].Files[0].Name, "File names do not match"),
+			!assert.Equal(t, testFile.Base64Value, globalSubmission.CodeVersions[0].Files[0].Base64Value, "File content does not match"):
 			return
 		}
 	})

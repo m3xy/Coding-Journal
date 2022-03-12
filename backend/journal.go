@@ -35,6 +35,10 @@ func getJournalSubroute(r *mux.Router) {
 	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 }
 
+// ----------
+// Router Functions
+// ----------
+
 // Validate if given security token works.
 // Params:
 // 	Header: securityToken
@@ -82,11 +86,11 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 
 // router function to export submissions
 // POST /submission/{id}/export/{groupNumber}
-func RouteExportSubmission(w http.ResponseWriter, r *http.Request) {
+func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] ExportSubmission request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 
-	// gets submission ID and group number
+	// gets submission ID and group number from URL
 	params := mux.Vars(r)
 	submissionID64, err1 := strconv.ParseUint(params["id"], 10, 32)
 	submissionID := uint(submissionID64)
@@ -127,24 +131,24 @@ func RouteExportSubmission(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// makes request to export the submission
-		reqBody, err := json.Marshal(globalSubmission)
-		if err != nil {
+		var reqBody []byte
+		var req *http.Request
+		var globalResp *http.Response
+		if reqBody, err = json.Marshal(globalSubmission); err != nil {
+			goto INTERNAL_ERROR
+		} else if req, err = http.NewRequest(http.MethodPost, 
+			journalURLs[groupNumber]+SUBROUTE_JOURNAL+"/submission", bytes.NewBuffer(reqBody)); err != nil {
+			goto INTERNAL_ERROR
+		} else if globalResp, err = sendSecureRequest(gormDb, req, groupNumber); err != nil {
+			goto INTERNAL_ERROR
+		} else {
+			goto SUCCESS
+		}
+		INTERNAL_ERROR: // procedure common to any internal server error
 			log.Printf("[ERROR] could not export submission: %v\n", err)
 			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
 			w.WriteHeader(http.StatusInternalServerError)
-		}
-		req, err := http.NewRequest(http.MethodPost, journalURLs[groupNumber]+SUBROUTE_JOURNAL+"/submission", bytes.NewBuffer(reqBody))
-		if err != nil {
-			log.Printf("[ERROR] could not export submission: %v\n", err)
-			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-		globalResp, err := sendSecureRequest(gormDb, req, groupNumber)
-		if err != nil {
-			log.Printf("[ERROR] could not export submission: %v\n", err)
-			resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+		SUCCESS:
 		w.WriteHeader(globalResp.StatusCode)
 	}
 
@@ -156,6 +160,10 @@ func RouteExportSubmission(w http.ResponseWriter, r *http.Request) {
 		log.Print("[INFO] AssignReviewers request successful\n")
 	}
 }
+
+// ----------
+// Helper Functions
+// ----------
 
 // This function queries a submission in the local format from the db, and transforms
 // it into the supergroup compliant format
@@ -172,6 +180,13 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// adds author names to an array
+	authors := []SuperGroupAuthor{}
+	for _, author := range localSubmission.Authors {
+		authors = append(authors, SuperGroupAuthor{ID: author.ID, Journal:"11"})
+	}
+	// constructs an array of tags for the submission
 	categories := []string{}
 	for _, category := range localSubmission.Categories {
 		categories = append(categories, category.Tag)
@@ -179,30 +194,24 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 	// creates the Supergroup metadata struct
 	supergroupData := &SupergroupSubmissionData{
 		CreationDate: fmt.Sprint(localSubmission.CreatedAt),
-		Categories:   categories,
 		Abstract:     localSubmission.MetaData.Abstract,
 		License:      localSubmission.License,
+		Categories:   categories,
+		Authors:      authors,
 	}
-
-	// adds author names to an array
-	authorNames := []string{}
-	for _, author := range localSubmission.Authors {
-		authorNames = append(authorNames, author.FullName)
-	}
-	supergroupData.AuthorNames = authorNames
 
 	// creates the list of file structs using the file paths and files.go
 	var base64 string
-	var supergroupFile *SupergroupFile
-	supergroupFiles := []*SupergroupFile{}
+	var supergroupFile SupergroupFile
+	supergroupFiles := []SupergroupFile{}
 	for _, file := range localSubmission.Files {
 		fullFilePath := filepath.Join(getSubmissionDirectoryPath(*localSubmission), fmt.Sprint(file.ID))
 		base64, err = getFileContent(fullFilePath)
 		if err != nil {
 			return nil, err
 		}
-		supergroupFile = &SupergroupFile{
-			Name:        filepath.Base(file.Path),
+		supergroupFile = SupergroupFile{
+			Name:        file.Path,
 			Base64Value: base64,
 		}
 		supergroupFiles = append(supergroupFiles, supergroupFile)
@@ -211,7 +220,10 @@ func localToGlobal(submissionID uint) (*SupergroupSubmission, error) {
 	// creates the supergroup submission to return
 	return &SupergroupSubmission{
 		Name:     localSubmission.Name,
-		Files:    supergroupFiles,
 		MetaData: supergroupData,
+		CodeVersions: []SupergroupCodeVersion{
+			{TimeStamp: localSubmission.CreatedAt,
+			Files: supergroupFiles},
+		},
 	}, nil
 }

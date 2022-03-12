@@ -99,37 +99,11 @@ type Submission struct {
 	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
 
-// Supergroup compliant code submissions (never stored in db)
-type SupergroupSubmission struct {
-	// name of the submission
-	Name string `json:"name"`
-	// metadata about the submission
-	MetaData *SupergroupSubmissionData `json:"metadata"`
-	// file objects which are members of the submission
-	Files []*SupergroupFile `json:"files"`
-}
-
 // structure for meta-data of the submission. matches the structure of the submission's
 // JSON data file. This struct is never stored in the db
 type SubmissionData struct {
-	// abstract for the submission, to be displayed upon opening of any given submission
 	Abstract string `json:"abstract"`
-	// reviewer comments on the overall submission
 	Reviews []*Review `json:"reviews"`
-}
-
-// supergroup compliant structure for meta-data of the submission
-type SupergroupSubmissionData struct {
-	// date the code submission was created
-	CreationDate string `json:"creationDate"`
-	// names of the authors listed on the submission
-	AuthorNames []string `json:"authorNames"`
-	// tags for organizing/grouping code submissions (does not access db, so doesnt use Category type)
-	Categories []string `json:"categories"`
-	// abstract for the submission, to be displayed upon opening of any given submission
-	Abstract string `json:"abstract"`
-	// license which the code is published under
-	License string `json:"license"`
 }
 
 // struct for code files
@@ -145,14 +119,6 @@ type File struct {
 	Base64Value string `gorm:"-" json:"base64Value"`
 	// structure to hold the user comments on the file
 	Comments []Comment `json:"comments,omitempty"`
-}
-
-// Supergroup compliant file structure (never stored in db)
-type SupergroupFile struct {
-	// name of the file as a string
-	Name string `json:"filename"`
-	// file content as a base64 encoded string
-	Base64Value string `json:"base64Value"`
 }
 
 // Structure for submission reviews
@@ -182,6 +148,48 @@ type Category struct {
 
 	CreatedAt time.Time `json:"-"`
 	DeletedAt time.Time `json:"-"`
+}
+
+// ---- Supergroup Data Structures ----
+
+// Supergroup compliant code submissions (never stored in db)
+type SupergroupSubmission struct {
+	Name string `json:"name"`
+	MetaData *SupergroupSubmissionData `json:"metadata"`
+	CodeVersions []SupergroupCodeVersion `json:"codeVersions"`
+}
+
+// supergroup compliant structure for meta-data of the submission
+type SupergroupSubmissionData struct {
+	// date the code submission was created
+	CreationDate string `json:"creationDate"`
+	// abstract for the submission, to be displayed upon opening of any given submission
+	Abstract string `json:"abstract"`
+	// license which the code is published under
+	License string `json:"license"`
+	// tags for organizing/grouping code submissions (does not access db, so doesnt use Category type)
+	Categories []string `json:"categories"`
+	// names of the authors listed on the submission
+	Authors []SuperGroupAuthor `json:"authors"`
+}
+
+type SuperGroupAuthor struct {
+	ID string `json:"userId"`
+	Journal string `json:"journal"`
+}
+
+// struct to store a supergroup compliant version of a submission
+type SupergroupCodeVersion struct {
+	TimeStamp time.Time `json:"timestamp"`
+	Files []SupergroupFile `json:"files"`
+}
+
+// Supergroup compliant file structure (never stored in db)
+type SupergroupFile struct {
+	// path of the file as a string
+	Name string `json:"filename"`
+	// file content as base 64 encoded string
+	Base64Value string `json:"base64Value"`
 }
 
 // ---- Database and reflect utilities ----
