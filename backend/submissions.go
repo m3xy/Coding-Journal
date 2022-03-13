@@ -124,6 +124,7 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 		// gets context struct
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		log.Printf("[ERROR] Could not validate request body")
+		fmt.Println(ctx)
 		resp.Message = "Request body could not be validated."
 		resp.Error = true
 		w.WriteHeader(http.StatusUnauthorized)

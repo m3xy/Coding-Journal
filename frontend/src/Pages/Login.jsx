@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from "react";
-import { Form, Button, Container, Row, Col } from "react-bootstrap";
+import { Form, Button, Container, Row, Col, Alert } from "react-bootstrap";
 import axiosInstance from "../Web/axiosInstance"
 import { useNavigate } from "react-router-dom"
 import JwtService from "../Web/jwt.service"
@@ -20,6 +20,8 @@ function Login() {
     const [journal, setJournal] = useState(11)
     const navigate = useNavigate();
 
+    const [show, setShow] = useState(false);
+
     function loginUser(email, password, journal) {
         let data = {
             email: email,
@@ -32,6 +34,7 @@ function Login() {
                 navigate('/');
             })
             .catch((error) => {
+                setShow(true);
                 console.log(error.config)
                 console.log(error)
             });
@@ -47,6 +50,15 @@ function Login() {
             <Row>
                 <Col></Col>
                 <Col>
+                {show 
+                    ? <Alert variant="danger" onClose={() => setShow(false)} dismissible>
+                        <Alert.Heading>Error during login</Alert.Heading>
+                            <p>
+                                Please try again.
+                            </p>
+                        </Alert>
+                    : <br />
+                }
                     <br />
                     <h2>Login</h2>
                     <Form onSubmit={handleSubmit}>

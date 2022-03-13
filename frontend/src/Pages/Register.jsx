@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from "react";
-import { Form, Button, Container, Row, Col } from "react-bootstrap";
+import { Form, Button, Container, Row, Col, Alert } from "react-bootstrap";
 import axiosInstance from "../Web/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import JwtService from "../Web/jwt.service.js";
@@ -20,6 +20,8 @@ function Register() {
   const [lastName, setLastName] = useState();
   const [email, setEmail] = useState();
   const [password, setPassword] = useState();
+
+  const [show, setShow] = useState(false);
 
 	const onRegisterSuccessful = () => {
 		axiosInstance.post("/auth/login", { email: email, password: password})
@@ -42,7 +44,7 @@ function Register() {
     axiosInstance
       .post(registerEndpoint, data)
       .then(() => { onRegisterSuccessful() })
-      .catch((error) => { console.log(error) })
+      .catch((error) => { setShow(true); })
   }
 
   async function handleSubmit(e) {
@@ -55,7 +57,15 @@ function Register() {
       <Row>
         <Col></Col>
         <Col xs={4}>
-          <br />
+          {show 
+            ? <Alert variant="danger" onClose={() => setShow(false)} dismissible>
+              <Alert.Heading>Error during registration</Alert.Heading>
+                <p>
+                  Please try again.
+                </p>
+              </Alert>
+            : <br />
+          }
           <h2>Register</h2>
           <Form onSubmit={handleSubmit}>
             <Form.Group className="mb-3" controlId="firstName">

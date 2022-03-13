@@ -19,7 +19,7 @@ class Upload extends React.Component {
         super(props);
 
         this.state = {
-            authors: [],
+            authors: [], //Change to string
             files: [],
             submissionName: "",
             submissionAbstract: "",
@@ -66,14 +66,19 @@ class Upload extends React.Component {
         console.log(authors);
         // const authorID = JSON.parse(userId).userId;  //Extract author's userId
 
-        
+        let files2 = [];
         const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
             return new Promise((resolve, reject) => {
-                files[i].path = files[i].webkitRelativePath;
+                files2.push({
+                    name: files[i].name,
+                    path: files[i].name,
+                });
+                files[i].path = files[i].name;
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = function(e) {
-                    files[i].base64Value = e.target.result;
+                    files[i].base64Value = e.target.result.split(',')[1];
+                    files2[i].base64Value = e.target.result.split(',')[1];
                     resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
                 }
                 reader.onerror = function() {
@@ -110,10 +115,10 @@ class Upload extends React.Component {
                .then(() => {
                    let data = {
                         name: submissionName,
-                        license: submissionAbstract,
-                        files: files,
+                        license: "MIT",
+                        abstract: submissionAbstract,
+                        files: files2,
                         authors: authors,
-                        reviewers: [{userId: null}],
                         categories: categories
                    }
                    console.log(data)
@@ -160,7 +165,7 @@ class Upload extends React.Component {
         //    console.log(error);
         // });
         
-        this.state.authors.push({userId: userId});
+        this.state.authors.push(userId);
         this.uploadSubmission(this.state.authors, this.state.submissionName, this.state.submissionAbstract, this.state.files, this.state.tags);
 
         //Clearing form
@@ -194,7 +199,8 @@ class Upload extends React.Component {
 
         for(let i = 0; i < files.length; i++){
             if(!files[i] 
-            || !(files[i].name.endsWith(".css") || files[i].name.endsWith(".java") || files[i].name.endsWith(".js"))){
+            // || !(files[i].name.endsWith(".css") || files[i].name.endsWith(".java") || files[i].name.endsWith(".js"))
+            ){
                 console.log("Invalid file");
                 return;
             } 
