@@ -13,6 +13,14 @@ import JwtService from "../Web/jwt.service.js"
 
 const registerEndpoint = "/auth/register"
 
+const defaultMessages = {
+	firstName: "A first name is required.",
+	lastName: "A last name is required.",
+	email: "A valid email is required.",
+	password: "A valid password is required",
+	repeatPassword: "Passwords do not match"
+}
+
 function Register() {
 	const navigate = useNavigate()
 	const [form, setForm] = useState({
@@ -55,8 +63,23 @@ function Register() {
 			.then(() => {
 				onRegisterSuccessful()
 			})
+			// Handle errors
 			.catch((error) => {
+				let data = error.response.data
 				console.log(error)
+				if (data.hasOwnProperty("fields")) {
+					for (let i in data.fields) {
+						let field = data.fields[i]
+						if (Object.keys(form).includes(field.field)) {
+							setErrors((errors) => {
+								return {
+									...errors,
+									[field.field]: field.message
+								}
+							})
+						}
+					}
+				}
 			})
 	}
 
@@ -111,7 +134,10 @@ function Register() {
 			})
 		} else if (!validated && !errors.hasOwnProperty(e.target.name)) {
 			setErrors((errors) => {
-				return { ...errors, [e.target.name]: e.target.value }
+				return {
+					...errors,
+					[e.target.name]: defaultMessages[e.target.name]
+				}
 			})
 		}
 	}
@@ -140,7 +166,7 @@ function Register() {
 								isInvalid={errors.hasOwnProperty("firstName")}
 							/>
 							<Form.Control.Feedback type="invalid">
-								A first name is required!
+								{errors["firstName"]}
 							</Form.Control.Feedback>
 						</Form.Group>
 
@@ -154,7 +180,7 @@ function Register() {
 								isInvalid={errors.hasOwnProperty("lastName")}
 							/>
 							<Form.Control.Feedback type="invalid">
-								A last name is required!
+								{errors["lastName"]}
 							</Form.Control.Feedback>
 						</Form.Group>
 
@@ -168,10 +194,12 @@ function Register() {
 								isInvalid={errors.hasOwnProperty("email")}
 							/>
 							<Form.Text className="text-muted">
-								We'll never share your email with anyone else.
+								{!errors.hasOwnProperty("email")
+									? "We'll never share your email with anyone else."
+									: ""}
 							</Form.Text>
 							<Form.Control.Feedback type="invalid">
-								This email is invalid!
+								{errors["email"]}
 							</Form.Control.Feedback>
 						</Form.Group>
 
@@ -185,7 +213,7 @@ function Register() {
 								isInvalid={errors.hasOwnProperty("password")}
 							/>
 							<Form.Control.Feedback type="invalid">
-								The password must be valid!
+								{errors["password"]}
 							</Form.Control.Feedback>
 						</Form.Group>
 						<Form.Group className="mb-3" controlId="repeatPassword">
@@ -200,7 +228,7 @@ function Register() {
 								)}
 							/>
 							<Form.Control.Feedback type="invalid">
-								Passwords don't match!
+								{errors["repeatPassword"]}
 							</Form.Control.Feedback>
 						</Form.Group>
 
