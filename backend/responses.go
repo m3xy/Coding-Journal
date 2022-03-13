@@ -10,6 +10,14 @@ type StandardResponse struct {
 	Error   bool   `json:"error"`
 }
 
+type FormResponse struct {
+	StandardResponse
+	Fields []struct {
+		Field   string `json:"field"`
+		Message string `json:"message"`
+	} `json:"fields"`
+}
+
 // POST /auth/login response.
 type AuthLogInResponse struct {
 	AccessToken  string `json:"access_token"`
@@ -74,7 +82,7 @@ type AssignReviewersBody struct {
 
 // POST /submission/{id}/review
 type UploadReviewBody struct {
-	Approved bool `json:"approved" validate:"required"`
+	Approved    bool   `json:"approved" validate:"required"`
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
@@ -85,19 +93,19 @@ type UpdateSubmissionStatusBody struct {
 
 // POST /submissions/upload/zip
 type UploadSubmissionByZipBody struct {
-	Name		   string	`json:"name" validate:"required"`
-	License		   string	`json:"license"`
-	Abstract	   string	`json:"abstract"`
-	Tags		   []string `json:"tags"`
-	Authors		   []string `json:"authors" validate:"required"`
-	Reviewers	   []string `json:"reviewers"`
-	ZipBase64Value string	`json:"base64" validate:"base64url,required"`
+	Name           string   `json:"name" validate:"required"`
+	License        string   `json:"license"`
+	Abstract       string   `json:"abstract"`
+	Tags           []string `json:"tags"`
+	Authors        []string `json:"authors" validate:"required"`
+	Reviewers      []string `json:"reviewers"`
+	ZipBase64Value string   `json:"base64" validate:"base64url,required"`
 }
 
 // --- JWT Claim types --- //
 type JwtClaims struct {
-	ID    string `json:"userId"`
-	UserType int `json:"userType" validate:"min=0,max=4"`
-	Scope string
+	ID       string `json:"userId"`
+	UserType int    `json:"userType" validate:"min=0,max=4"`
+	Scope    string
 	jwt.StandardClaims
 }

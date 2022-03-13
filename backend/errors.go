@@ -14,6 +14,13 @@ type BadUserError struct {
 
 func (e *BadUserError) Error() string { return "User " + e.userID + " doesn't exist!" }
 
+// Handle repeat emails
+type RepeatEmailError struct {
+	email string
+}
+
+func (e *RepeatEmailError) Error() string { return "Email " + e.email + " is already taken!" }
+
 // Handle users with incorrect permissions.
 type WrongPermissionsError struct {
 	userID string
@@ -32,7 +39,7 @@ func (e *NoSubmissionError) Error() string { return fmt.Sprintf("Submission %d d
 
 // handle the case where a user is not assigned as a reviewer for a given submission.
 type NotReviewerError struct {
-	UserID string
+	UserID       string
 	SubmissionID uint
 }
 
@@ -42,7 +49,7 @@ func (e *NotReviewerError) Error() string {
 
 // Handle duplicate reviews.
 type DuplicateReviewError struct {
-	UserID string
+	UserID       string
 	SubmissionID uint
 }
 
@@ -55,20 +62,27 @@ type SubmissionStatusFinalisedError struct {
 	SubmissionID uint
 }
 
-func (e *SubmissionStatusFinalisedError) Error() string { return fmt.Sprintf("Cannot perform this action on approved/disapproved submission: %d", e.SubmissionID) }
+func (e *SubmissionStatusFinalisedError) Error() string {
+	return fmt.Sprintf("Cannot perform this action on approved/disapproved submission: %d", e.SubmissionID)
+}
 
 // handle case where an editor tries to change status of a submission without all reviews being submitted first
 type MissingReviewsError struct {
 	SubmissionID uint
 }
-func (e *MissingReviewsError) Error() string { return fmt.Sprintf("Cannot change status of submission: %d as it is missing reviews", e.SubmissionID) }
+
+func (e *MissingReviewsError) Error() string {
+	return fmt.Sprintf("Cannot change status of submission: %d as it is missing reviews", e.SubmissionID)
+}
 
 // handle case where an editor tries to approve a submission without all reviews being approving reviews
 type MissingApprovalError struct {
 	SubmissionID uint
 }
-func (e *MissingApprovalError) Error() string { return fmt.Sprintf("Cannot change status of submission: %d as not all reviewers approve", e.SubmissionID) }
 
+func (e *MissingApprovalError) Error() string {
+	return fmt.Sprintf("Cannot change status of submission: %d as not all reviewers approve", e.SubmissionID)
+}
 
 // Handle duplicate files.
 type DuplicateFileError struct {

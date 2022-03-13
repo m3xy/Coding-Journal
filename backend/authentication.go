@@ -13,7 +13,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -287,9 +286,9 @@ func validateWebToken(accessToken string, scope string) (bool, string, int) {
 // Create a token with given scope.
 func createToken(ID string, userType int, scope string) (string, error) {
 	claims := JwtClaims{
-		ID:    ID,
+		ID:       ID,
 		UserType: userType,
-		Scope: scope,
+		Scope:    scope,
 		StandardClaims: jwt.StandardClaims{
 			Issuer: "CS3099User11_Project_Code",
 		},
@@ -318,41 +317,50 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
-	var message string
 	user := &User{}
+	var resp FormResponse
 	if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
-		message = "Registration failed - Wrong fields provided."
-		goto ERROR
-	}
-	if validate.Struct(*user) != nil {
-		log.Printf("[WARN] Invalid password format received.")
-		message = "Registration failed - invalid password"
-		goto ERROR
-	}
-
-	if _, err := registerUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
+		resp = FormResponse{StandardResponse: StandardResponse{
+			Message: "Invalid fields provided.",
+			Error:   true,
+		}}
+	} else if validate.Struct(*user) != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		resp = FormResponse{StandardResponse: StandardResponse{
+			Message: "Registration failed",
+			Error:   true,
+		}}
+	} else if _, err := registerUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
-		message = "Registration failed - " + err.Error()
-		goto ERROR
+		switch err.(type) {
+		case *RepeatEmailError:
+			w.WriteHeader(http.StatusBadRequest)
+			resp = FormResponse{
+				StandardResponse: StandardResponse{
+					Message: err.Error(),
+					Error:   true,
+				},
+				Fields: []struct {
+					Field   string `json:"field"`
+					Message string `json:"message"`
+				}{{Field: "email", Message: err.Error()}},
+			}
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			resp = FormResponse{StandardResponse: StandardResponse{
+				Message: "Registration Failed, please try again later.",
+				Error:   true,
+			}}
+		}
+	} else {
+		resp = FormResponse{StandardResponse: StandardResponse{
+			Message: "Registration successful!",
+			Error:   false,
+		}}
 	}
 
-	//
-	log.Printf("[INFO] User signup from %s successful.", r.RemoteAddr)
-	if err := json.NewEncoder(w).Encode(StandardResponse{
-		Message: "Registration successful!",
-		Error:   false,
-	}); err != nil {
-		log.Printf("[ERROR] JSON encoding failed: %v", err)
-	}
-	return
-
-ERROR:
-	w.WriteHeader(http.StatusBadRequest)
-	if err := json.NewEncoder(w).Encode(StandardResponse{
-		Message: message,
-		Error:   true,
-	}); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] JSON encoding failed: %v", err)
 	}
 	return
@@ -371,7 +379,7 @@ func registerUser(user User, UserType int) (string, error) {
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user
 		if !isUnique(tx, User{}, "Email", user.Email) {
-			return errors.New("Email already taken!")
+			return &RepeatEmailError{email: user.Email}
 		}
 
 		// Make credentials insert transaction.
