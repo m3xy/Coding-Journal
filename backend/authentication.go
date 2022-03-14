@@ -227,19 +227,19 @@ func GetToken(w http.ResponseWriter, r *http.Request) {
 	var body interface{}
 
 	// Validate refresh token, and create new tokens.
-	if ok, user, userType := validateWebToken(refreshToken, "refresh"); !ok {
+	if ok, user, userType := validateWebToken(refreshToken, CLAIM_REFRESH); !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		body = StandardResponse{
 			Message: "Given refresh token is invalid!",
 			Error:   true,
 		}
-	} else if token, err := createToken(user, userType, "bearer"); err != nil {
+	} else if token, err := createToken(user, userType, CLAIM_BEARER); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		body = StandardResponse{
 			Message: "Access token creation failed!",
 			Error:   true,
 		}
-	} else if newRefresh, err := createToken(user, userType, "refresh"); err != nil {
+	} else if newRefresh, err := createToken(user, userType, CLAIM_REFRESH); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		body = StandardResponse{
 			Message: "Refresh token creation failed!",
@@ -275,12 +275,11 @@ func validateWebToken(accessToken string, scope string) (bool, string, int) {
 	}
 	if claims, ok := token.Claims.(*JwtClaims); !ok {
 		return false, "-", -1
-	} else if claims.Scope != "scope" {
+	} else if claims.Scope != scope {
 		return false, "-", -1
 	} else {
 		return true, claims.ID, claims.UserType
 	}
-
 }
 
 // Create a token with given scope.

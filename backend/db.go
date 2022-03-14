@@ -86,7 +86,7 @@ type Submission struct {
 	// license which the code is published under
 	License string `gorm:"size:64" json:"license" validate:"max=118"`
 	// pointer to allow nil values as neither approved nor dissaproved
-	Approved *bool `json:"approved" gorm:"default:"NULL"`
+	Approved *bool `json:"approved" gorm:"default:NULL"`
 	// an array of the submission's files
 	Files []File `json:"files,omitempty" validate:"dive"`
 	// an array of the submissions's authors
@@ -102,8 +102,8 @@ type Submission struct {
 // structure for meta-data of the submission. matches the structure of the submission's
 // JSON data file. This struct is never stored in the db
 type SubmissionData struct {
-	Abstract string `json:"abstract"`
-	Reviews []*Review `json:"reviews"`
+	Abstract string    `json:"abstract"`
+	Reviews  []*Review `json:"reviews"`
 }
 
 // struct for code files
@@ -123,8 +123,8 @@ type File struct {
 
 // Structure for submission reviews
 type Review struct {
-	ReviewerID string `json:"reviewerId"`
-	Approved bool `json:"approved"`
+	ReviewerID  string `json:"reviewerId"`
+	Approved    bool   `json:"approved"`
 	Base64Value string `json:"base64Value"`
 }
 
@@ -154,9 +154,9 @@ type Category struct {
 
 // Supergroup compliant code submissions (never stored in db)
 type SupergroupSubmission struct {
-	Name string `json:"name"`
-	MetaData SupergroupSubmissionData `json:"metadata"`
-	CodeVersions []SupergroupCodeVersion `json:"codeVersions"`
+	Name         string                   `json:"name"`
+	MetaData     SupergroupSubmissionData `json:"metadata"`
+	CodeVersions []SupergroupCodeVersion  `json:"codeVersions"`
 }
 
 // supergroup compliant structure for meta-data of the submission
@@ -174,14 +174,14 @@ type SupergroupSubmissionData struct {
 }
 
 type SuperGroupAuthor struct {
-	ID string `json:"userId"`
+	ID      string `json:"userId"`
 	Journal string `json:"journal"`
 }
 
 // struct to store a supergroup compliant version of a submission
 type SupergroupCodeVersion struct {
-	TimeStamp time.Time `json:"timestamp"`
-	Files []SupergroupFile `json:"files"`
+	TimeStamp time.Time        `json:"timestamp"`
+	Files     []SupergroupFile `json:"files"`
 }
 
 // Supergroup compliant file structure (never stored in db)
