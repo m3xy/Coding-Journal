@@ -258,7 +258,7 @@ class Upload extends React.Component {
 
         const tags = this.state.tags.map((tag, i) => {
             return (
-                <Button variant="outline-secondary" size="sm" onClick={() => {
+                <Button key={i} variant="outline-secondary" size="sm" onClick={() => {
                     this.setState({
                         tags: this.state.tags.filter(value => value !== tag)
                     })}
@@ -310,7 +310,7 @@ class Upload extends React.Component {
                                     <Tab eventKey="files" title="Files">
                                         <Row>
                                             <Form.Group controlId="formFile" className="mb-3">
-                                                <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later */}
+                                                <Form.Control type="file" accept=".css,.java,.js" required onChange={this.dropFiles}/>{/* multiple later w/ "zip,application/octet-stream,application/zip,application/x-zip,application/x-zip-compressed" */}
                                             </Form.Group>
                                             <Card.Body>
 
