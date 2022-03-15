@@ -43,7 +43,7 @@ function Profile() {
 				console.log(response.data);
 				setFirstname(response.data.profile.firstName)
 				setLastname(response.data.profile.lastName)
-				setUsertype(response.data.profile.userType)
+				setUsertype(response.data.userType)
 				setEmail(response.data.profile.email)
 				setPhoneNumber(response.data.profile.phoneNumber)
 				setOrganization(response.data.profile.organization)
