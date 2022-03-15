@@ -1,15 +1,10 @@
 volumes:
   db_data:
-
-networks:
-  backend:
-    driver: bridge
+  file_sys:
 
 services:
   db:
     build: ./db
-    networks:
-      - backend
     ports:
       - "3307:3306"
     volumes:
@@ -19,17 +14,14 @@ services:
     build: ./backend
     depends_on:
       - db
-    links:
-      - db
-    networks:
-      - backend
     ports:
       - "3333:3333"
     volumes:
       - ./logs:/var/tmp/cs3099-log
+      - file_sys:/filesystem
     environment:
       LOG_PATH: "/var/tmp/cs3099-log/cs3099-backend.log"
-      DATABASE_URL: "myuser:mypass@tcp(localhost:3307)"
+      DATABASE_URL: "myuser:mypass@tcp(db:3306)"
 
   frontend:
     build: ./frontend
@@ -38,4 +30,6 @@ services:
     ports:
       - "23409:23409"
     environment:
-      NODE_ENV: "nodocker"
+      NODE_ENV: "development"
+    volumes:
+      - ./frontend:/usr/src/app

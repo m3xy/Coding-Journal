@@ -2,94 +2,30 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt"
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/validator.v2"
 )
 
 const (
-	TEST_LOG_PATH  = "./test.log"
 	VALID_PW       = "aB12345$"
 	PW_NO_UC       = "a123456$"
 	PW_NO_LC       = "B123456$"
 	PW_NO_NUM      = "aBcdefg$"
 	PW_NO_SC       = "aB123456"
 	PW_WRONG_CHARS = "asbd/\\s@!"
-	TEST_DB        = "testdb"
-	JSON_TAG_PW    = "password"
 	INVALID_ID     = "invalid-always"
 )
-
-var testUsers []*Credentials = []*Credentials{
-	{Email: "test.test@test.test", Pw: "123456aB$", Fname: "test",
-		Lname: "test", PhoneNumber: "0574349206", Usertype: USERTYPE_USER},
-	{Email: "john.doe@test.com", Pw: "dlbjDs2!", Fname: "John",
-		Lname: "Doe", Organization: "TestOrg", Usertype: USERTYPE_USER},
-	{Email: "jane.doe@test.net", Pw: "dlbjDs2!", Fname: "Jane",
-		Lname: "Doe", Usertype: USERTYPE_PUBLISHER},
-}
-
-var wrongCredsUsers []*Credentials = []*Credentials{
-	{Email: "test.nospec@test.com", Pw: "badN0Special", Fname: "test", Lname: "nospec"},
-	{Email: "test.nonum@test.com", Pw: "testNoNum!", Fname: "test", Lname: "nonum"},
-	{Email: "test.toosmall@test.com", Pw: "g0.Ku", Fname: "test", Lname: "toosmall"},
-	{Email: "test.wrongchars@test.com", Pw: "Tho/se]chars|ille\"gal", Fname: "test", Lname: "wrongchars"},
-	{Email: "test.nolowercase@test.com", Pw: "ALLCAP5!", Fname: "test", Lname: "nolower"},
-	{Email: "test.nouppercase@test.com", Pw: "nocap5!!", Fname: "test", Lname: "noupper"},
-}
-
-// Initialise the database for testing.
-func testInit() {
-	dbInit(TEST_DB)
-	setup(TEST_LOG_PATH)
-	if err := dbClear(); err != nil {
-		fmt.Printf("Error occurred while clearing Db: %v", err)
-	}
-}
-
-// Close database at the end of test.
-func testEnd() {
-	if err := dbClear(); err != nil {
-		fmt.Printf("Error occurred while clearing Db: %v", err)
-	}
-	db.Close()
-}
-
-func sendJsonRequest(endpoint string, method string, data interface{}) (*http.Response, error) {
-	var req *http.Request
-	if data != nil {
-		jsonDat, _ := json.Marshal(data)
-		req, _ = http.NewRequest(method, BACKEND_ADDRESS+endpoint, bytes.NewBuffer(jsonDat))
-	} else {
-		req, _ = http.NewRequest(method, BACKEND_ADDRESS+endpoint, nil)
-	}
-	return sendSecureRequest(req, TEAM_ID)
-}
-
-func testAuth(t *testing.T) {
-	// Set up database.
-	dbInit(TEST_DB)
-	if err := dbClear(); err != nil {
-		fmt.Printf("Error occured while clearing Db: %v", err)
-	}
-
-	// Set up logging to a local testing file.
-	file, err := os.OpenFile(TEST_LOG_PATH, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		fmt.Printf("Log file creation failure: %v! Exiting...", err)
-	}
-	log.SetOutput(file)
-}
 
 // Test successful password hashing
 func TestPwHash(t *testing.T) {
@@ -118,15 +54,22 @@ func TestPwComp(t *testing.T) {
 }
 
 func TestPw(t *testing.T) {
-	validator.SetValidationFunc("validpw", validpw)
+	if validate == nil {
+		validate = validator.New()
+		validate.RegisterValidation("ispw", ispw)
+	}
+
 	t.Run("Passwords valid", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			assert.Nilf(t, validator.Validate(*testUsers[i]), "%s Should be valid!", testUsers[i].Pw)
+			if err := validate.Struct(testUsers[i]); err != nil {
+				fmt.Printf("%v\n", err)
+				assert.Nilf(t, err, "%s Should be valid!", testUsers[i].Password)
+			}
 		}
 	})
 	t.Run("Passwords invalid", func(t *testing.T) {
 		for i := 0; i < len(wrongCredsUsers); i++ {
-			assert.NotNilf(t, validator.Validate(*wrongCredsUsers[i]), "%s should be illegal!", wrongCredsUsers[i].Pw)
+			assert.NotNilf(t, validate.Struct(wrongCredsUsers[i]), "%s should be illegal!", wrongCredsUsers[i].Password)
 		}
 	})
 }
@@ -137,7 +80,8 @@ func TestRegisterUser(t *testing.T) {
 	// Test registering new users with default credentials.
 	t.Run("Valid registrations", func(t *testing.T) {
 		for i := range testUsers {
-			_, err := registerUser(testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			_, err := registerUser(*trialUser, USERTYPE_NIL)
 			if err != nil {
 				t.Errorf("User registration error: %v\n", err.Error())
 				return
@@ -148,7 +92,8 @@ func TestRegisterUser(t *testing.T) {
 	// Test reregistering those users
 	t.Run("Repeat registrations", func(t *testing.T) {
 		for i := range testUsers {
-			_, err := registerUser(testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			_, err := registerUser(*trialUser, USERTYPE_NIL)
 			if err == nil {
 				t.Error("Already registered account cannot be reregistered.")
 				return
@@ -158,75 +103,49 @@ func TestRegisterUser(t *testing.T) {
 	testEnd()
 }
 
-// Test credential uniqueness with test database.
-func TestCheckUnique(t *testing.T) {
-	testInit()
-	// Test uniqueness in empty table
-	t.Run("Unique elements", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			assert.Truef(t, checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"),
-				testUsers[i].Email), "Email %s Shouldn't exist in database!", testUsers[i].Email)
-		}
-	})
-
-	// Add an element to table
-	stmt := fmt.Sprintf(INSERT_CRED,
-		TABLE_USERS,
-		getDbTag(&Credentials{}, "Pw"),
-		getDbTag(&Credentials{}, "Fname"),
-		getDbTag(&Credentials{}, "Lname"),
-		getDbTag(&Credentials{}, "Email"))
-
-	// Test uniquenes if element already exists in table.
-	t.Run("Non-unique elements", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			_, err := db.Query(stmt, testUsers[i].Pw, testUsers[i].Fname, testUsers[i].Lname, testUsers[i].Email)
-			assert.Nilf(t, err, "Database query should work, but error gotten: %v", err)
-			assert.Falsef(t, checkUnique(TABLE_USERS, getDbTag(&Credentials{}, "Email"), testUsers[0].Email),
-				"Email %s should already be in database!", testUsers[i].Email)
-		}
-	})
-	testEnd()
-}
-
 // Test user sign-up using test database.
 func TestSignUp(t *testing.T) {
 	// Set up test
 	testInit()
-	srv := setupCORSsrv()
+	defer testEnd()
 
-	// Start server.
-	go srv.ListenAndServe()
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
 
 	// Test not yet registered users.
 	t.Run("Valid signup requests", func(t *testing.T) {
-		UserStmt := fmt.Sprintf(SELECT_ROW, getDbTag(&Credentials{}, "Id"), TABLE_USERS, getDbTag(&Credentials{}, "Email"))
-		IdsStmt := fmt.Sprintf(SELECT_ROW, getDbTag(&IdMappings{}, "GlobalId"), TABLE_IDMAPPINGS, getDbTag(&IdMappings{}, "Id"))
 		for i := range testUsers {
 			// Create JSON body for sign up request based on test user.
-			resp, _ := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			reqBody, _ := json.Marshal(trialUser)
+			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
 
 			// Check if response OK and user registered.
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Expected %d but got %d status code!", http.StatusOK, resp.StatusCode)
 
-			res := db.QueryRow(UserStmt, testUsers[i].Email)
-			storedCreds := &Credentials{}
-			err := res.Scan(&storedCreds.Id)
-			assert.NotEqualf(t, sql.ErrNoRows, err, "User %s %s should be in database!", testUsers[i].Fname, testUsers[i].Lname)
+			assert.NotEqualf(t, true,
+				isUnique(gormDb, &User{}, "email", testUsers[i].Email), "User should be in database!")
 
-			// Check if global ID exists for user.
-			res = db.QueryRow(IdsStmt, storedCreds.Id)
-			storedMapping := &IdMappings{Id: storedCreds.Id}
-			err = res.Scan(storedMapping.GlobalId)
-			assert.NotEqualf(t, sql.ErrNoRows, err, "ID %s should be in database!", storedMapping.GlobalId)
+			var exists bool
+			if err := gormDb.Model(&GlobalUser{}).Select("count(*) > 0").
+				Where(&GlobalUser{User: testUsers[i]}).Find(&exists).Error; err != nil {
+				t.Errorf("Global ID test query error: %v", err)
+			}
+			assert.NotEqual(t, false, exists, "ID should be in database!")
 		}
 	})
 
 	// Test bad request response for an already registered user.
 	t.Run("Repeat user signups", func(t *testing.T) {
 		for i := 0; i < len(testUsers); i++ {
-			resp, _ := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, testUsers[i])
+			trialUser := testUsers[i].getCopy()
+			reqBody, _ := json.Marshal(trialUser)
+			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
 
 			// Check if response is indeed unsuccessful.
@@ -236,9 +155,14 @@ func TestSignUp(t *testing.T) {
 
 	// Test bad request response for invalid credentials.
 	t.Run("Invalid signups", func(t *testing.T) {
-		for i := range wrongCredsUsers {
-			resp, _ := sendJsonRequest(ENDPOINT_SIGNUP, http.MethodPost, wrongCredsUsers[i])
+		for _, user := range wrongCredsUsers {
+			trialUser := user.getCopy()
+			reqBody, _ := json.Marshal(trialUser)
+			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
 			defer resp.Body.Close()
+
 			// Check if response is indeed unsuccessful.
 			if resp.StatusCode != http.StatusBadRequest {
 				t.Errorf("Status incorrect, should be %d, got %d\n", http.StatusBadRequest, resp.StatusCode)
@@ -246,139 +170,90 @@ func TestSignUp(t *testing.T) {
 			}
 		}
 	})
-
-	// Close server.
-	if err := srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
-	testEnd()
 }
 
-// Test user log in.
-func TestLogIn(t *testing.T) {
-	// Set up test
+// Test user client login
+func TestAuthLogIn(t *testing.T) {
+	// Set up test and start server.
 	testInit()
-	srv := setupCORSsrv()
+	defer testEnd()
 
-	// Start server.
-	go srv.ListenAndServe()
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn)
 
-	// Populate database with valid users.
-	for i := range testUsers {
-		id, err := registerUser(testUsers[i])
-		if err != nil {
-			t.Errorf("User registration error: %v\n", err)
-			return
-		} else {
-			// Set user ID for ID checking.
-			testUsers[i].Id = id
-		}
+	// Populate database.
+	for _, u := range testUsers {
+		registerUser(u, USERTYPE_NIL)
 	}
 
-	// Test valid logins
+	// Set JWT Secret.
+	if myEnv, err := godotenv.Read("secrets.env"); err != nil {
+		t.Errorf("Dotenv file reading error: %v", err)
+		return
+	} else {
+		JwtSecret = myEnv["JWT_SECRET"]
+	}
+
 	t.Run("Valid logins", func(t *testing.T) {
-		for i := range testUsers {
-			// Create a request for user login.
-			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[i].Email
-			loginMap[JSON_TAG_PW] = testUsers[i].Pw
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
-			assert.Nil(t, err, "Request should not error.")
-			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response status should be %d", http.StatusOK)
+		for _, user := range testUsers {
+			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
+			bodyBuf, _ := json.Marshal(body)
 
-			// Get ID from user response.
-			respMap := make(map[string]string)
-			err = json.NewDecoder(resp.Body).Decode(&respMap)
-			assert.Nil(t, err, "Body unparsing should succeed")
-			storedId, exists := respMap[getJsonTag(&Credentials{}, "Id")]
-			assert.True(t, exists, "ID should exist in response.")
+			// Send request
+			req, w := httptest.NewRequest("POST", ENDPOINT_LOGIN, bytes.NewBuffer(bodyBuf)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+			defer resp.Body.Close()
 
-			// Check if gotten
-			assert.Equal(t, testUsers[i].Id, storedId, "ID must equal registration's ID.")
+			if !assert.Equalf(t, 200, resp.StatusCode, "Request should be successful!") {
+				return
+			}
+
+			// Validate body content
+			var validBody AuthLogInResponse
+			if err := json.NewDecoder(resp.Body).Decode(&validBody); err != nil {
+				t.Errorf("Login response decoding error: %v\n", err)
+				return
+			}
+			var actualUser User
+			if err := gormDb.Where("Email = ?", user.Email).Find(&actualUser).Error; err != nil {
+				t.Errorf("SQL query error: %v\n", err)
+				return
+			}
+
+			if token, err := jwt.ParseWithClaims(validBody.AccessToken, &JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
+				return []byte(JwtSecret), nil
+			}); err != nil {
+				t.Errorf("Error parsing JWT token: %v\n", err)
+				return
+			} else if claims, ok := token.Claims.(*JwtClaims); !ok {
+				t.Errorf("Error getting JWT token claims: %v\n", err)
+				return
+			} else {
+				assert.Equal(t, actualUser.GlobalUserID, claims.ID, "User should be inside token.")
+			}
 		}
 	})
 
-	// Test invalid password login.
-	t.Run("Invalid password logins", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[i].Email
-			loginMap[JSON_TAG_PW] = VALID_PW // Ensure this pw is different from all test users.
+	t.Run("Invalid logins", func(t *testing.T) {
+		for _, user := range wrongCredsUsers {
+			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
+			bodyBuf, _ := json.Marshal(body)
 
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
-			assert.Nil(t, err, "Request should not error.")
-			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
+			// Send request
+			req, w := httptest.NewRequest("POST", ENDPOINT_LOGIN, bytes.NewBuffer(bodyBuf)), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+			defer resp.Body.Close()
+			if !assert.Equal(t, 401, resp.StatusCode, "Status code should be 401 - unauthorized") {
+				return
+			}
+
+			// Verify body format
+			var validBody StandardResponse
+			if err := json.NewDecoder(resp.Body).Decode(&validBody); err != nil {
+				t.Errorf("Response failed to decode to correct format: %v\n", err)
+			}
 		}
 	})
-
-	// Test invalid email login.
-	t.Run("Invalid email logins", func(t *testing.T) {
-		for i := 1; i < len(testUsers); i++ {
-			loginMap := make(map[string]string)
-			loginMap[getJsonTag(&Credentials{}, "Email")] = testUsers[0].Email
-			loginMap[JSON_TAG_PW] = testUsers[i].Pw
-
-			resp, err := sendJsonRequest(ENDPOINT_LOGIN, http.MethodPost, loginMap)
-			assert.Nil(t, err, "Request should not error.")
-			assert.Equalf(t, http.StatusUnauthorized, resp.StatusCode, "Response should have status %d", http.StatusUnauthorized)
-		}
-	})
-
-	// Close server.
-	if err := srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
-	testEnd()
-}
-
-// Test user info getter.
-func TestGetUserProfile(t *testing.T) {
-	testInit()
-	srv := setupCORSsrv()
-
-	// Start server.
-	go srv.ListenAndServe()
-
-	// Populate database for testing and test valid user.
-	for i := range testUsers {
-		testUsers[i].Id, _ = registerUser(testUsers[i])
-	}
-
-	t.Run("Valid user profiles", func(t *testing.T) {
-		for i := range testUsers {
-			res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+testUsers[i].Id, http.MethodGet, nil)
-			assert.Nil(t, err, "Request should not error.")
-			assert.Equal(t, http.StatusOK, res.StatusCode, "Status should be OK.")
-
-			resCreds := Credentials{}
-			err = json.NewDecoder(res.Body).Decode(&resCreds)
-			assert.Nil(t, err, "JSON decoding must not error.")
-
-			// Check equality for all user info.
-			assert.Equal(t, testUsers[i].Email, resCreds.Email, "Email should be equal.")
-			assert.Equal(t, testUsers[i].Fname, resCreds.Fname, "First name should be equal.")
-			assert.Equal(t, testUsers[i].Lname, resCreds.Lname, "Last name should be equal.")
-			assert.Equal(t, testUsers[i].Usertype, resCreds.Usertype, "Usertype should be equal.")
-			assert.Equal(t, testUsers[i].PhoneNumber, resCreds.PhoneNumber, "Phone number should be equal.")
-			assert.Equal(t, testUsers[i].Organization, resCreds.Organization, "Organization should be equal.")
-		}
-	})
-
-	// Test invalid users.
-	t.Run("Invalid user profile", func(t *testing.T) {
-		res, err := sendJsonRequest(ENDPOINT_USERINFO+"/"+INVALID_ID, http.MethodGet, nil)
-		assert.Nil(t, err, "Request should not error.")
-		assert.Equalf(t, http.StatusNotFound, res.StatusCode, "Request should return status %d", http.StatusNotFound)
-	})
-
-	// Close server.
-	if err := srv.Shutdown(context.Background()); err != nil {
-		fmt.Printf("HTTP server shutdown: %v", err)
-	}
-	testEnd()
-}
-
-// Test user import.
-func TestExport(t *testing.T) {
-
 }

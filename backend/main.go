@@ -11,6 +11,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -25,29 +27,31 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
-	ENDPOINT_LOGIN           = "/login"
-	ENDPOINT_LOGIN_GLOBAL    = "/glogin"
-	ENDPOINT_SIGNUP          = "/register"
-	ENDPOINT_ALL_SUBMISSIONS = "/submissions"
-	ENDPOINT_SUBMISSION      = "/submission"
-	ENDPOINT_FILE            = "/submission/file"
-	ENDPOINT_NEWFILE         = "/upload"
-	ENDPOINT_USERINFO        = "/users"
-	ENDPOINT_NEWCOMMENT      = "/submission/file/newcomment"
-	ENDPOINT_VALIDATE        = "/validate"
+	SUBROUTE_JOURNAL = "/journal"
+
+	ENDPOINT_USERINFO = "/users"
+	ENDPOINT_VALIDATE = "/validate"
 )
 
+var prodLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
+	SlowThreshold: time.Second,
+	LogLevel:      logger.Error,
+})
+
 func main() {
-	srv := setupCORSsrv()
 
 	// Initialise database with production credentials.
-	dbInit(dbname)
-	setup(os.Getenv("LOG_PATH"))
+	var err error
+	if gormDb, err = gormInit(dbname, prodLogger); err != nil {
+		return
+	}
+	setup(gormDb, os.Getenv("LOG_PATH"))
 
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	// Run server in goroutine to avoid blocking call.
+	srv := setupCORSsrv()
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %v\n", err)
@@ -76,35 +80,30 @@ func setupCORSsrv() *http.Server {
 
 	// sets up handler for CORS
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
+		AllowedOrigins: []string{"http://0.0.0.0:23409", "http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
 		AllowedHeaders: []string{"content-type", SECURITY_TOKEN_KEY, "bearer_token", "refresh_token", "user"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PUT"},
 	})
 
-	// Set up middleware
-	router.Use(authenticationMiddleWare)
-
 	// Setup all routes.
-	router.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_LOGIN_GLOBAL, logInGlobal).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_ALL_SUBMISSIONS, getAllSubmissions).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_SUBMISSION, getSubmission).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_FILE, getFile).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
-	router.HandleFunc(ENDPOINT_NEWFILE, uploadSingleFile).Methods(http.MethodPost, http.MethodOptions)
 	router.HandleFunc(ENDPOINT_VALIDATE, tokenValidation).Methods(http.MethodGet, http.MethodOptions)
-	router.HandleFunc("/users/{"+getJsonTag(&Credentials{}, "Id")+"}", getUserProfile).Methods(http.MethodGet, http.MethodOptions)
+	getAuthSubRoutes(router)        // Auth subroutes
+	getJournalSubroute(router)      // Journal subroutes
+	getUserSubroutes(router)        // Users subroutes
+	getSubmissionsSubRoutes(router) // Submissions and files routes
+	getFilesSubRoutes(router)
 
 	// Setup HTTP server and shutdown signal notification
 	return &http.Server{
-		Addr:    PORT,
-		Handler: c.Handler(router),
+		Addr:         PORT,
+		Handler:      RequestLoggerMiddleware(c.Handler(router)),
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
 	}
 }
 
 // Set up the server and it's dependencies.
-func setup(logpath string) error {
+func setup(db *gorm.DB, logpath string) error {
 	// Set log file logging.
 	var err error = nil
 	file, err := os.OpenFile(logpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -115,13 +114,13 @@ func setup(logpath string) error {
 	log.SetOutput(file)
 
 	// Check security token existence before running.
-	err = securityCheck()
+	err = securityCheck(db)
 	if err != nil {
 		goto RETURN
 	}
 
 	// Check for filesystem existence.
-	if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {
+	/* if _, err = os.Stat(FILESYSTEM_ROOT); os.IsNotExist(err) {
 		log.Printf("Filesystem not setup up! Setting it up at %s",
 			FILESYSTEM_ROOT)
 		err = os.MkdirAll(FILESYSTEM_ROOT, DIR_PERMISSIONS)
@@ -129,10 +128,10 @@ func setup(logpath string) error {
 			log.Fatalf("Filesystem setup error: %v\n", err)
 			goto RETURN
 		}
-	}
+	} */
 
 	// Set foreign servers.
-	if err = setForeignServers(); err != nil {
+	if err = setForeignServers(db); err != nil {
 		log.Fatalf("FATAL - Foreign server set up error: %v\n", err)
 		goto RETURN
 	}

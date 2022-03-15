@@ -1,0 +1,24 @@
+.HomePage {
+    margin: auto;
+    width: 80%;
+}
+
+.HomeContent {
+    padding: 2%;
+    background-color: #FAFAFA;
+}
+
+.ScrollerComponent {
+    width: 80%;
+}
+
+.ScrollerContainer {
+    margin: 20px;
+    height: 20%;
+    white-space: nowrap;
+    display: flex;
+    flex-direction: row;
+
+    overflow-x: auto;
+    overflow-y: hidden;
+}
