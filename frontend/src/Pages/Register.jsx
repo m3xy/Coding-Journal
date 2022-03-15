@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from "react"
-import { Form, Button, Container, Row, Col } from "react-bootstrap"
+import { Form, Button, Container, Row, Col, Alert } from "react-bootstrap"
 import axiosInstance from "../Web/axiosInstance"
 import { useNavigate } from "react-router-dom"
 import JwtService from "../Web/jwt.service.js"
@@ -20,6 +20,7 @@ const defaultMessages = {
 	password: "A valid password is required",
 	repeatPassword: "Passwords do not match"
 }
+const DEFAULT_500_MSG = "Registration failed - please try again later."
 
 function Register() {
 	const navigate = useNavigate()
@@ -32,6 +33,9 @@ function Register() {
 	})
 	const [errors, setErrors] = useState({})
 	const [moddedFields, setModdedFields] = useState([])
+
+	const [show, setShow] = useState(false)
+	const [alertMsg, setAlertMsg] = useState("")
 
 	const onRegisterSuccessful = () => {
 		axiosInstance
@@ -65,21 +69,35 @@ function Register() {
 			})
 			// Handle errors
 			.catch((error) => {
-				let data = error.response.data
 				console.log(error)
-				if (data.hasOwnProperty("fields")) {
-					for (let i in data.fields) {
-						let field = data.fields[i]
-						if (Object.keys(form).includes(field.field)) {
-							setErrors((errors) => {
-								return {
-									...errors,
-									[field.field]: field.message
-								}
-							})
+				let message = ""
+
+				// Erroring if the error has a server response
+				if (error.response != null) {
+					let data = error.response.data
+
+					// Get wrong form fields if there are any.
+					if (data.hasOwnProperty("fields")) {
+						for (let i in data.fields) {
+							let field = data.fields[i]
+							if (Object.keys(form).includes(field.field)) {
+								setErrors((errors) => {
+									return {
+										...errors,
+										[field.field]: field.message
+									}
+								})
+							}
 						}
 					}
+					message = data.message
+				} else {
+					// Handling of no-response
+					message = DEFAULT_500_MSG
 				}
+
+				setShow(true)
+				setAlertMsg(message)
 			})
 	}
 
@@ -153,7 +171,16 @@ function Register() {
 			<Row>
 				<Col></Col>
 				<Col xs={4}>
-					<br />
+					{show ? (
+						<Alert
+							variant="danger"
+							onClose={() => setShow(false)}
+							dismissible>
+							<p>{alertMsg}</p>
+						</Alert>
+					) : (
+						<br />
+					)}
 					<h2>Register</h2>
 					<Form onSubmit={handleSubmit}>
 						<Form.Group className="mb-3" controlId="firstName">

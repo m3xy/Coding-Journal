@@ -13,8 +13,8 @@ const (
 
 // request context object for logged in users
 type RequestContext struct {
-	ID string `validate:"required"`
-	UserType int `validate:"required"`
+	ID       string `validate:"required"`
+	UserType int    `validate:"required"`
 }
 
 // Middleware for user authentication and security key verification.
@@ -31,12 +31,12 @@ func journalMiddleWare(next http.Handler) http.Handler {
 // Middleware for strict access token validation.
 func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ok, id, userType := validateWebToken(r.Header.Get("Authorization"), CLAIM_BEARER); !ok {
+		if ok, id, userType := validateWebToken(r.Header.Get("bearer_token"), CLAIM_BEARER); !ok {
 			next.ServeHTTP(w, r)
 		} else {
 			if !isUnique(gormDb, &GlobalUser{}, "id", id) {
 				ctx := context.WithValue(r.Context(), "data", RequestContext{
-					ID: id,
+					ID:       id,
 					UserType: userType,
 				})
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -53,29 +53,29 @@ type StatusResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
-func (sw *StatusResponseWriter) WriteHeader (statusCode int) {
+
+func (sw *StatusResponseWriter) WriteHeader(statusCode int) {
 	sw.statusCode = statusCode
 	sw.ResponseWriter.WriteHeader(statusCode)
 }
 
 // Logged for incoming requests.
 // Format: user user_type [method] [time] [code] host path query
-func RequestLoggerMiddleware (next http.Handler) http.Handler {
+func RequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		user, usertype := "-", "-"
-		if  ctx, ok := r.Context().Value("data").(RequestContext);
-		ok && validate.Struct(ctx) == nil {
+		if ctx, ok := r.Context().Value("data").(RequestContext); ok && validate.Struct(ctx) == nil {
 			user = ctx.ID
-			userMap := map[int]string {0: "user", 1: "publisher", 2: "reviewer",
-			3: "reviewer-publisher", 4: "editor"}
+			userMap := map[int]string{0: "user", 1: "publisher", 2: "reviewer",
+				3: "reviewer-publisher", 4: "editor"}
 			usertype = userMap[ctx.UserType]
 		}
 
 		// Create response writer with given status.
 		sw := &StatusResponseWriter{
 			ResponseWriter: w,
-			statusCode: http.StatusOK,
+			statusCode:     http.StatusOK,
 		}
 
 		// Log the request's final result.

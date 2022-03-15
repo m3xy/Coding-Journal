@@ -28,6 +28,6 @@ services:
     ports:
       - "23409:23409"
     environment:
-      NODE_ENV: "nodocker"
+      NODE_ENV: "development"
     volumes:
       - ./frontend:/usr/src/app

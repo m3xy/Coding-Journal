@@ -17,6 +17,8 @@ const axiosInstance = axios.create({
   },
 });
 
+const TOKEN_ROUTE = "/auth/token"
+
 // Handler for 401
 axiosInstance.interceptors.response.use(
   (response) => {
@@ -24,13 +26,13 @@ axiosInstance.interceptors.response.use(
   },
   async (error) =>  {
     var origRequest = error.config;
-    if (origRequest.url !== "/token" && error.response) {
+    if (origRequest.url !== TOKEN_ROUTE && error.response) {
       if (error.response.status === 401 && !origRequest._retry) {
         origRequest._retry = true;
         try {
           const rs = await axiosInstance({
             method: "get",
-            url: "/auth/token",
+            url: TOKEN_ROUTE,
             headers: {
               refresh_token: "Refresh " + JwtService.getRefreshToken(),
             },

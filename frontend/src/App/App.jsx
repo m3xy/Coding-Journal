@@ -31,31 +31,29 @@ import Navigation from "../Components/Navbar"
 import HomePage from "../Pages/HomePage/HomePage"
 
 function App() {
-	return (
-		<Container fluid="true">
-			<Router>
-				<Navigation />
-				<Routes>
-					<Route path="/" element={<HomePage />} />
-					<Route path="/login" element={<Login />} />
-					<Route path="/register" element={<Register />} />
-					<Route path="/about" element={<About />} />
-					<Route
-						path="/code/:submissionId/:filePath"
-						element={<Code />}
-					/>
-					<Route path="/code" element={<Code />} />
-					{/* optional URL params removed in react router v6*/}
-					<Route path="/comment" element={<Comment />} />
-					<Route path="/contact" element={<Contact />} />
-					<Route path="/upload" element={<Upload />} />
-					<Route path="/profile" element={<Profile />} />
-					<Route path="/submissions" element={<Submissions />} />
-				</Routes>
-				<Footer />
-			</Router>
-		</Container>
-	)
+    return(
+        <Container fluid="true">
+            <Router>
+                <Navigation />
+                <Routes>
+                    <Route path="/" element = {<HomePage />} />
+                    <Route path="/login" element = {<Login />} />
+                    <Route path="/register" element = {<Register />} />
+                    <Route path="/about" element = {<About />} />
+                    <Route path="/code/:submissionId/:filePath" element = {<Code />} />
+                    <Route path="/code/:fileId" element = {<Code />} />
+                    <Route path="/code" element = {<Code />} />
+                    {/* optional URL params removed in react router v6*/}
+                    <Route path="/comment" element = {<Comment />} />
+                    <Route path="/contact" element = {<Contact />} />
+                    <Route path="/upload" element = {<Upload />} />
+                    <Route path="/profile" element = {<Profile />} />
+                    <Route path="/submissions" element = {<Submissions />} />
+                </Routes>
+                <Footer />
+            </Router>
+        </Container>
+    );
 }
 
 export default App

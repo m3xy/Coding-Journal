@@ -20,18 +20,26 @@ function Code(props) {
     const [submissionName, setSubmissionName] = useState('Submission');
     const [submissionId, setSubmissionId] = useState(0);
     const [filePath, setFilePath] = useState('App/Pages/index.js');
+    const [fileId, setFileId] = useState(0);
 
     // const [fileName, setFileName] = useState('App/Pages/index.js');
 
     // let { submissionId, filePath } = useParams();
+
+    // const [comments, setComments] = useState({
+    //     1:[ {submissionId: null, filePath: null, author: "John Doe", base64Value: "Looks Good!"}, 
+    //         {submissionId: null, filePath: null, author: "Jane Doe", base64Value: "I disagree."},
+    //         {submissionId: null, filePath: null, author: "Jim Doe", base64Value: "I have 500 more citations than both of you, I can assure you, this code is mediocre."}
+    //       ]
+    // });
 
     const [comments, setComments] = useState({
         1:[ {submissionId: null, filePath: null, author: "John Doe", base64Value: "Looks Good!"}, 
             {submissionId: null, filePath: null, author: "Jane Doe", base64Value: "I disagree."},
             {submissionId: null, filePath: null, author: "Jim Doe", base64Value: "I have 500 more citations than both of you, I can assure you, this code is mediocre."}
           ]
-    }        
-    );
+    });
+
     const [show, setShow] = useState(false);
 
     const monacoRef = useRef();
