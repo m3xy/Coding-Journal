@@ -313,8 +313,8 @@ func TestUploadSubmission(t *testing.T) {
 				Name: "Test", Authors: []string{globalAuthors[0].ID},
 				Reviewers: []string{globalReviewers[0].ID},
 				Files: []File{
-					{Name: "test.txt", Path: "test.txt", Base64Value: "test"}, // Check correct file paths.
-					{Name: "test.txt", Path: "test/test.txt", Base64Value: "test"},
+					{Path: "test.txt", Base64Value: "test"}, // Check correct file paths.
+					{Path: "test/test.txt", Base64Value: "test"},
 				},
 			}
 			testValidUpload(testSubmission, t)
@@ -460,8 +460,8 @@ func TestAddSubmission(t *testing.T) {
 		Authors:   globalAuthors,   // Check for authors
 		Reviewers: globalReviewers, // Check for reviewers
 		Files: []File{
-			{Name: "test.txt", Path: "test.txt", Base64Value: "test"}, // Check correct file paths.
-			{Name: "test.txt", Path: "test/test.txt", Base64Value: "test"},
+			{Path: "test.txt", Base64Value: "test"}, // Check correct file paths.
+			{Path: "test/test.txt", Base64Value: "test"},
 		},
 		MetaData: &SubmissionData{
 			Abstract: "test", // Check that metadata is correctly stored.
@@ -512,7 +512,6 @@ func TestAddSubmission(t *testing.T) {
 			_, err = os.Stat(fileDataPath)
 			switch {
 			case !assert.NotErrorIs(t, err, os.ErrNotExist, "Data file not generated during file upload"),
-				!assert.Equal(t, file.Name, queriedFile.Name, "File names do not match"),
 				!assert.Equal(t, file.Path, queriedFile.Path, "File Paths do not match"),
 				!assert.Equal(t, file.SubmissionID, queriedFile.SubmissionID, "File SubmissionIDs do not match"),
 				!assert.Equal(t, file.Base64Value, queriedFileContent, "file content not written to filesystem properly"),
@@ -554,8 +553,8 @@ func TestAddSubmission(t *testing.T) {
 			BadFilesSubmission := Submission{
 				Name: "Test", Authors: globalAuthors,
 				Files: []File{
-					{Name: "test.txt", Path: "test.txt"},
-					{Name: "test.txt", Path: "test.txt"},
+					{Path: "test.txt"},
+					{Path: "test.txt"},
 				},
 			}
 			verifyRollback(&BadFilesSubmission)
@@ -640,11 +639,11 @@ func TestGetSubmission(t *testing.T) {
 		// tests files
 		testFiles := []File{}
 		for _, file := range testSubmission.Files {
-			testFiles = append(testFiles, File{Name: file.Name, Path: file.Path})
+			testFiles = append(testFiles, File{Path: file.Path})
 		}
 		files := []File{}
 		for _, file := range queriedSubmission.Files {
-			files = append(files, File{Name: file.Name, Path: file.Path})
+			files = append(files, File{Path: file.Path})
 		}
 		assert.ElementsMatch(t, testFiles, files, "reviewer IDs don't match")
 	})

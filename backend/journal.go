@@ -303,7 +303,6 @@ func globalToLocal(globalSubmission *SupergroupSubmission) (*Submission, error) 
 	for _, file := range globalSubmission.CodeVersions[0].Files {
 		files = append(files, File{
 			Path: file.Name,
-			Name: file.Name,
 			Base64Value: file.Base64Value,
 		})
 	}

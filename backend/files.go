@@ -27,7 +27,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -150,11 +149,6 @@ func getFile(w http.ResponseWriter, r *http.Request) {
 // 	(int) : the id of the added file (0 if an error occurs)
 // 	(error) : if the operation fails
 func addFileTo(file *File, submissionID uint) (uint, error) {
-	// error cases
-	if file.Name == "" {
-		return 0, errors.New("File name must be set")
-	}
-
 	// inserts the file into the db, and gets the submission name
 	submission := &Submission{}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
@@ -293,7 +287,6 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(rc)
 		files[i] = File{
-			Name:        file.FileInfo().Name(),
 			Path:        file.FileHeader.Name,
 			Base64Value: base64.URLEncoding.EncodeToString(buf.Bytes()),
 		}

@@ -33,10 +33,8 @@ const (
 // NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
 // as to prevent adding a file with the same SubmissionID twice
 var testFiles []File = []File{
-	{SubmissionID: 0, Path: "testFile1.txt",
-		Name: "testFile1.txt", Base64Value: "hello world"},
-	{SubmissionID: 0, Path: "testFile2.txt",
-		Name: "testFile2.txt", Base64Value: "hello world"},
+	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
+	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
 }
 
 var testComments []*Comment = []*Comment{
@@ -96,7 +94,7 @@ func TestGetFile(t *testing.T) {
 	t.Run("Get One File no comments", func(t *testing.T) {
 		// adds a file to the database and filesystem
 		fileID, err := addFileTo(&testFile, submissionID)
-		if !assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Name, err) {
+		if !assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Path, err) {
 			return
 		}
 
@@ -123,7 +121,6 @@ func TestGetFile(t *testing.T) {
 		// tests that the file was retrieved with the correct information
 		switch {
 		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"),
-			!assert.Equal(t, testFile.Name, file.Name, "file names do not match"),
 			!assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"),
 			!assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
 			return
@@ -260,7 +257,6 @@ func TestGetFileData(t *testing.T) {
 		// tests the returned data for equality with the sent data (files do not have comments here)
 		switch {
 		case !assert.Equal(t, submissionID, queriedFile.SubmissionID, "Submission IDs do not match"):
-		case !assert.Equal(t, testFile.Name, queriedFile.Name, "File names do not match"):
 		case !assert.Equal(t, testFile.Path, queriedFile.Path, "File paths do not match"):
 		case !assert.Equal(t, testFile.Base64Value, queriedFile.Base64Value, "File Content does not match"):
 			return

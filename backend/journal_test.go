@@ -354,7 +354,7 @@ func TestLocalToGlobal(t *testing.T) {
 			!assert.Equal(t, testSubmission.MetaData.Abstract, globalSubmission.MetaData.Abstract,
 				"Abstracts do not match"),
 			// compares files
-			!assert.Equal(t, testFile.Name, globalSubmission.CodeVersions[0].Files[0].Name, "File names do not match"),
+			!assert.Equal(t, testFile.Path, globalSubmission.CodeVersions[0].Files[0].Name, "File names do not match"),
 			!assert.Equal(t, testFile.Base64Value, globalSubmission.CodeVersions[0].Files[0].Base64Value, "File content does not match"):
 			return
 		}
@@ -420,7 +420,7 @@ func TestGlobalToLocal(t *testing.T) {
 			!assert.Equal(t, localSubmission.MetaData.Abstract, globalSub.MetaData.Abstract,
 				"Abstracts do not match"),
 			// compares files
-			!assert.Equal(t, globalCodeVersion.Files[0].Name, localSubmission.Files[0].Name, 
+			!assert.Equal(t, globalCodeVersion.Files[0].Name, localSubmission.Files[0].Path,
 				"File names do not match"),
 			!assert.Equal(t, globalCodeVersion.Files[0].Base64Value, localSubmission.Files[0].Base64Value, 
 				"File content does not match"):
