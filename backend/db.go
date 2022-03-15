@@ -80,22 +80,19 @@ type Server struct {
 
 // Structure for code Submissions
 type Submission struct {
+	// actual table fields
 	gorm.Model
-	// name of the submission
 	Name string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
-	// license which the code is published under
 	License string `gorm:"size:64" json:"license" validate:"max=118"`
-	// pointer to allow nil values as neither approved nor dissaproved
-	Approved *bool `json:"approved" gorm:"default:NULL"`
-	// an array of the submission's files
+	Approved *bool `json:"approved" gorm:"default:NULL"` // pointer to allow nil values as neither approved nor dissaproved
+
+	// associations to other tables
 	Files []File `json:"files,omitempty" validate:"dive"`
-	// an array of the submissions's authors
 	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty" validate:"required,dive"`
-	// an array of the submission's reviewers
 	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
-	// tags for organizing/grouping code submissions
-	Categories []Category `gorm:"many2many:categories_submissions" json:"categories,omitempty"`
-	// metadata about the submission
+	Categories []Category `gorm:"many2many:categories_submissions" json:"categories,omitempty"` // tags for organizing/grouping code submissions (i.e. python)
+
+	// stored in filesystem, not db
 	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
 }
 
@@ -108,35 +105,34 @@ type SubmissionData struct {
 
 // struct for code files
 type File struct {
+	// stored in files table
 	gorm.Model
-	// id of the submission this file is a part of
-	SubmissionID uint `json:"submissionId"`
-	// relative path to the file from the root of the submission's file structure
-	Path string `json:"path"`
-	// base name of the file with extension
+	SubmissionID uint `json:"submissionId"` // foreign key linking files and submissions tables
+	Path string `json:"path"` // this path is relative from submission root
 	Name string `json:"name"`
-	// content of the file encoded as a Base64 string (non-db field)
-	Base64Value string `gorm:"-" json:"base64Value"`
-	// structure to hold the user comments on the file
+
+	// association to other tables
 	Comments []Comment `json:"comments,omitempty"`
+
+	// stored in filesystem
+	Base64Value string `gorm:"-" json:"base64Value"` // file content, only stored in filesystem
 }
 
-// Structure for submission reviews
+// Structure for submission reviews (not written to db, all in filesystem)
 type Review struct {
 	ReviewerID  string `json:"reviewerId"`
 	Approved    bool   `json:"approved"`
 	Base64Value string `json:"base64Value"`
 }
 
-// Structure for user comments on code (not written to db)
+// Structure for user comments on code
 type Comment struct {
 	gorm.Model
-	// author of the comment as an id
 	AuthorID string `json:"author"`
-	// file which the comment belongs to
-	FileID uint `json:"fileId"`
-	// content of the comment as a string
+	FileID uint `json:"fileId"` // foreign key linking comments to files table
 	Base64Value string    `gorm:"type:mediumtext" json:"base64Value"`
+
+	// self association for replies to user comments
 	ParentID    *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
 	Comments    []Comment `gorm:"foreignKey:ParentID" json:"comments,omitempty"`
 }
@@ -161,15 +157,11 @@ type SupergroupSubmission struct {
 
 // supergroup compliant structure for meta-data of the submission
 type SupergroupSubmissionData struct {
-	// date the code submission was created
 	CreationDate time.Time `json:"creationDate"`
-	// abstract for the submission, to be displayed upon opening of any given submission
-	Abstract string `json:"abstract"`
-	// license which the code is published under
+	Abstract string `json:"abstract"` 
 	License string `json:"license"`
-	// tags for organizing/grouping code submissions (does not access db, so doesnt use Category type)
+
 	Categories []string `json:"categories"`
-	// names of the authors listed on the submission
 	Authors []SuperGroupAuthor `json:"authors"`
 }
 
@@ -186,9 +178,7 @@ type SupergroupCodeVersion struct {
 
 // Supergroup compliant file structure (never stored in db)
 type SupergroupFile struct {
-	// path of the file as a string
-	Name string `json:"filename"`
-	// file content as base 64 encoded string
+	Name string `json:"filename"` // actually a file path not basename
 	Base64Value string `json:"base64Value"`
 }
 
