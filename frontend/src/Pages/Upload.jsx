@@ -66,19 +66,13 @@ class Upload extends React.Component {
         console.log(authors);
         // const authorID = JSON.parse(userId).userId;  //Extract author's userId
 
-        let files2 = [];
         const filePromises = files.map((file, i) => {   //Create Promise for each file (Encode to base 64 before upload)
             return new Promise((resolve, reject) => {
-                files2.push({
-                    name: files[i].name,
-                    path: files[i].name,
-                });
                 files[i].path = files[i].name;
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = function(e) {
                     files[i].base64Value = e.target.result.split(',')[1];
-                    files2[i].base64Value = e.target.result.split(',')[1];
                     resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
                 }
                 reader.onerror = function() {
@@ -117,19 +111,21 @@ class Upload extends React.Component {
                         name: submissionName,
                         license: "MIT",
                         abstract: submissionAbstract,
-                        files: files2,
+                        files: files,
                         authors: authors,
                         categories: categories
                    }
                    console.log(data)
-                   console.log(data.files[0].name)
                    axiosInstance.post(uploadEndpoint, data)
                                 .then((response) => {
                                     console.log(response);
-                                    // console.log("Submission ID: " + response.data["id"]);
+                                    console.log("Submission ID: " + response.data["ID"]);
+
+                                    var submissionPage = window.open("/submission/" + response.data["ID"]);
+
+
                                     // var codePage = window.open("/code");
-                                    // codePage.submissionId = response.data["id"];
-                                    // codePage.submissionName = response.data["name"];
+                                    // codePage.submissionId = response.data["ID"];
                                     // codePage.submission = files[0];
                                 })
                                 .catch((error) => {
