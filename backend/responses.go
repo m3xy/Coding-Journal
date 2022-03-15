@@ -36,6 +36,12 @@ type NewCommentResponse struct {
 	ID uint `json:"id"`
 }
 
+// GET /submissions
+type QuerySubmissionsResponse struct {
+	StandardResponse
+	Submissions []Submission `json:"submissions"` // submissions only contain ID and name
+}
+
 // POST /submissions/create
 type UploadSubmissionResponse struct {
 	StandardResponse
@@ -67,7 +73,7 @@ type NewCommentPostBody struct {
 // POST /submissions/create body
 type UploadSubmissionBody struct {
 	Name      string   `json:"name" validate:"required"`
-	License   string   `json:"license" `
+	License   string   `json:"license"`
 	Abstract  string   `json:"abstract"`
 	Tags      []string `json:"tags"`
 	Authors   []string `json:"authors" validate:"required"`
@@ -75,18 +81,18 @@ type UploadSubmissionBody struct {
 	Files     []File   `json:"files"`
 }
 
-// POST /submission/{id}/assignreviewers
+// POST /submissions/{id}/assignreviewers
 type AssignReviewersBody struct {
 	Reviewers []string `json:"reviewers" validate:"min=1"`
 }
 
-// POST /submission/{id}/review
+// POST /submissions/{id}/review
 type UploadReviewBody struct {
 	Approved    bool   `json:"approved" validate:"required"`
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
-// POST /submission/{id}/approve
+// POST /submissions/{id}/approve
 type UpdateSubmissionStatusBody struct {
 	Status bool `json:"status" validate:"required"`
 }

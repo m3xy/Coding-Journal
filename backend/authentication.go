@@ -280,7 +280,6 @@ func validateWebToken(accessToken string, scope string) (bool, string, int) {
 	} else {
 		return true, claims.ID, claims.UserType
 	}
-
 }
 
 // Create a token with given scope.

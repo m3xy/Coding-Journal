@@ -114,6 +114,150 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 // Router Function Tests
 // ------------
 
+// Tests that GetQuerySubmissions works properly
+func TestQuerySubmissions(t *testing.T) {
+	var err error
+	// Set up server and configures filesystem/db
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(ENDPOINT_SUBMISSIONS, GetQuerySubmissions)
+
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+
+	// adds a test submission to the db and filesystem
+	addTestSubmission := func(name string, tags []string, authors []GlobalUser, reviewers []GlobalUser) uint {
+		categories := []Category{}
+		for _, tag := range tags {
+			categories = append(categories, Category{Tag:tag})
+		}
+		submission := &Submission{
+			Name: name,
+			License: "MIT",
+			Categories: categories,
+			Authors: authors,
+			Reviewers: reviewers,
+		}
+		submissionID, err := addSubmission(submission)
+		if !assert.NoError(t, err, "Error while adding test submission") {
+			return 0
+		}
+		return submissionID
+	}
+
+	// wipe the db and filesystem submission tables
+	clearSubmissions := func() {
+		// deletes submissions w/ associations
+		var submissions []Submission
+		if !assert.NoError(t, gormDb.Find(&submissions).Error) {
+			return
+		}
+		for _, submission := range submissions {
+			gormDb.Select(clause.Associations).Unscoped().Delete(&submission)
+		}
+	}
+
+	t.Run("Valid Query", func(t *testing.T) {
+		t.Run("order by date", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+
+			// sends a request with the only parameter being order by date, and returns the response struct
+			sendReq := func(orderBy string) *QuerySubmissionsResponse {
+				queryRoute := fmt.Sprintf("%s?orderBy=%s", ENDPOINT_SUBMISSIONS, orderBy)
+				req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
+				router.ServeHTTP(w, req)
+				resp := w.Result()
+
+				respData := &QuerySubmissionsResponse{}
+				if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
+					return nil
+				} else if !assert.Falsef(t, respData.StandardResponse.Error, 
+					"Error returned on query - %v", respData.StandardResponse.Message) {
+					return nil
+				}
+				return respData
+			}
+
+			// test that the response is as expected
+			resp := sendReq("newest")
+			switch {
+			case !assert.NotEmpty(t, resp, "request response is nil"),
+				!assert.Equal(t, submissionIDs[0], resp.Submissions[0].ID, "Submissions not in correct order"),
+				!assert.Equal(t, submissionIDs[1], resp.Submissions[1].ID, "Submissions not in correct order"):
+				return
+			}
+
+			// test that the response is as expected
+			resp = sendReq("oldest")
+			switch {
+			case !assert.NotEmpty(t, resp, "request response is nil"),
+				!assert.Equal(t, submissionIDs[0], resp.Submissions[1].ID, "Submissions not in correct order"),
+				!assert.Equal(t, submissionIDs[1], resp.Submissions[0].ID, "Submissions not in correct order"):
+				return
+			}
+		})
+
+		t.Run("query by single tag", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+
+			queryRoute := fmt.Sprintf("%s?tags=python", ENDPOINT_SUBMISSIONS)
+			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+
+			respData := &QuerySubmissionsResponse{}
+			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
+				return
+			} else if !assert.Falsef(t, respData.StandardResponse.Error, 
+				"Error returned on query - %v", respData.StandardResponse.Message) {
+				return
+			}
+
+			if !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned") { return }
+			assert.Equal(t, submissionIDs[0], respData.Submissions[0].ID, "Submissions id incorrect")
+		})
+
+		t.Run("query by multiple tags", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 3)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[2] = addTestSubmission("test3", []string{"java", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+
+			queryRoute := fmt.Sprintf("%s?tags=python&tags=go", ENDPOINT_SUBMISSIONS)
+			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+
+			respData := &QuerySubmissionsResponse{}
+			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
+				return
+			} else if !assert.Falsef(t, respData.StandardResponse.Error, 
+				"Error returned on query - %v", respData.StandardResponse.Message) {
+				return
+			}
+
+			switch {
+			case !assert.Equal(t, 2, len(respData.Submissions), "too many submissions returned"),
+				!assert.Contains(t, submissionIDs, respData.Submissions[0].ID, "Submission id incorrect"),
+				!assert.Contains(t, submissionIDs, respData.Submissions[1].ID, "Submission id incorrect"):
+				return
+			}
+		})
+	})
+}
+
 // Tests that submissions.go can upload submissions properly
 func TestUploadSubmission(t *testing.T) {
 	// Set up server and configures filesystem/db
@@ -122,7 +266,7 @@ func TestUploadSubmission(t *testing.T) {
 
 	// Create mux router
 	router := mux.NewRouter()
-	router.HandleFunc(ENDPOINT_SUBMISSIONS+ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission)
+	router.HandleFunc(ENDPOINT_SUBMISSIONS+ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission)
 	route := ENDPOINT_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
 
 	globalAuthors, globalReviewers, err := initMockUsers(t)

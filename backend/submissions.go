@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -43,6 +44,10 @@ const (
 	ENDPOINT_UPLOAD_SUBMISSION = "/create"
 	SUBROUTE_SUBMISSION        = "/submission"
 	ENDPOINT_SUBMISSIONS       = "/submissions"
+
+	ORDER_NIL = 0
+	ORDER_ASCENDING = 1
+	ORDER_DESCENDING = 2
 )
 
 // Describe mux routing for submission-based endpoints.
@@ -55,7 +60,7 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submission/{id} - Get given submission.
 	// + /submissions/create - Create a submission.
 	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, uploadSubmission).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_ASSIGN_REVIEWERS, RouteAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, RouteUploadReview).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_CHANGE_STATUS, RouteUpdateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
@@ -65,6 +70,89 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 // ------
 // Router Functions
 // ------
+
+// function to query a list of submissions with a set of query parameters to filter/order the list
+func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] GetQuerySubmissions request received from %v", r.RemoteAddr)
+	var err error
+	var stdResp StandardResponse
+	var resp *QuerySubmissionsResponse
+	var submissions []Submission
+
+	// gets the ordered list of submissions
+	if submissions, err = ControllerQuerySubmissions(r.URL.Query()); err != nil {
+		switch err.(type) {
+		case *BadQueryParameterError:
+			stdResp = StandardResponse{Message: fmt.Sprintf("Bad Request - %s", err.Error()), Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		case *ResultSetEmptyError:
+			stdResp = StandardResponse{Message:"No submissions fit search queries", Error: false}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			log.Printf("[ERROR] could not query submissions: %v\n", err)
+			stdResp = StandardResponse{Message: "Internal Server Error - could not query submissions", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	} else {
+		stdResp = StandardResponse{Message: "", Error: false}
+	}
+	// builds the full response from the error message
+	resp = &QuerySubmissionsResponse{
+		StandardResponse: stdResp,
+		Submissions: submissions,
+	}
+
+	// sends a response to the client
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if !resp.Error {
+		log.Print("[INFO] GetSubmissionWithParams request successful\n")
+	}
+}
+
+// Controller to do the work of actually building a query to get submissions from
+// the database and order them
+// 
+// Params:
+// 	queryParams (net.URL.Values) :
+func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
+	// parses the query parameters
+	tags := queryParams["tags"]
+	orderBy := ""
+	if len(queryParams["orderBy"]) > 0 {
+		orderBy = queryParams["orderBy"][0]
+		if orderBy != "newest" && orderBy != "oldest" {
+			return nil, &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
+		}
+	}
+
+	// queries the database
+	var submissions []Submission
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		tx = tx.Model(&Submission{})
+		if len(tags) > 0 {
+			tx = tx.Where("id IN (?)", gormDb.Table(
+				"categories_submissions").Select("submission_id").Where("category_tag IN ?", tags))
+		}
+		if orderBy == "newest" {
+			tx = tx.Order("submissions.created_at ASC")
+		} else if orderBy == "oldest" {
+			tx = tx.Order("submissions.created_at DESC")
+		}
+		// selects fields and gets submissions
+		if res := tx.Select("id, name").Find(&submissions); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected == 0 {
+			return &ResultSetEmptyError{}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return submissions, nil
+}
 
 // Router function to get the names and id's of every submission of a given user
 // if no user id is given in the query parameters, return all valid submissions
@@ -110,8 +198,8 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 // Router function to upload new submissions to the db. The body of the
 // sent request should be a valid submission Json objects as specified
 // in backend/README.md
-func uploadSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] uploadSubmission request received from %v", r.RemoteAddr)
+func PostUploadSubmission(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] PostUploadSubmission request received from %v", r.RemoteAddr)
 	// parses the Json request body into a submission struct
 	resp := UploadSubmissionResponse{}
 	reqBody := UploadSubmissionBody{}
@@ -161,7 +249,7 @@ func uploadSubmission(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if !resp.Error {
-		log.Print("[INFO] uploadSubmission request successful\n")
+		log.Print("[INFO] PostUploadSubmission request successful\n")
 	}
 }
 

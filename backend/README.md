@@ -216,6 +216,51 @@ interface Profile {
 }
 ```
 
+## Submission
+
+### Submission Query
+
+Querying an ordered list of submissions based upon query parameters
+
+1. Enpoint
+
+    The enpoint to query submissions is **GET** `/submissions`
+
+2. Request
+
+    1. Headers
+
+    2. Body
+
+    3. Parameters:
+
+        - orderBy - newest or oldest
+        - tags - any existant code tag (i.e. python, java, etc.)
+
+3. Response
+
+    1.  Status
+
+        - 200 - if the submissions are queried properly
+        - 204 - if the query returns an empty result set
+        - 400 - if the query is malformatted (i.e. illegal query parameters)
+        - 500 - if something else goes wrong in the backend
+
+    2.  Body - the object shown below
+
+```typescript 
+interface QuerySubmissionsResponse {
+    message: string;
+    error: bool;
+    submissions: Submission[];
+}
+
+interface Submission {
+    id: uint;
+    name: string;
+}
+```
+
 ### Submission Upload
 
 Uploading submissions from the local journal
@@ -235,8 +280,8 @@ interface Submission {
     name: string;
     license: string;
     files: File[];
-    authors: GlobalUser[];
-    reviewers: GlobalUser[];
+    authors: string[];
+    reviewers: string[];
     categories: string[];
 }
 
