@@ -82,15 +82,15 @@ type Server struct {
 type Submission struct {
 	// actual table fields
 	gorm.Model
-	Name string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
-	License string `gorm:"size:64" json:"license" validate:"max=118"`
-	Approved *bool `json:"approved" gorm:"default:NULL"` // pointer to allow nil values as neither approved nor dissaproved
+	Name     string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
+	License  string `gorm:"size:64" json:"license" validate:"max=118"`
+	Approved *bool  `json:"approved" gorm:"default:NULL"` // pointer to allow nil values as neither approved nor dissaproved
 
 	// associations to other tables
-	Files []File `json:"files,omitempty" validate:"dive"`
-	Authors []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty" validate:"required,dive"`
-	Reviewers []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
-	Categories []Category `gorm:"many2many:categories_submissions" json:"categories,omitempty"` // tags for organizing/grouping code submissions (i.e. python)
+	Files      []File       `json:"files,omitempty" validate:"dive"`
+	Authors    []GlobalUser `gorm:"many2many:authors_submission" json:"authors,omitempty" validate:"required,dive"`
+	Reviewers  []GlobalUser `gorm:"many2many:reviewers_submission" json:"reviewers,omitempty"`
+	Categories []Category   `gorm:"many2many:categories_submissions" json:"categories,omitempty"` // tags for organizing/grouping code submissions (i.e. python)
 
 	// stored in filesystem, not db
 	MetaData *SubmissionData `gorm:"-" json:"metaData,omitempty"`
@@ -107,8 +107,8 @@ type SubmissionData struct {
 type File struct {
 	// stored in files table
 	gorm.Model
-	SubmissionID uint `json:"submissionId"` // foreign key linking files and submissions tables
-	Path string `json:"path"` // this path is relative from submission root
+	SubmissionID uint   `json:"submissionId"` // foreign key linking files and submissions tables
+	Path         string `json:"path"`         // this path is relative from submission root
 	// Name string `json:"name"`
 
 	// association to other tables
@@ -128,13 +128,14 @@ type Review struct {
 // Structure for user comments on code
 type Comment struct {
 	gorm.Model
-	AuthorID string `json:"author"`
-	FileID uint `json:"fileId"` // foreign key linking comments to files table
-	Base64Value string    `gorm:"type:mediumtext" json:"base64Value"`
+	AuthorID    string `json:"author"`
+	FileID      uint   `json:"fileId"` // foreign key linking comments to files table
+	Base64Value string `gorm:"type:mediumtext" json:"base64Value"`
+	LineNumber  int    `json:"lineNumber"`
 
 	// self association for replies to user comments
-	ParentID    *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
-	Comments    []Comment `gorm:"foreignKey:ParentID" json:"comments,omitempty"`
+	ParentID *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
+	Comments []Comment `gorm:"foreignKey:ParentID" json:"comments,omitempty"`
 }
 
 // stores submission tags (i.e. networking, java, python, etc.)
@@ -158,11 +159,11 @@ type SupergroupSubmission struct {
 // supergroup compliant structure for meta-data of the submission
 type SupergroupSubmissionData struct {
 	CreationDate time.Time `json:"creationDate"`
-	Abstract string `json:"abstract"` 
-	License string `json:"license"`
+	Abstract     string    `json:"abstract"`
+	License      string    `json:"license"`
 
-	Categories []string `json:"categories"`
-	Authors []SuperGroupAuthor `json:"authors"`
+	Categories []string           `json:"categories"`
+	Authors    []SuperGroupAuthor `json:"authors"`
 }
 
 type SuperGroupAuthor struct {
@@ -178,7 +179,7 @@ type SupergroupCodeVersion struct {
 
 // Supergroup compliant file structure (never stored in db)
 type SupergroupFile struct {
-	Name string `json:"filename"` // actually a file path not basename
+	Name        string `json:"filename"` // actually a file path not basename
 	Base64Value string `json:"base64Value"`
 }
 

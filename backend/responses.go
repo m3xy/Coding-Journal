@@ -67,6 +67,7 @@ type JournalLoginPostBody struct {
 // POST /file/{id}/newcomment body. {id} in the URL is the file id
 type NewCommentPostBody struct {
 	ParentID    *uint  `json:"parentId,omitempty"` // optionally set for replies
+	LineNumber  int    `json:"lineNumber"`
 	Base64Value string `json:"base64Value"`
 }
 

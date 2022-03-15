@@ -6,7 +6,7 @@
 // This file takes care of user commenting
 // ========================================
 
-package main 
+package main
 
 import (
 	"encoding/json"
@@ -46,6 +46,12 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		message = "File ID given is not a number."
 		w.WriteHeader(http.StatusBadRequest)
 		goto RETURN
+
+		// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		message = "No user logged in"
+		w.WriteHeader(http.StatusUnauthorized)
+
 	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		message = "Request format is invalid."
 		w.WriteHeader(http.StatusBadRequest)
@@ -55,7 +61,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	// Get author ID from request, and add comment.
 	if commentID, err := addComment(&Comment{
 		AuthorID: r.Context().Value("userId").(string), FileID: uint(fileID64),
-		ParentID: req.ParentID, Base64Value: req.Base64Value,
+		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber,
 	}); err != nil {
 		message = "Comment creation failed."
 		w.WriteHeader(http.StatusInternalServerError)
@@ -66,7 +72,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 
 RETURN:
 	// Encode response - set as error if empty
-	if encodable != nil {
+	if encodable == nil {
 		encodable = StandardResponse{Message: message, Error: true}
 	} else if err := json.NewEncoder(w).Encode(encodable); err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)

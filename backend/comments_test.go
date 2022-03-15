@@ -27,11 +27,6 @@ import (
 
 // Tests the basic ability of the CodeFiles module to add a comment to a file
 // given file path and submission id
-//
-// Test Depends On:
-// 	- TestAddComment()
-// 	- TestCreateSubmission()
-// 	- TestAddFiles()
 func TestUploadUserComment(t *testing.T) {
 	// Set up server and configures filesystem/db
 	testInit()
@@ -73,6 +68,7 @@ func TestUploadUserComment(t *testing.T) {
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(&NewCommentPostBody{
 			Base64Value: testComment.Base64Value,
+			LineNumber:  0,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
@@ -96,6 +92,7 @@ func TestUploadUserComment(t *testing.T) {
 		assert.Equal(t, fileID, addedComment.FileID, "file IDs do not match")
 		assert.Equal(t, testComment.AuthorID, addedComment.AuthorID, "Comment author ID mismatch")
 		assert.Equal(t, testComment.Base64Value, addedComment.Base64Value, "Comment content does not match")
+		assert.Equal(t, testComment.LineNumber, addedComment.LineNumber, "line numbers do not match")
 	})
 
 	// upload a single user comment to a valid file in a valid submission
