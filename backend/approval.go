@@ -15,14 +15,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"gorm.io/gorm"
 	"github.com/gorilla/mux"
+	"gorm.io/gorm"
 )
 
 const (
 	ENDPOINT_ASSIGN_REVIEWERS = "/assignreviewers"
-	ENPOINT_REVIEW = "/review"
-	ENDPOINT_CHANGE_STATUS = "/approve"
+	ENPOINT_REVIEW            = "/review"
+	ENDPOINT_CHANGE_STATUS    = "/approve"
 )
 
 // ------------
@@ -44,27 +44,27 @@ func RouteAssignReviewers(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct and validates it
+		// gets context struct and validates it
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// checks that the client has the proper permisssions (i.e. is an editor)
+		// checks that the client has the proper permisssions (i.e. is an editor)
 	} else if ctx.UserType != USERTYPE_EDITOR {
 		resp = &StandardResponse{Message: "The client must have editor permissions to assign reviewers.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// decodes request body and validates it
+		// decodes request body and validates it
 	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
 		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// adds reviewers and handles error cases
+		// adds reviewers and handles error cases
 	} else {
 		if err := assignReviewers(reqBody.Reviewers, submissionID); err != nil {
 			switch err.(type) {
 			// one of the reviewers is not registered as a user, or does not have proper permissions
-			case *BadUserError, *WrongPermissionsError: 
+			case *BadUserError, *WrongPermissionsError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
 				w.WriteHeader(http.StatusBadRequest)
 
@@ -89,7 +89,6 @@ func RouteAssignReviewers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 // router function for reviewer review upload
 func RouteUploadReview(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] RouteUploadReview request received from %v", r.RemoteAddr)
@@ -104,27 +103,27 @@ func RouteUploadReview(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct and validates it
+		// gets context struct and validates it
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// checks that the client has the proper permisssions
+		// checks that the client has the proper permisssions
 	} else if ctx.UserType != USERTYPE_REVIEWER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER {
 		resp = &StandardResponse{Message: "The client must have reviewer permissions to upload a review.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// decodes request body and validates it
+		// decodes request body and validates it
 	} else if json.NewDecoder(r.Body).Decode(reqBody) != nil || validate.Struct(reqBody) != nil {
 		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// adds review and handles error cases
+		// adds review and handles error cases
 	} else {
 		// builds review to add now that all fields have been validated
 		review := &Review{
-			ReviewerID: ctx.ID,
-			Approved: reqBody.Approved,
+			ReviewerID:  ctx.ID,
+			Approved:    reqBody.Approved,
 			Base64Value: reqBody.Base64Value,
 		}
 		// adds the review and formats response based upon error type if one occurs
@@ -155,7 +154,6 @@ func RouteUploadReview(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 // router function for updating submission status
 func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] updateSubmissionStatus request received from %v", r.RemoteAddr)
@@ -170,22 +168,22 @@ func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct and validates it
+		// gets context struct and validates it
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// checks that the client has the proper permisssions
+		// checks that the client has the proper permisssions
 	} else if ctx.UserType != USERTYPE_EDITOR {
 		resp = &StandardResponse{Message: "The client must have editor permissions to update submission status.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	// decodes request body and validates it
+		// decodes request body and validates it
 	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
 		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// adds review and handles error cases
+		// adds review and handles error cases
 	} else {
 		// changes the submission status
 		if err := updateSubmissionStatus(reqBody.Status, submissionID); err != nil {
@@ -211,7 +209,6 @@ func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 // ------------
 // Helper Functions
 // ------------
@@ -220,7 +217,7 @@ func assignReviewers(reviewerIDs []string, submissionID uint) error {
 	// builds array of reviewers
 	reviewers := make([]GlobalUser, len(reviewerIDs))
 	for i, reviewerID := range reviewerIDs {
-		reviewers[i] = GlobalUser{ ID: reviewerID }
+		reviewers[i] = GlobalUser{ID: reviewerID}
 	}
 	// begins a transaction and checks that the submission has not been approved or disapproved yet
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
@@ -237,8 +234,8 @@ func assignReviewers(reviewerIDs []string, submissionID uint) error {
 	return nil
 }
 
-// adds a review to a given submission's metadata 
-// 
+// adds a review to a given submission's metadata
+//
 // Params:
 // 	review (*Review) : the review to be added
 // 	submissionID (uint) : the id of the submission for the review to be added to
@@ -269,7 +266,7 @@ func addReview(review *Review, submissionID uint) error {
 	// checks that the reviewer has not already uploaded a review (loop is ok here because the number of reviews is small)
 	for _, currReview := range submission.MetaData.Reviews {
 		if review.ReviewerID == currReview.ReviewerID {
-			return &DuplicateReviewError{ UserID:review.ReviewerID, SubmissionID: submissionID }
+			return &DuplicateReviewError{UserID: review.ReviewerID, SubmissionID: submissionID}
 		}
 	}
 
@@ -302,7 +299,7 @@ func updateSubmissionStatus(status bool, submissionID uint) error {
 		// all reviewers must submit reviews before the submission status is changed
 		if approved, ok := reviews[reviewer.ID]; !ok {
 			return &MissingReviewsError{SubmissionID: submissionID}
-		// cannot approve a submission if any reviewer has not yet approved it
+			// cannot approve a submission if any reviewer has not yet approved it
 		} else if !approved && status {
 			return &MissingApprovalError{SubmissionID: submissionID}
 		}

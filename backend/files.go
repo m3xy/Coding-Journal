@@ -309,7 +309,7 @@ func TmpStoreZip(base64value string) (string, error) {
 	}
 	defer f.Close()
 	path := f.Name()
-	if  err := os.WriteFile(path, zipBytes, 0666); err != nil {
+	if err := os.WriteFile(path, zipBytes, 0666); err != nil {
 		log.Printf("[ERROR] ZIP file creation failed: %v", err)
 		goto ROLLBACK
 	}

@@ -134,14 +134,14 @@ func TestQuerySubmissions(t *testing.T) {
 	addTestSubmission := func(name string, tags []string, authors []GlobalUser, reviewers []GlobalUser) uint {
 		categories := []Category{}
 		for _, tag := range tags {
-			categories = append(categories, Category{Tag:tag})
+			categories = append(categories, Category{Tag: tag})
 		}
 		submission := &Submission{
-			Name: name,
-			License: "MIT",
+			Name:       name,
+			License:    "MIT",
 			Categories: categories,
-			Authors: authors,
-			Reviewers: reviewers,
+			Authors:    authors,
+			Reviewers:  reviewers,
 		}
 		submissionID, err := addSubmission(submission)
 		if !assert.NoError(t, err, "Error while adding test submission") {
@@ -179,7 +179,7 @@ func TestQuerySubmissions(t *testing.T) {
 				respData := &QuerySubmissionsResponse{}
 				if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
 					return nil
-				} else if !assert.Falsef(t, respData.StandardResponse.Error, 
+				} else if !assert.Falsef(t, respData.StandardResponse.Error,
 					"Error returned on query - %v", respData.StandardResponse.Message) {
 					return nil
 				}
@@ -219,12 +219,14 @@ func TestQuerySubmissions(t *testing.T) {
 			respData := &QuerySubmissionsResponse{}
 			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
 				return
-			} else if !assert.Falsef(t, respData.StandardResponse.Error, 
+			} else if !assert.Falsef(t, respData.StandardResponse.Error,
 				"Error returned on query - %v", respData.StandardResponse.Message) {
 				return
 			}
 
-			if !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned") { return }
+			if !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned") {
+				return
+			}
 			assert.Equal(t, submissionIDs[0], respData.Submissions[0].ID, "Submissions id incorrect")
 		})
 
@@ -243,7 +245,7 @@ func TestQuerySubmissions(t *testing.T) {
 			respData := &QuerySubmissionsResponse{}
 			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
 				return
-			} else if !assert.Falsef(t, respData.StandardResponse.Error, 
+			} else if !assert.Falsef(t, respData.StandardResponse.Error,
 				"Error returned on query - %v", respData.StandardResponse.Message) {
 				return
 			}
@@ -284,7 +286,7 @@ func TestUploadSubmission(t *testing.T) {
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			ctx := context.WithValue(req.Context(), "data", RequestContext{
-				ID: globalAuthors[0].ID,
+				ID:       globalAuthors[0].ID,
 				UserType: globalAuthors[0].UserType,
 			})
 			router.ServeHTTP(w, req.WithContext(ctx))
@@ -334,7 +336,7 @@ func TestUploadSubmission(t *testing.T) {
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			if authed {
 				ctx := context.WithValue(req.Context(), "data", RequestContext{
-					ID: globalAuthors[0].ID,
+					ID:       globalAuthors[0].ID,
 					UserType: globalAuthors[0].UserType,
 				})
 				router.ServeHTTP(w, req.WithContext(ctx))
@@ -466,7 +468,7 @@ func TestAddSubmission(t *testing.T) {
 		MetaData: &SubmissionData{
 			Abstract: "test", // Check that metadata is correctly stored.
 			Reviews: []*Review{
-				{ReviewerID: globalReviewers[0].ID, Approved:true, Base64Value: "test"},
+				{ReviewerID: globalReviewers[0].ID, Approved: true, Base64Value: "test"},
 			},
 		},
 	}
@@ -721,12 +723,12 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 	route := ENDPOINT_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
 	router := mux.NewRouter()
 	router.HandleFunc(route, PostUploadSubmissionByZip)
-	reqCtx := RequestContext {
-		ID: authors[0].ID,
+	reqCtx := RequestContext{
+		ID:       authors[0].ID,
 		UserType: authors[0].UserType,
 	}
 
-	t.Run("Valid decoded zip file", func (t *testing.T) {
+	t.Run("Valid decoded zip file", func(t *testing.T) {
 		// Get test Zip file's base 64 value.
 		content, err := ioutil.ReadFile(TEST_ZIP_PATH)
 		if !assert.NoErrorf(t, err, "Zip file failed to open: %v", err) {
@@ -735,8 +737,8 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 
 		// Valid Zip file for a submission
 		testFileZipSubmission := UploadSubmissionByZipBody{
-			Name: "Test",
-			Authors: []string{authors[0].ID},
+			Name:           "Test",
+			Authors:        []string{authors[0].ID},
 			ZipBase64Value: base64.URLEncoding.EncodeToString(content),
 		}
 
@@ -777,10 +779,10 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 		}
 	})
 
-	t.Run("Empty Zip content", func (t *testing.T) {
+	t.Run("Empty Zip content", func(t *testing.T) {
 		// Valid Zip file for a submission
 		emptyZipSubmission := UploadSubmissionByZipBody{
-			Name: "Test",
+			Name:    "Test",
 			Authors: []string{authors[0].ID},
 		}
 
@@ -800,11 +802,11 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 		}
 	})
 
-	t.Run("Invalid zip", func (t *testing.T) {
+	t.Run("Invalid zip", func(t *testing.T) {
 		// Valid Zip file for a submission
 		emptyZipSubmission := UploadSubmissionByZipBody{
-			Name: "Test",
-			Authors: []string{authors[0].ID},
+			Name:           "Test",
+			Authors:        []string{authors[0].ID},
 			ZipBase64Value: "ADbasdflADA==",
 		}
 

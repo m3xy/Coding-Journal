@@ -38,16 +38,21 @@ type NoSubmissionError struct {
 func (e *NoSubmissionError) Error() string { return fmt.Sprintf("Submission %d doesn't exist!", e.ID) }
 
 // Handles the case where the result of a given query is empty
-type ResultSetEmptyError struct {}
-func (e *ResultSetEmptyError) Error() string { return fmt.Sprintf("No results returned for the given query") }
+type ResultSetEmptyError struct{}
 
-// Handle a badly formatted/illegal query parameter value 
-type BadQueryParameterError struct {
-	ParamName string
-	Value interface{}
+func (e *ResultSetEmptyError) Error() string {
+	return fmt.Sprintf("No results returned for the given query")
 }
 
-func (e *BadQueryParameterError) Error() string { return fmt.Sprintf("Illegal query parameter. %s cannot take value %v", e.ParamName, e.Value) }
+// Handle a badly formatted/illegal query parameter value
+type BadQueryParameterError struct {
+	ParamName string
+	Value     interface{}
+}
+
+func (e *BadQueryParameterError) Error() string {
+	return fmt.Sprintf("Illegal query parameter. %s cannot take value %v", e.ParamName, e.Value)
+}
 
 // handle the case where a user is not assigned as a reviewer for a given submission.
 type NotReviewerError struct {

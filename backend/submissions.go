@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/url"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -45,8 +45,8 @@ const (
 	SUBROUTE_SUBMISSION        = "/submission"
 	ENDPOINT_SUBMISSIONS       = "/submissions"
 
-	ORDER_NIL = 0
-	ORDER_ASCENDING = 1
+	ORDER_NIL        = 0
+	ORDER_ASCENDING  = 1
 	ORDER_DESCENDING = 2
 )
 
@@ -86,7 +86,7 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 			stdResp = StandardResponse{Message: fmt.Sprintf("Bad Request - %s", err.Error()), Error: true}
 			w.WriteHeader(http.StatusBadRequest)
 		case *ResultSetEmptyError:
-			stdResp = StandardResponse{Message:"No submissions fit search queries", Error: false}
+			stdResp = StandardResponse{Message: "No submissions fit search queries", Error: false}
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			log.Printf("[ERROR] could not query submissions: %v\n", err)
@@ -99,7 +99,7 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	// builds the full response from the error message
 	resp = &QuerySubmissionsResponse{
 		StandardResponse: stdResp,
-		Submissions: submissions,
+		Submissions:      submissions,
 	}
 
 	// sends a response to the client
@@ -113,7 +113,7 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 
 // Controller to do the work of actually building a query to get submissions from
 // the database and order them
-// 
+//
 // Params:
 // 	queryParams (net.URL.Values) :
 func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
@@ -493,7 +493,6 @@ func addFiles(tx *gorm.DB, s *Submission) error {
 			return &DuplicateFileError{Path: file.Path}
 		}
 	}
-	fmt.Println(len(s.Files))
 
 	// Add files to the database
 	model := &Submission{}

@@ -139,7 +139,7 @@ func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
 		var files []SupergroupFile
 		var authors []SuperGroupAuthor
 		var categories []string
-		
+
 		// copies metadata
 		if s.MetaData.Categories != nil {
 			categories := make([]string, len(s.MetaData.Categories))
@@ -151,10 +151,10 @@ func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
 		}
 		metadata = SupergroupSubmissionData{
 			CreationDate: s.MetaData.CreationDate,
-			Abstract: s.MetaData.Abstract,
-			License: s.MetaData.License,
-			Categories: categories,
-			Authors: authors,
+			Abstract:     s.MetaData.Abstract,
+			License:      s.MetaData.License,
+			Categories:   categories,
+			Authors:      authors,
 		}
 		// copies code versions
 		var codeVersionCopy SupergroupCodeVersion
@@ -166,15 +166,15 @@ func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
 			}
 			codeVersionCopy = SupergroupCodeVersion{
 				TimeStamp: codeVersion.TimeStamp,
-				Files: files,
+				Files:     files,
 			}
 			codeVersions = append(codeVersions, codeVersionCopy)
 			files = nil
 		}
 		// constructs the final copy of the supergroup submission
 		return &SupergroupSubmission{
-			Name: s.Name,
-			MetaData: metadata,
+			Name:         s.Name,
+			MetaData:     metadata,
 			CodeVersions: codeVersions,
 		}
 	} else {
