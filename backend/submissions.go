@@ -115,10 +115,15 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 // the database and order them
 //
 // Params:
-// 	queryParams (net.URL.Values) :
+// 	queryParams (url.Values) : a mapping of query parameters to their values
+// Returns:
+// 	([]Submission) : an array of submissions with ID and Name set ordered based upon the query
+// 	(error) : an error if one occurs
 func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 	// parses the query parameters
 	tags := queryParams["tags"]
+	authors := queryParams["authors"]
+	reviewers := queryParams["reviewers"]
 	orderBy := ""
 	if len(queryParams["orderBy"]) > 0 {
 		orderBy = queryParams["orderBy"][0]
@@ -131,15 +136,27 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 	var submissions []Submission
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		tx = tx.Model(&Submission{})
+		// includes submissions with a given tag
 		if len(tags) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
 				"categories_submissions").Select("submission_id").Where("category_tag IN ?", tags))
 		}
+		// authors and reviewers
+		if len(authors) > 0 {
+			tx = tx.Where("id IN (?)", gormDb.Table(
+				"authors_submission").Select("submission_id").Where("global_user_id IN ?", authors))
+		}
+		if len(reviewers) > 0 {
+			tx = tx.Where("id IN (?)", gormDb.Table(
+				"reviewers_submission").Select("submission_id").Where("global_user_id IN ?", reviewers))
+		}
+		// order of submissions
 		if orderBy == "newest" {
 			tx = tx.Order("submissions.created_at ASC")
 		} else if orderBy == "oldest" {
 			tx = tx.Order("submissions.created_at DESC")
 		}
+
 		// selects fields and gets submissions
 		if res := tx.Select("id, name").Find(&submissions); res.Error != nil {
 			return res.Error

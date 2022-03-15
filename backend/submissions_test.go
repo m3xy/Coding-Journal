@@ -163,31 +163,31 @@ func TestQuerySubmissions(t *testing.T) {
 	}
 
 	t.Run("Valid Query", func(t *testing.T) {
+		// handles sending the request and parsing the response
+		handleQuery := func(queryRoute string) *QuerySubmissionsResponse {
+			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+
+			respData := &QuerySubmissionsResponse{}
+			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
+				return nil
+			} else if !assert.Falsef(t, respData.StandardResponse.Error,
+				"Error returned on query - %v", respData.StandardResponse.Message) {
+				return nil
+			}
+			return respData
+		}
+
 		t.Run("order by date", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-
-			// sends a request with the only parameter being order by date, and returns the response struct
-			sendReq := func(orderBy string) *QuerySubmissionsResponse {
-				queryRoute := fmt.Sprintf("%s?orderBy=%s", ENDPOINT_SUBMISSIONS, orderBy)
-				req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
-				router.ServeHTTP(w, req)
-				resp := w.Result()
-
-				respData := &QuerySubmissionsResponse{}
-				if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
-					return nil
-				} else if !assert.Falsef(t, respData.StandardResponse.Error,
-					"Error returned on query - %v", respData.StandardResponse.Message) {
-					return nil
-				}
-				return respData
-			}
-
+			
 			// test that the response is as expected
-			resp := sendReq("newest")
+			queryRoute := fmt.Sprintf("%s?orderBy=newest", ENDPOINT_SUBMISSIONS)
+			resp := handleQuery(queryRoute)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
 				!assert.Equal(t, submissionIDs[0], resp.Submissions[0].ID, "Submissions not in correct order"),
@@ -196,7 +196,8 @@ func TestQuerySubmissions(t *testing.T) {
 			}
 
 			// test that the response is as expected
-			resp = sendReq("oldest")
+			queryRoute = fmt.Sprintf("%s?orderBy=oldest", ENDPOINT_SUBMISSIONS)
+			resp = handleQuery(queryRoute)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
 				!assert.Equal(t, submissionIDs[0], resp.Submissions[1].ID, "Submissions not in correct order"),
@@ -212,18 +213,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			queryRoute := fmt.Sprintf("%s?tags=python", ENDPOINT_SUBMISSIONS)
-			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-			resp := w.Result()
-
-			respData := &QuerySubmissionsResponse{}
-			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
-				return
-			} else if !assert.Falsef(t, respData.StandardResponse.Error,
-				"Error returned on query - %v", respData.StandardResponse.Message) {
-				return
-			}
-
+			respData := handleQuery(queryRoute)
 			if !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned") {
 				return
 			}
@@ -238,22 +228,41 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[2] = addTestSubmission("test3", []string{"java", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			queryRoute := fmt.Sprintf("%s?tags=python&tags=go", ENDPOINT_SUBMISSIONS)
-			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-			resp := w.Result()
-
-			respData := &QuerySubmissionsResponse{}
-			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
-				return
-			} else if !assert.Falsef(t, respData.StandardResponse.Error,
-				"Error returned on query - %v", respData.StandardResponse.Message) {
-				return
-			}
-
+			respData := handleQuery(queryRoute)
 			switch {
 			case !assert.Equal(t, 2, len(respData.Submissions), "too many submissions returned"),
 				!assert.Contains(t, submissionIDs, respData.Submissions[0].ID, "Submission id incorrect"),
 				!assert.Contains(t, submissionIDs, respData.Submissions[1].ID, "Submission id incorrect"):
+				return
+			}
+		})
+
+		t.Run("query by author", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[1:2], globalReviewers[:1])
+
+			queryRoute := fmt.Sprintf("%s?authors=%s", ENDPOINT_SUBMISSIONS, globalAuthors[0].ID)
+			respData := handleQuery(queryRoute)
+			switch {
+			case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
+				!assert.Equal(t, submissionIDs[0], respData.Submissions[0].ID, "Submission id incorrect"):
+				return
+			}
+		})
+
+		t.Run("query by reviewer", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+
+			queryRoute := fmt.Sprintf("%s?reviewers=%s", ENDPOINT_SUBMISSIONS, globalReviewers[0].ID)
+			respData := handleQuery(queryRoute)
+			switch {
+			case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
+				!assert.Equal(t, submissionIDs[0], respData.Submissions[0].ID, "Submission id incorrect"):
 				return
 			}
 		})
