@@ -11,16 +11,38 @@ import axiosInstance from "../Web/axiosInstance";
 import {Container, Row, Col, Form, InputGroup, Card, Breadcrumb, Modal, Button, Toast} from "react-bootstrap"
 import MonacoEditor from 'react-monaco-editor';
 
-const codeEndpoint = 'submission/file'
-const commentEndpoint = 'submission/file/newcomment';
+const submissionEndpoint = '/submission'
+const fileEndpoint = '/file'
+// const codeEndpoint = '/submission/file'
+// const commentEndpoint = '/submission/file/newcomment';
 
 function Code(props) {
 
-    const [code, setCode] = useState('// type your code...');
-    const [submissionName, setSubmissionName] = useState('Submission');
-    const [submissionId, setSubmissionId] = useState(0);
-    const [filePath, setFilePath] = useState('App/Pages/index.js');
-    const [fileId, setFileId] = useState(0);
+    // const [code, setCode] = useState('// type your code...');
+    // const [submissionName, setSubmissionName] = useState('Submission');
+    // const [submissionId, setSubmissionId] = useState(0);
+    // const [filePath, setFilePath] = useState('App/Pages/index.js');
+    // const [fileId, setFileId] = useState(0);
+
+    const params = useParams();
+
+    const [code, setCode] = useState("// type your code...");
+    const [file, setFile] = useState({ID:null, submissionId:null, path:"", name:""});
+    const [submission, setSubmission] = useState({
+        ID:null,
+        name:"",
+        license:"",
+        files:[file],
+        authors:[],
+        reviewers:[],
+        categories:[],
+        metaData:{
+            abstract:"",
+            reviews:[]
+        }
+    });
+    
+    
 
     // const [fileName, setFileName] = useState('App/Pages/index.js');
 
@@ -40,7 +62,7 @@ function Code(props) {
           ]
     });
 
-    const [show, setShow] = useState(false);
+    const [showComments, setShowComments] = useState(false);
 
     const monacoRef = useRef();
     const [theme, setTheme] = useState('vs');
@@ -50,18 +72,38 @@ function Code(props) {
 
 
     useEffect(() => {
-        // setCode('//Request Submission ID: ' + window.submissionId);
-        if(typeof window.submission !== 'undefined'){
-            setCode(atob(window.submission.split(",")[1]));
-            setSubmissionId(window.submissionId);
-            setFilePath(window.submissionName);
-        }
+        // if(typeof window.submission !== 'undefined'){
+        //     setCode(atob(window.submission.base64Value));
+        //     setSubmissionId(window.submissionId);
+        //     setFilePath(window.submission.webkitRelativePath);
+        // }
 
         // if (isLoading) {
         //     simulateNetworkRequest().then(() => {
         //       setLoading(false);
         //     });
         // }
+
+        //Get submission
+        axiosInstance.get(submissionEndpoint + "/" + params.id)
+            .then((response) => {
+                console.log(response.data);
+                
+                axiosInstance.get(fileEndpoint + "/" + response.data.files[0].ID)
+                    .then((response2) => {
+                        console.log(response2.data);
+                        setSubmission(response.data);
+                        setFile(response2.data);
+                        setCode(atob(response2.data.base64Value));
+                    }).catch((error) => {
+                        console.log(error);
+                    })
+
+                
+            }).catch((error) => {
+                console.log(error);
+            })
+
 
         //Remember to also request comments for submission
         // axiosInstance.post(codeEndpoint, null, {params: {submissionId, filePath}})
@@ -71,7 +113,7 @@ function Code(props) {
         //             .catch((error) => {
         //                 console.log(error)
         //             });
-    })
+    }, [])
 
     const editorDidMount = (editor, monaco) => {
         console.log('editorDidMount', editor);
@@ -145,47 +187,38 @@ function Code(props) {
 
         if (comment == null || comment == "") {
             console.log("No comment written");
-        } else {
-
-            let userId = null;                          //Preparing to get userId from session cookie
-            let cookies = document.cookie.split(';');   //Split all cookies into key value pairs
-            for(let i = 0; i < cookies.length; i++){    //For each cookie,
-                let cookie = cookies[i].split("=");     //  Split key value pairs into key and value
-                if(cookie[0].trim() == "userId"){       //  If userId key exists, extract the userId value
-                    userId = cookie[1].trim();
-                    break;
-                }
-            }
-            if(userId === null){                        //If user has not logged in, disallow submit
-                console.log("Not logged in");
-                return;
-            }
-
-            let data = {
-                submissionId: submissionId,
-                filePath: filePath,
-                author: userId,
-                base64Value: btoa(comment)
-            }
-            console.log(data);
-            axiosInstance.post(commentEndpoint, data)
-                        .then((response) => {
-                            console.log(response);
-                            document.getElementById("CommentText").value = "";
-                        })
-                        .catch((error) => {
-                            console.log(error);
-                        });
+            return;
         }
+        
+        let userId = JwtService.getUserID();        //Preparing to get userId from session cookie
+        if(userId === null){                        //If user has not logged in, disallow submit
+            console.log("Not logged in");
+            return;
+        }
+
+        let data = {
+            authorId: userId,
+            base64Value: btoa(comment)
+        }
+        console.log(data);
+        axiosInstance.post(fileEndpoint + "/" + file.ID + "/comment", data)
+                    .then((response) => {
+                        console.log(response);
+                        document.getElementById("CommentText").value = "";
+                    })
+                    .catch((error) => {
+                        console.log(error);
+                    });
+        
         
     }
 
     const handleClose = () => {
-        setShow(false);
+        setShowComments(false);
     }
 
     const handleShow = () => {
-        setShow(true);
+        setShowComments(true);
     }
 
     const handleClick = () => setLoading(true);
@@ -220,22 +253,22 @@ function Code(props) {
         })
     })
 
-    const filePathHTML = filePath.split("/").map((part, i) => {
-        return (<Breadcrumb.Item href={'/code/' + submissionId + '/' + filePath.match(new RegExp('^(.*?)' + part))[0]} key={i}>{part}</Breadcrumb.Item>);
+    const filePathHTML = file.path.split("/").map((part, i) => {
+        return (<Breadcrumb.Item href={'/code/' + submission.ID + '/' + file.path.match(new RegExp('^(.*?)' + part))[0]} key={i}>{part}</Breadcrumb.Item>);
     })
 
     return(
         <Container>
             <br />
             <Card>
-            <Card.Header>{submissionName}</Card.Header>
+            <Card.Header>{submission.name}</Card.Header>
             <Card.Body>
             <Card.Title>
                 <Breadcrumb>
                     {filePathHTML}
                 </Breadcrumb>
             </Card.Title>
-            <Card.Text>Abstract</Card.Text>
+            <Card.Text>{submission.metaData.abstract}</Card.Text>
             <Row>
                 <Col>
                     <InputGroup size="sm" className="mb-3">
@@ -262,7 +295,7 @@ function Code(props) {
                 </Col>
             </Row>
             <Row>
-            <Modal show={show} onHide={handleClose} size="lg">
+            <Modal show={showComments} onHide={handleClose} size="lg">
             <Form onSubmit={postComment}>
                 <Modal.Header closeButton>
                     <Modal.Title>Comments</Modal.Title>
