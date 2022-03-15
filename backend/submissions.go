@@ -494,9 +494,12 @@ func addFiles(tx *gorm.DB, s *Submission) error {
 			return &DuplicateFileError{Path: file.Path}
 		}
 	}
+	fmt.Println(len(s.Files))
 
 	// Add files to the database
-	if err := tx.Model(s).Association("Files").Append(s.Files); err != nil {
+	model := &Submission{}
+	model.ID = s.ID
+	if err := tx.Model(model).Association("Files").Append(s.Files); err != nil {
 		return err
 	}
 
