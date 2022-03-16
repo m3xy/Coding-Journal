@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react"
 import Dropzone from "react-dropzone"
 import { Form, ListGroup, Ratio, Card, CloseButton } from "react-bootstrap"
 import styles from "./FormComponents.module.css"
-import { useRef } from "react"
 
 const FileLabel = ({ children }) => {
 	return <label style={{ margin: "5px" }}>{children}</label>
@@ -30,7 +29,7 @@ const FormFile = ({
 	const onDrop = (acceptedFiles) => {
 		if (fileLimit ? acceptedFiles.length > fileLimit : false) return
 		let success = acceptedFiles.map((file) => {
-			return validate(elemName, file.hasOwnProperty('path') ? file.path : file.name)
+			let state = validate(elemName, file.hasOwnProperty('path'))
 		})
 		if (success.includes(false)) {
 			return

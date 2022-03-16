@@ -16,6 +16,7 @@ const FormText = ({
 	onChange,
 	isInvalid,
 	placeholder,
+	feedback,
 	rows
 }) => {
 	return (
@@ -32,6 +33,9 @@ const FormText = ({
 				rows={rows ? rows : 1}
 				onChange={onChange}
 			/>
+			<Form.Control.Feedback type="invalid">
+				{feedback? feedback: ""}
+			</Form.Control.Feedback>
 		</Form.Group>
 	)
 }

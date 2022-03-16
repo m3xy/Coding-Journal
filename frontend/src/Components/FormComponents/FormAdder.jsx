@@ -10,7 +10,8 @@ const FormAdder = ({
 	arrName,
 	label,
 	placeholder,
-	setForm,
+	feedback,
+	onChange,
 	validate
 }) => {
 	const val = useRef()
@@ -18,25 +19,25 @@ const FormAdder = ({
 	const [input, setInput] = useState("")
 
 	const valid = (required, val) => {
-		return (!required && val.length === 0) || validate(elemName, val)
+		return (
+			(!required && val.length === 0) ||
+			(validate(elemName, val) && !array.includes(input))
+		)
 	}
-
 
 	// Map elements of the array each to a button representing it.
 	let cards = array.map((elem, i) => {
 		return (
 			<Button
 				key={i}
-				variant="outline-secondary"
+				variant="outline-danger"
 				size="sm"
 				className={styles.isolatedArrayButton}
 				onClick={() => {
 					setArray((array) => {
 						return array.filter((value) => value !== elem)
 					})
-					setForm((form) => {
-						return { ...form, [arrName]: array }
-					})
+					onChange({target:{name: arrName, value: array}})
 				}}>
 				{elem}
 			</Button>
@@ -57,10 +58,8 @@ const FormAdder = ({
 			return
 		}
 		setArray((array) => {
+			onChange({target:{name: arrName, value: [...array, input]}})
 			return [...array, input]
-		})
-		setForm((form) => {
-			return { ...form, [arrName]: array }
 		})
 		val.current.value = ""
 		setInput("")
@@ -91,6 +90,7 @@ const FormAdder = ({
 				</Button>
 			</InputGroup>
 			<Col>{cards}</Col>
+			<Form.Control.Feedback>{feedback? feedback: ""}</Form.Control.Feedback>
 		</Row>
 	)
 }
