@@ -179,6 +179,22 @@ func TestQuerySubmissions(t *testing.T) {
 			return respData
 		}
 
+		t.Run("no query parameters", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			
+			// test that the response is as expected
+			resp := handleQuery(ENDPOINT_SUBMISSIONS)
+			switch {
+			case !assert.NotEmpty(t, resp, "request response is nil"),
+				!assert.Contains(t, submissionIDs, resp.Submissions[0].ID, "Missing submission 1 ID"),
+				!assert.Contains(t, submissionIDs, resp.Submissions[1].ID, "Missing submission 2 ID"):
+				return
+			}
+		})
+
 		t.Run("order by date", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
@@ -265,6 +281,35 @@ func TestQuerySubmissions(t *testing.T) {
 				!assert.Equal(t, submissionIDs[0], respData.Submissions[0].ID, "Submission id incorrect"):
 				return
 			}
+		})
+	})
+
+	t.Run("Error Handling Validation", func(t *testing.T) {
+		// handles sending the request and returns the response
+		handleQuery := func(queryRoute string) *http.Response {
+			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			return w.Result()
+		}
+
+		t.Run("bad value given for query parameter", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+			queryRoute := fmt.Sprintf("%s?orderBy=blub", ENDPOINT_SUBMISSIONS)
+			resp := handleQuery(queryRoute)
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Incorrect status code returned")
+		})
+
+		t.Run("query empty result set", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+			queryRoute := fmt.Sprintf("%s?tags=blub", ENDPOINT_SUBMISSIONS)
+			resp := handleQuery(queryRoute)
+			assert.Equal(t, http.StatusNoContent, resp.StatusCode, "Incorrect status code returned")
 		})
 	})
 }
