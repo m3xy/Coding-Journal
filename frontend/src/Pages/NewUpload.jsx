@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react"
-import DragAndDrop from "./DragAndDrop"
 import axiosInstance from "../Web/axiosInstance"
 import {
 	Form,
@@ -16,13 +15,13 @@ import {
 	Tab
 } from "react-bootstrap"
 import JwtService from "../Web/jwt.service"
-import { useDropzone } from "react-dropzone"
-import { FormText, FormAdder } from "../Components/FormComponents"
+import Dropzone from "react-dropzone"
+import { FormText, FormAdder, FormFile } from "../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
 
 const Upload = () => {
 	const [form, setForm] = useState({
-		file: { path: "", base64Value: "" },
+		file: "",
 		authors: [],
 		submissionName: ""
 	})
@@ -34,10 +33,6 @@ const Upload = () => {
 	const [moddedFields, setModdedFields] = useState([])
 
 	const navigate = useNavigate()
-
-	useEffect(() => {
-		console.log(JwtService.getUserID())
-	}, [])
 
 	// Validate an element inserted into the form.
 	const validate = (key, val) => {
@@ -196,7 +191,7 @@ const Upload = () => {
 					rows={3}
 					isInvalid={errors.hasOwnProperty("submissionAbstract")}
 					onChange={handleOptional}
-					type="textarea"
+					as="textarea"
 				/>
 			</Row>
 			<Row>
@@ -216,29 +211,15 @@ const Upload = () => {
 	let filesTab = (
 		<Tab eventKey="files" title="Files">
 			<Row>
-				<Form.Group controlId="formFile" className="mb-3">
-					<Form.Control
-						type="file"
-						accept=".zip"
-						required
-						onChange={handleDrop}
-					/>
-					<Card.Body>
-						{form.file != "" ? (
-							<ListGroup>{fileCard}</ListGroup>
-						) : (
-							<Card.Text
-								className="text-center"
-								style={{ color: "grey" }}>
-								<i>
-									Drag and Drop <br />
-								</i>
-								<br />
-								<br />
-							</Card.Text>
-						)}
-					</Card.Body>
-				</Form.Group>
+				<FormFile 
+					accept=".zip"
+					display="Submission ZIP"
+					name="file"
+					elemName="file"
+					fileLimit={1}
+					validate={validate}
+					setForm={setForm}
+				/>
 			</Row>
 		</Tab>
 	)
