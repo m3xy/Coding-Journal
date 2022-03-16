@@ -15,9 +15,14 @@ import {
 	Tab
 } from "react-bootstrap"
 import JwtService from "../Web/jwt.service"
-import Dropzone from "react-dropzone"
 import { FormText, FormAdder, FormFile } from "../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
+
+const defaultMsgs = {
+	submissionName: "A name is required!",
+	file: "A single ZIP file is allowed.",
+	tag: "This tag has already been inserted into the submission!"
+}
 
 const Upload = () => {
 	const [form, setForm] = useState({
@@ -33,6 +38,21 @@ const Upload = () => {
 	const [moddedFields, setModdedFields] = useState([])
 
 	const navigate = useNavigate()
+
+	// Immediately exit if the user is not logged in.
+	useEffect(() => {
+		let user = JwtService.getUserID()
+		if (!user) {
+			navigate("/login")
+		} else {
+			setForm((form) => {
+				return { ...form, ["authors"]: [user] }
+			})
+			setModdedFields((fields) =>{
+				return [...fields, "authors"]
+			})
+		}
+	}, [])
 
 	// Validate an element inserted into the form.
 	const validate = (key, val) => {
@@ -50,6 +70,7 @@ const Upload = () => {
 		}
 	}
 
+	// Handle droping a file to the drag & drop case.
 	const handleDrop = (e) => {
 		let files = e.target.files
 		if (files.length > 1) {
@@ -75,7 +96,12 @@ const Upload = () => {
 			})
 		} else if (!validated && !errors.hasOwnProperty(e.target.name)) {
 			setErrors((errors) => {
-				return { ...errors, [e.target.name]: true }
+				return {
+					...errors,
+					[e.target.name]: defaultMsgs.hasOwnProperty(e.target.name)
+						? defaultMsgs[e.target.name]
+						: "Invalid."
+				}
 			})
 		}
 	}
@@ -178,88 +204,87 @@ const Upload = () => {
 	// The tab with the submission's details form.
 	let detailsTab = (
 		<Tab eventKey="details" title="details">
-			<Row>
-				<FormText
-					display="Name"
-					name="submissionName"
-					isInvalid={errors.hasOwnProperty("submissionName")}
-					onChange={handleRequired}
-				/>
-				<FormText
-					display="Abstract"
-					name="submissionAbstract"
-					rows={3}
-					isInvalid={errors.hasOwnProperty("submissionAbstract")}
-					onChange={handleOptional}
-					as="textarea"
-				/>
-			</Row>
-			<Row>
-				<FormAdder
-					display="Tags"
-					elemName="tag"
-					arrName="tags"
-					label="addTags"
-					setForm={setForm}
-					validate={validate}
-				/>
-			</Row>
+			<FormText
+				display="Name"
+				name="submissionName"
+				isInvalid={errors.hasOwnProperty("submissionName")}
+				feedback={
+					errors.hasOwnProperty("submissionName")
+						? errors.submissionName
+						: ""
+				}
+				onChange={handleRequired}
+			/>
+			<FormText
+				display="Abstract"
+				name="submissionAbstract"
+				rows={3}
+				isInvalid={errors.hasOwnProperty("submissionAbstract")}
+				feedback={""}
+				onChange={handleOptional}
+				as="textarea"
+			/>
+			<FormAdder
+				display="Tags"
+				elemName="tag"
+				arrName="tags"
+				label="addTags"
+				feedback={defaultMsgs.tag}
+				onChange={handleOptional}
+				validate={validate}
+			/>
 		</Tab>
 	)
 
 	// The tab for file selection.
 	let filesTab = (
 		<Tab eventKey="files" title="Files">
-			<Row>
-				<FormFile 
-					accept=".zip"
-					display="Submission ZIP"
-					name="file"
-					elemName="file"
-					fileLimit={1}
-					validate={validate}
-					setForm={setForm}
-				/>
-			</Row>
+			<FormFile
+				accept=".zip"
+				display="Submission ZIP"
+				name="file"
+				elemName="file"
+				fileLimit={1}
+				validate={validate}
+				setForm={setForm}
+			/>
 		</Tab>
 	)
 
 	return (
-		<Container>
-			<br />
-			<Row>
-				<Col></Col>
-				<Col xs={4}>
-					<Card>
-						<Form onSubmit={handleSubmit}>
-							<Card.Header>Submission Upload</Card.Header>
-							<Card.Body>
-								<Tabs
-									justify
-									defaultActiveKey="details"
-									id="profileTabs"
-									className="mb-3">
-									{detailsTab}
-									{filesTab}
-								</Tabs>
-							</Card.Body>
-							<Card.Footer className="text-center">
-								<Button
-									variant="outline-secondary"
-									type="submit"
-									disabled={
-										Object.keys(errors).length === 0 &&
-										moddedFields.length ===
-											Object.keys(form).length
-									}>
-									Upload
-								</Button>{" "}
-							</Card.Footer>
-						</Form>
-					</Card>
-				</Col>
-				<Col></Col>
-			</Row>
+		<Container style={{ textAlign: "center" }}>
+			<Card
+				style={{
+					minWidth: "26rem",
+					maxWidth: "40rem",
+					margin: "0 auto",
+					marginTop: "15px"
+				}}>
+				<Form onSubmit={handleSubmit}>
+					<Card.Header>Submission Upload</Card.Header>
+					<Card.Body>
+						<Tabs
+							justify
+							defaultActiveKey="details"
+							id="profileTabs"
+							className="mb-3">
+							{detailsTab}
+							{filesTab}
+						</Tabs>
+					</Card.Body>
+					<Card.Footer className="text-center">
+						<Button
+							variant="outline-secondary"
+							type="submit"
+							disabled={
+								Object.keys(errors).length === 0 ||
+								!moddedFields.length === Object.keys(form).length
+							}>
+							Upload
+						</Button>{" "}
+					</Card.Footer>
+				</Form>
+			</Card>
 		</Container>
 	)
 }
