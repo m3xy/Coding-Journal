@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react"
+import { useEffect } from "react"
 import { Form, Button, InputGroup, Row, Col } from "react-bootstrap"
 import styles from "./FormComponents.module.css"
 
@@ -12,9 +13,16 @@ const FormAdder = ({
 	setForm,
 	validate
 }) => {
-	const val = useRef("")
+	const val = useRef()
 	const [array, setArray] = useState([])
+	const [input, setInput] = useState("")
 
+	const valid = (required, val) => {
+		return (!required && val.length === 0) || validate(elemName, val)
+	}
+
+
+	// Map elements of the array each to a button representing it.
 	let cards = array.map((elem, i) => {
 		return (
 			<Button
@@ -35,23 +43,27 @@ const FormAdder = ({
 		)
 	})
 
+	const handleChange = (e) => {
+		setInput(e.target.value)
+	}
+
 	// Handle click on adding an element to the array
 	const handleClick = () => {
-		let value = val.current.value
 		if (
-			value.length <= 0 ||
-			!validate(elemName, value) ||
-			array.includes(value)
+			input.length <= 0 ||
+			!validate(elemName, input) ||
+			array.includes(input)
 		) {
 			return
 		}
 		setArray((array) => {
-			return [...array, value]
+			return [...array, input]
 		})
 		setForm((form) => {
 			return { ...form, [arrName]: array }
 		})
 		val.current.value = ""
+		setInput("")
 	}
 
 	return (
@@ -67,15 +79,14 @@ const FormAdder = ({
 					aria-label={display}
 					aria-describedby={label}
 					ref={val}
-					isInvalid={array.includes(val.current)}
+					onChange={handleChange}
+					isInvalid={!valid(false, input)}
 				/>
 				<Button
 					variant="outline-secondary"
 					id={label}
 					onClick={handleClick}
-					disabled={
-						!val.current.length === 0 || array.includes(val.current)
-					}>
+					disabled={!valid(true, input)}>
 					Add
 				</Button>
 			</InputGroup>

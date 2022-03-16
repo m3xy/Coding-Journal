@@ -12,17 +12,18 @@ const FormText = ({
 	display,
 	name,
 	type,
+	as,
 	onChange,
 	isInvalid,
 	placeholder,
 	rows
 }) => {
-	console.log(rows ? rows : 1)
 	return (
 		<Form.Group className="mb-3" controlId={name}>
 			<Form.Label> {display} </Form.Label>
 			<Form.Control
 				type={type ? type : "text"}
+				as={as ? as : 'input'}
 				name={name}
 				placeholder={
 					placeholder ? placeholder : "Insert " + display + " here..."

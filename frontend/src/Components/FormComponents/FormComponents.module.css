@@ -1,3 +1,21 @@
 .isolatedArrayButton {
 	margin: 3px;
 }
+
+.DropContainer {
+	text-align: center;
+	padding: 30px;
+	color: #CCCCCC;
+	background-color: #FAFAFA;
+	border-color: #CCCCCC;
+	border-width: 2px;
+	border-radius: 2px;
+	border-style: dashed;
+	transition: 0.2s
+
+}
+
+.DropContainer:hover {
+	border-color: #0d6efd;
+	transition: 0.2s
+}
