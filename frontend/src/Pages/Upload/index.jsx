@@ -26,6 +26,7 @@ const Upload = () => {
 	})
 	const [errors, setErrors] = useState({})
 	const [moddedFields, setModdedFields] = useState([])
+
 	const [show, setShowAlert] = useState(false)
 	const [msg, setMsg] = useState()
 
@@ -55,11 +56,11 @@ const Upload = () => {
 				return true
 			// Enforce ZIP format for file name.
 			case "file":
-				return String(val.name).match(/^([A-z0-9-_+]+\.(zip))$/)
+				return /^([A-z0-9-_+]+\.(zip))$/.test(val.name)
 			case "files":
 				return !val
 					.map((file) => {
-						return validate("file", file.name)
+						return validate("file", file)
 					})
 					.includes(false)
 			case "submissionName":
@@ -180,6 +181,7 @@ const Upload = () => {
 						: ""
 				}
 				onChange={handleRequired}
+				required
 			/>
 			<FormText
 				display="Abstract"
