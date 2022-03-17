@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 import Dropzone from "react-dropzone"
-import { Form, ListGroup, Ratio, Card, CloseButton } from "react-bootstrap"
+import { Form, ListGroup, Card, CloseButton } from "react-bootstrap"
 import styles from "./FormComponents.module.css"
 
 const FileLabel = ({ children }) => {
@@ -10,30 +10,32 @@ const FormFile = ({
 	display,
 	label,
 	accept,
-    placeholder,
+	placeholder,
 	elemName,
 	name,
 	fileLimit,
 	validate,
-	setForm
+	onChange
 }) => {
 	const [files, setFiles] = useState([])
+	const [modded, setModded] = useState(false)
 
 	useEffect(() => {
-		setForm((form) => {
-			return { ...form, [name]: files }
-		})
+		if (modded) onChange({ target: { name: name, value: files } })
 	}, [files])
 
 	// Handle dropping new files to the drag n' drop.
 	const onDrop = (acceptedFiles) => {
 		if (fileLimit ? acceptedFiles.length > fileLimit : false) return
 		let success = acceptedFiles.map((file) => {
-			let state = validate(elemName, file.hasOwnProperty('path'))
+			console.log(file)
+			return validate(elemName, file.name)
 		})
+		console.log(success)
 		if (success.includes(false)) {
 			return
 		} else {
+			setModded(true)
 			setFiles(acceptedFiles)
 		}
 	}
@@ -44,9 +46,9 @@ const FormFile = ({
 				<CloseButton
 					onClick={() => {
 						setFiles((files) => {
-                            return files.filter((rmFile) => {
-                                rmFile.name != file.name
-                            })
+							return files.filter((rmFile) => {
+								rmFile.name != file.name
+							})
 						})
 					}}
 				/>
@@ -64,14 +66,17 @@ const FormFile = ({
 		<Dropzone onDrop={onDrop}>
 			{({ getRootProps, getInputProps }) => {
 				return (
-                <section className={styles.DropContainer} {...getRootProps()}>
-                    <input {...getInputProps()} />
-                    <p>
-                        {placeholder
-                            ? placeholder
-                            : "Drop " + display + " here..."}
-                    </p>
-				</section>)
+					<section
+						className={styles.DropContainer}
+						{...getRootProps()}>
+						<input {...getInputProps()} />
+						<p>
+							{placeholder
+								? placeholder
+								: "Drop " + display + " here..."}
+						</p>
+					</section>
+				)
 			}}
 		</Dropzone>
 	)
@@ -83,7 +88,7 @@ const FormFile = ({
 				type="file"
 				accept={accept}
 				onChange={(e) => {
-                    console.log(e);
+					console.log(e.target.files)
 					onDrop([...e.target.files])
 				}}
 			/>

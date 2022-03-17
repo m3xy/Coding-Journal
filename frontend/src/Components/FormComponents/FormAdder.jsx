@@ -17,6 +17,11 @@ const FormAdder = ({
 	const val = useRef()
 	const [array, setArray] = useState([])
 	const [input, setInput] = useState("")
+	const [modded, setModded] = useState(false)
+
+	useEffect(() => {
+		if (modded) onChange({ target: { name: arrName, value: array } })
+	}, [array, modded])
 
 	const valid = (required, val) => {
 		return (
@@ -35,9 +40,9 @@ const FormAdder = ({
 				className={styles.isolatedArrayButton}
 				onClick={() => {
 					setArray((array) => {
+						setModded(true)
 						return array.filter((value) => value !== elem)
 					})
-					onChange({target:{name: arrName, value: array}})
 				}}>
 				{elem}
 			</Button>
@@ -58,7 +63,6 @@ const FormAdder = ({
 			return
 		}
 		setArray((array) => {
-			onChange({target:{name: arrName, value: [...array, input]}})
 			return [...array, input]
 		})
 		val.current.value = ""
@@ -90,7 +94,9 @@ const FormAdder = ({
 				</Button>
 			</InputGroup>
 			<Col>{cards}</Col>
-			<Form.Control.Feedback>{feedback? feedback: ""}</Form.Control.Feedback>
+			<Form.Control.Feedback>
+				{feedback ? feedback : ""}
+			</Form.Control.Feedback>
 		</Row>
 	)
 }
