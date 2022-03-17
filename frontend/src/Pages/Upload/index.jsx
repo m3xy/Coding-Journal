@@ -8,13 +8,13 @@ import styles from "./Upload.module.css"
 
 const defaultMsgs = {
 	submissionName: "A name is required!",
-	file: "A single ZIP file is allowed.",
+	files: "A single ZIP file is allowed.",
 	tag: "This tag has already been inserted into the submission!"
 }
 
 const Upload = () => {
 	const [form, setForm] = useState({
-		file: "",
+		files: [],
 		authors: [],
 		submissionName: ""
 	})
@@ -52,6 +52,12 @@ const Upload = () => {
 			// Enforce ZIP format for file name.
 			case "file":
 				return String(val.name).match(/^([A-z0-9-_+]+\.(zip))$/)
+			case "files":
+				return !val
+					.map((file) => {
+						return validate("file", file.name)
+					})
+					.includes(false)
 			case "submissionName":
 			case "tag":
 			case "author":
@@ -104,48 +110,35 @@ const Upload = () => {
 		return handleChange(e)
 	}
 
-	// Handler for the submit button - submit form, upload submission.
-	const handleSubmit = () => {
-		uploadSubmission()
-	}
-
+	// Upload the submission to the database.
 	const uploadSubmission = async () => {
-		// Get files
-		try {
-			let data = {
-				name: form.submissionName,
-				authors: form.authors,
-				abstract: optionals.submissionAbstract,
-				tags: optionals.tags,
-				base64Value: ""
-			}
-			// Get zip's encoded value
-			await new Promise((resolve, reject) => {
-				file.path = file.name
-				const reader = new FileReader()
-				reader.readAsDataURL(file)
-				reader.onload = (e) => {
-					data.base64Value = e.target.result.split(",")[1]
-					resolve()
-				}
-				reader.onerror = () => {
-					reject(reader.error)
-				}
-			})
-		} catch (err) {
-			console.log(err)
-			return
+		let data = {
+			name: form.submissionName,
+			authors: form.authors,
+			abstract: optionals.submissionAbstract,
+			tags: optionals.tags
 		}
 
 		// Send axios request
-		axiosInstance
-			.post(uploadEndpoint, data)
-			.then((response) => {
-				navigate("/submission/" + response.data.ID)
-			})
-			.catch((error) => {
-				console.log(error)
-			})
+		let submit = (data) => {
+			axiosInstance
+				.post("/submissions/create", data)
+				.then((response) => {
+					navigate("/submission/" + response.data.ID)
+				})
+				.catch((error) => {
+					console.log(error)
+				})
+		}
+
+		const reader = new FileReader()
+		reader.readAsDataURL(form.files[0])
+		reader.onload = (e) => {
+			submit({ ...data, base64Value: e.target.result.split(",")[1] })
+		}
+		reader.onerror = () => {
+			console.log(reader.error)
+		}
 	}
 
 	// The tab with the submission's details form.
@@ -189,7 +182,7 @@ const Upload = () => {
 			<FormFile
 				accept=".zip"
 				display="Submission ZIP"
-				name="file"
+				name="files"
 				elemName="file"
 				fileLimit={1}
 				validate={validate}
@@ -201,7 +194,7 @@ const Upload = () => {
 	return (
 		<Container className={styles.UploadContainer}>
 			<Card className={styles.UploadCard}>
-				<Form onSubmit={handleSubmit}>
+				<Form>
 					<Card.Header>Submission Upload</Card.Header>
 					<Card.Body>
 						<Tabs
@@ -216,9 +209,9 @@ const Upload = () => {
 					<Card.Footer className="text-center">
 						<Button
 							variant="outline-secondary"
-							type="submit"
+							onClick={uploadSubmission}
 							disabled={
-								Object.keys(errors).length === 0 ||
+								Object.keys(errors).length !== 0 ||
 								moddedFields.length !== Object.keys(form).length
 							}>
 							Upload
