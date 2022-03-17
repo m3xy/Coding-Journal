@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import axiosInstance from "../../Web/axiosInstance"
-import { Form, Button, Card, Container, Tabs, Tab } from "react-bootstrap"
+import { Form, Button, Card, Tabs, Tab, Alert } from "react-bootstrap"
 import JwtService from "../../Web/jwt.service"
 import { FormText, FormAdder, FormFile } from "../../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
@@ -24,6 +24,8 @@ const Upload = () => {
 	})
 	const [errors, setErrors] = useState({})
 	const [moddedFields, setModdedFields] = useState([])
+	const [show, setAlertShow] = useState(false)
+	const [msg, setMsg] = useState()
 
 	const navigate = useNavigate()
 
@@ -88,6 +90,16 @@ const Upload = () => {
 		}
 	}
 
+	// Show an error alert
+	const showError = (err) => {
+		setMsg(
+			<>
+				<bold>Upload failed</bold> - {err}
+			</>
+		)
+		setAlertShow(true)
+	}
+
 	// Handler for required form content.
 	const handleRequired = (e) => {
 		setForm((form) => {
@@ -128,6 +140,15 @@ const Upload = () => {
 				})
 				.catch((error) => {
 					console.log(error)
+					if (error.hasOwnProperty("repsonse")) {
+						showError(
+							error.response.data.message +
+								" - " +
+								error.response.status
+						)
+					} else {
+						showError("Please try again later - 500")
+					}
 				})
 		}
 
@@ -140,6 +161,7 @@ const Upload = () => {
 		}
 		reader.onerror = () => {
 			console.log(reader.error)
+			showError(reader.error.message)
 		}
 	}
 
@@ -194,7 +216,7 @@ const Upload = () => {
 	)
 
 	return (
-		<Container className={styles.UploadContainer}>
+		<>
 			<Card className={styles.UploadCard}>
 				<Form>
 					<Card.Header>Submission Upload</Card.Header>
@@ -221,7 +243,19 @@ const Upload = () => {
 					</Card.Footer>
 				</Form>
 			</Card>
-		</Container>
+			{show ? (
+				<div className={styles.UploadAlert}>
+					<Alert
+						variant="danger"
+						onClose={() => setAlertShow(false)}
+						dismissible>
+						<p>{msg}</p>
+					</Alert>
+				</div>
+			) : (
+				<div></div>
+			)}
+		</>
 	)
 }
 
