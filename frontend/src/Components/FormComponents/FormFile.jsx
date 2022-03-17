@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import Dropzone from "react-dropzone"
+import { useDropzone } from "react-dropzone"
 import { Form, ListGroup, Card, CloseButton } from "react-bootstrap"
 import styles from "./FormComponents.module.css"
 
@@ -15,28 +15,31 @@ const FormFile = ({
 	name,
 	fileLimit,
 	validate,
+	feedback,
 	onChange
 }) => {
 	const [files, setFiles] = useState([])
 	const [modded, setModded] = useState(false)
+	const { getRootProps, getInputProps } = useDropzone({
+		onDrop: (files) => onDrop(files),
+		accept: accept.split(",")
+	})
+	const [invalid, setInvalid] = useState(false)
 
 	useEffect(() => {
 		if (modded) onChange({ target: { name: name, value: files } })
 	}, [files])
 
 	// Handle dropping new files to the drag n' drop.
-	const onDrop = (acceptedFiles) => {
-		if (fileLimit ? acceptedFiles.length > fileLimit : false) return
-		let success = acceptedFiles.map((file) => {
-			console.log(file)
-			return validate(elemName, file.name)
-		})
-		console.log(success)
-		if (success.includes(false)) {
+	const onDrop = (files) => {
+		if (fileLimit ? files.length > fileLimit : false) return
+		if (!validate(name, files)) {
+			setInvalid(true)
 			return
 		} else {
+			setInvalid(false)
 			setModded(true)
-			setFiles(acceptedFiles)
+			setFiles(files)
 		}
 	}
 
@@ -63,22 +66,10 @@ const FormFile = ({
 	})
 
 	let dropArea = (
-		<Dropzone onDrop={onDrop}>
-			{({ getRootProps, getInputProps }) => {
-				return (
-					<section
-						className={styles.DropContainer}
-						{...getRootProps()}>
-						<input {...getInputProps()} />
-						<p>
-							{placeholder
-								? placeholder
-								: "Drop " + display + " here..."}
-						</p>
-					</section>
-				)
-			}}
-		</Dropzone>
+		<section className={styles.DropContainer} {...getRootProps()}>
+			<input {...getInputProps()} />
+			<p>{placeholder ? placeholder : "Drop " + display + " here..."}</p>
+		</section>
 	)
 
 	return (
@@ -87,11 +78,17 @@ const FormFile = ({
 			<Form.Control
 				type="file"
 				accept={accept}
+				isInvalid={invalid}
 				onChange={(e) => {
 					console.log(e.target.files)
 					onDrop([...e.target.files])
 				}}
 			/>
+			<Form.Control.Feedback type="invalid">
+				{feedback
+					? feedback
+					: "Please drop a file/files in the correct format."}
+			</Form.Control.Feedback>
 			<Card.Body>{files.length !== 0 ? cards : dropArea}</Card.Body>
 		</Form.Group>
 	)

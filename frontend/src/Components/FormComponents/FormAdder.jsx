@@ -10,7 +10,7 @@ const FormAdder = ({
 	arrName,
 	label,
 	placeholder,
-	feedback,
+	required,
 	onChange,
 	validate
 }) => {
@@ -71,7 +71,10 @@ const FormAdder = ({
 
 	return (
 		<Row>
-			<Form.Label>{display}</Form.Label>
+			<Form.Label>
+				{" "}
+				{display + (required ? "" : " (optional)")}{" "}
+			</Form.Label>
 			<InputGroup>
 				<Form.Control
 					placeholder={
@@ -94,9 +97,6 @@ const FormAdder = ({
 				</Button>
 			</InputGroup>
 			<Col>{cards}</Col>
-			<Form.Control.Feedback>
-				{feedback ? feedback : ""}
-			</Form.Control.Feedback>
 		</Row>
 	)
 }
