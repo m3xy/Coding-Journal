@@ -1,0 +1,10 @@
+.UploadCard {
+	min-width: 26rem;
+	max-width: 40rem;
+	margin: 0 auto;
+	margin-top: 15px;
+}
+
+.UploadContainer {
+	text-align: center;
+}

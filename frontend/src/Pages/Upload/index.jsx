@@ -1,22 +1,10 @@
 import React, { useState, useEffect } from "react"
-import axiosInstance from "../Web/axiosInstance"
-import {
-	Form,
-	Button,
-	Card,
-	ListGroup,
-	CloseButton,
-	Container,
-	Row,
-	Col,
-	InputGroup,
-	FormControl,
-	Tabs,
-	Tab
-} from "react-bootstrap"
-import JwtService from "../Web/jwt.service"
-import { FormText, FormAdder, FormFile } from "../Components/FormComponents"
+import axiosInstance from "../../Web/axiosInstance"
+import { Form, Button, Card, Container, Tabs, Tab } from "react-bootstrap"
+import JwtService from "../../Web/jwt.service"
+import { FormText, FormAdder, FormFile } from "../../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
+import styles from "./Upload.module.css"
 
 const defaultMsgs = {
 	submissionName: "A name is required!",
@@ -48,7 +36,7 @@ const Upload = () => {
 			setForm((form) => {
 				return { ...form, ["authors"]: [user] }
 			})
-			setModdedFields((fields) =>{
+			setModdedFields((fields) => {
 				return [...fields, "authors"]
 			})
 		}
@@ -57,32 +45,20 @@ const Upload = () => {
 	// Validate an element inserted into the form.
 	const validate = (key, val) => {
 		switch (key) {
+			// Simply return true for optional, requirementless entries.
+			case "tags":
 			case "submissionAbstract":
 				return true
+			// Enforce ZIP format for file name.
 			case "file":
-				return String(val.name).match(
-					/^([A-z0-9-_+]+\/)*([A-z0-9-_+]+\.(zip))$/
-				)
+				return String(val.name).match(/^([A-z0-9-_+]+\.(zip))$/)
 			case "submissionName":
 			case "tag":
 			case "author":
 				return val.length > 0
+			default:
+				return false
 		}
-	}
-
-	// Handle droping a file to the drag & drop case.
-	const handleDrop = (e) => {
-		let files = e.target.files
-		if (files.length > 1) {
-			return false
-		}
-		let file = files[0]
-		if (!validate("file", file.name)) {
-			return false
-		}
-
-		let formFileList = new DataTransfer()
-		handleRequired({ target: { name: "file", file } })
 	}
 
 	// Handle a change in a form value handled by required and optional.
@@ -129,25 +105,18 @@ const Upload = () => {
 	}
 
 	// Handler for the submit button - submit form, upload submission.
-	const handleSubmit = (e) => {
-		e.preventDefault()
-		uploadSubmission(
-			form.authors,
-			form.submissionName,
-			optionals.submissionAbstract,
-			form.file,
-			optionals.tags
-		)
+	const handleSubmit = () => {
+		uploadSubmission()
 	}
 
-	const uploadSubmission = async (authors, name, subAbstract, file, tags) => {
+	const uploadSubmission = async () => {
 		// Get files
 		try {
 			let data = {
-				name: name,
-				authors: authors,
-				abstract: subAbstract,
-				tags: tags,
+				name: form.submissionName,
+				authors: form.authors,
+				abstract: optionals.submissionAbstract,
+				tags: optionals.tags,
 				base64Value: ""
 			}
 			// Get zip's encoded value
@@ -178,28 +147,6 @@ const Upload = () => {
 				console.log(error)
 			})
 	}
-
-	const removeFile = () => {
-		setForm((form) => {
-			return { ...form, file: "" }
-		})
-	}
-	// The card corresponding to a file.
-	let fileCard = (
-		<ListGroup.Item as="li" action onClick={() => {}}>
-			<CloseButton onClick={removeFile} />
-			<br />
-			<label>File name: {form.file.name}</label>
-			<br />
-			<label>File type: {form.file.type}</label>
-			<br />
-			<label>File Size: {form.file.size} bytes</label>
-			<br />
-			<label>
-				Last modified: {new Date(form.file.lastModified).toUTCString()}
-			</label>
-		</ListGroup.Item>
-	)
 
 	// The tab with the submission's details form.
 	let detailsTab = (
@@ -246,20 +193,14 @@ const Upload = () => {
 				elemName="file"
 				fileLimit={1}
 				validate={validate}
-				setForm={setForm}
+				onChange={handleRequired}
 			/>
 		</Tab>
 	)
 
 	return (
-		<Container style={{ textAlign: "center" }}>
-			<Card
-				style={{
-					minWidth: "26rem",
-					maxWidth: "40rem",
-					margin: "0 auto",
-					marginTop: "15px"
-				}}>
+		<Container className={styles.UploadContainer}>
+			<Card className={styles.UploadCard}>
 				<Form onSubmit={handleSubmit}>
 					<Card.Header>Submission Upload</Card.Header>
 					<Card.Body>
@@ -278,7 +219,7 @@ const Upload = () => {
 							type="submit"
 							disabled={
 								Object.keys(errors).length === 0 ||
-								!moddedFields.length === Object.keys(form).length
+								moddedFields.length !== Object.keys(form).length
 							}>
 							Upload
 						</Button>{" "}
