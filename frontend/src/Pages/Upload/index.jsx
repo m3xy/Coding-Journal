@@ -4,7 +4,9 @@ import { Form, Button, Card, Tabs, Tab, Alert } from "react-bootstrap"
 import JwtService from "../../Web/jwt.service"
 import { FormText, FormAdder, FormFile } from "../../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
+import { CSSTransition } from "react-transition-group"
 import styles from "./Upload.module.css"
+import transitionStyles from "./Alert.module.css"
 
 const defaultMsgs = {
 	submissionName: "A name is required!",
@@ -24,7 +26,7 @@ const Upload = () => {
 	})
 	const [errors, setErrors] = useState({})
 	const [moddedFields, setModdedFields] = useState([])
-	const [show, setAlertShow] = useState(false)
+	const [show, setShowAlert] = useState(false)
 	const [msg, setMsg] = useState()
 
 	const navigate = useNavigate()
@@ -97,7 +99,7 @@ const Upload = () => {
 				<bold>Upload failed</bold> - {err}
 			</>
 		)
-		setAlertShow(true)
+		setShowAlert(true)
 	}
 
 	// Handler for required form content.
@@ -243,18 +245,20 @@ const Upload = () => {
 					</Card.Footer>
 				</Form>
 			</Card>
-			{show ? (
+			<CSSTransition
+				in={show}
+				timeout={100}
+				unmountOnExit
+				classNames={{ ...transitionStyles }}>
 				<div className={styles.UploadAlert}>
 					<Alert
 						variant="danger"
-						onClose={() => setAlertShow(false)}
+						onClose={() => setShowAlert(false)}
 						dismissible>
 						<p>{msg}</p>
 					</Alert>
 				</div>
-			) : (
-				<div></div>
-			)}
+			</CSSTransition>
 		</>
 	)
 }

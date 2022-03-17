@@ -7,6 +7,24 @@
 	text-align: center;
 }
 
+@keyframes fadeIn {
+	0% {
+		opacity: 0%;
+	}
+	100% {
+		opacity: 100%;
+	}
+}
+
+@keyframes fadeOut {
+	0% {
+		opacity: 100%;
+	}
+	100% {
+		opacity: 0%;
+	}
+}
+
 .UploadAlert {
 	min-width: 30rem;
 	max-width: 42rem;
