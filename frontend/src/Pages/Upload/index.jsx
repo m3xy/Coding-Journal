@@ -133,8 +133,10 @@ const Upload = () => {
 
 		const reader = new FileReader()
 		reader.readAsDataURL(form.files[0])
-		reader.onload = (e) => {
-			submit({ ...data, base64Value: e.target.result.split(",")[1] })
+		reader.onloadend = () => {
+			let base64 = reader.result.replace("data:", "").replace(/^.+,/, "")
+			console.log(base64)
+			submit({ ...data, base64: base64 })
 		}
 		reader.onerror = () => {
 			console.log(reader.error)
