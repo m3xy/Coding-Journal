@@ -296,7 +296,7 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 
 // Unzip a file to some temporary folder. Returns folder path.
 func TmpStoreZip(base64value string) (string, error) {
-	zipBytes, err := base64.URLEncoding.DecodeString(base64value)
+	zipBytes, err := base64.StdEncoding.DecodeString(base64value)
 
 	if err != nil {
 		log.Printf("[ERROR] Base 64 value given is invalid/corrupt.")
