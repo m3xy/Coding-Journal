@@ -238,6 +238,10 @@ function Register() {
 								placeholder="Password"
 								onChange={handleChange}
 								isInvalid={errors.hasOwnProperty("password")}
+								isValid={
+									!errors.hasOwnProperty("password") &&
+									moddedFields.includes("password")
+								}
 							/>
 							<Form.Control.Feedback type="invalid">
 								{errors["password"]}
@@ -253,6 +257,11 @@ function Register() {
 								isInvalid={errors.hasOwnProperty(
 									"repeatPassword"
 								)}
+								isValid={
+									!errors.hasOwnProperty("repeatPassword") &&
+									!errors.hasOwnProperty("password") &&
+									moddedFields.includes("repeatPassword")
+								}
 							/>
 							<Form.Control.Feedback type="invalid">
 								{errors["repeatPassword"]}
