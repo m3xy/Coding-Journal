@@ -28,7 +28,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -252,7 +251,7 @@ func loadComments(tx *gorm.DB, c Comment) error {
 // 	(error) : if something goes wrong, nil otherwise
 func getFileContent(filePath string) (string, error) {
 	// reads in the file's content
-	fileData, err := ioutil.ReadFile(filePath)
+	fileData, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}
@@ -288,7 +287,7 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 		buf.ReadFrom(rc)
 		files[i] = File{
 			Path:        file.FileHeader.Name,
-			Base64Value: base64.URLEncoding.EncodeToString(buf.Bytes()),
+			Base64Value: base64.StdEncoding.EncodeToString(buf.Bytes()),
 		}
 	}
 	return files, nil
@@ -296,7 +295,7 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 
 // Unzip a file to some temporary folder. Returns folder path.
 func TmpStoreZip(base64value string) (string, error) {
-	zipBytes, err := base64.URLEncoding.DecodeString(base64value)
+	zipBytes, err := base64.StdEncoding.DecodeString(base64value)
 
 	if err != nil {
 		log.Printf("[ERROR] Base 64 value given is invalid/corrupt.")

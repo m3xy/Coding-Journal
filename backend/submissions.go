@@ -23,6 +23,8 @@
 package main
 
 import (
+	"archive/zip"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,9 +43,10 @@ import (
 )
 
 const (
-	ENDPOINT_UPLOAD_SUBMISSION = "/create"
-	SUBROUTE_SUBMISSION        = "/submission"
-	ENDPOINT_SUBMISSIONS       = "/submissions"
+	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
+	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
+	SUBROUTE_SUBMISSION          = "/submission"
+	ENDPOINT_SUBMISSIONS         = "/submissions"
 
 	ORDER_NIL        = 0
 	ORDER_ASCENDING  = 1
@@ -60,7 +63,7 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submission/{id} - Get given submission.
 	// + /submissions/create - Create a submission.
 	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmissionByZip).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_ASSIGN_REVIEWERS, RouteAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, RouteUploadReview).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_CHANGE_STATUS, RouteUpdateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
@@ -389,13 +392,6 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 
 // Send submission data to the frontend for display. ID included for file
 // and comment queries.
-//
-// Response Codes:
-//	200 : if the submission exists and the request succeeded
-// 	401 : if the proper security token was not given in the request
-//	400 : if the request is invalid or badly formatted
-// 	500 : if something else goes wrong in the backend
-// Response Body: a submission object as specified in README.md
 func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
@@ -432,6 +428,90 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Print("[INFO] success\n")
 	return
+}
+
+// Compresses a given submission and returns it to the frontend to be downloaded
+// GET /submission/{id}/download
+func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] GetDownloadSubmission request received from %v", r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/zip")
+	var zipContent []byte
+
+	// gets the submission ID and calls the controller
+	params := mux.Vars(r)
+	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+	} else if zipContent, err = ControllerDownloadSubmission(uint(submissionID64)); err != nil {
+		switch err.(type) {
+		case *NoSubmissionError: // The given submission doesn't exist
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			log.Printf("[ERROR] Internal server error on submission download - %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+	log.Println("[INFO] GetDownloadSubmission request succeeded")
+	w.Write(zipContent)
+}
+
+// Controller for the
+//
+// Params:
+// 	submissionID (uint) : the unique ID of the submission being downloaded
+// Returns:
+// 	(string) : a string of the zip file's contents
+// 	(error) : an error if one occurs
+func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
+	submission, err := getSubmission(submissionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// creates the zip archive if it doesn't exist, retrieves it otherwise
+	zipPath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprintf("%s.zip", submission.Name))
+	if _, err := os.Stat(zipPath); errors.Is(err, os.ErrNotExist) {
+		zipArchive, err := os.Create(zipPath)
+		if err != nil {
+			return nil, err
+		}
+		defer zipArchive.Close()
+		writer := zip.NewWriter(zipArchive)
+		for _, file := range submission.Files {
+			// gets the file content from the filesystem
+			file.Base64Value, err = getFileContent(filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID)))
+			if err != nil {
+				return nil, err
+			}
+			// decodes file content into a byte array to be made into a zip
+			fileBytes, err := base64.StdEncoding.DecodeString(file.Base64Value)
+			if err != nil {
+				return nil, err
+			}
+			// creates a new zip entry for the given file
+			zipEntryWriter, err := writer.Create(fmt.Sprintf("%s/%s", submission.Name, file.Path))
+			if err != nil {
+				return nil, err
+			}
+			if _, err = zipEntryWriter.Write(fileBytes); err != nil {
+				return nil, err
+			}
+		}
+		writer.Close() // flushes the contents of the buffer into the file
+
+		// any other error occurred
+	} else if err != nil {
+		return nil, err
+	}
+
+	// read byte-array from the zip file, encode it to base64 and return
+	zipContent, err := os.ReadFile(zipPath)
+	if err != nil {
+		return nil, err
+	}
+	retVal := make([]byte, base64.StdEncoding.EncodedLen(len(zipContent)))
+	base64.StdEncoding.Encode(retVal, zipContent)
+	return retVal, nil
 }
 
 // ------
