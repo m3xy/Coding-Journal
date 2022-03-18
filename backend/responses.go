@@ -36,6 +36,12 @@ type NewCommentResponse struct {
 	ID uint `json:"id"`
 }
 
+// GET /submissions/tags
+type GetAvailableTagsResponse struct {
+	StandardResponse
+	Tags []string `json:"tags"`
+}
+
 // GET /submissions
 type QuerySubmissionsResponse struct {
 	StandardResponse

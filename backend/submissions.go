@@ -43,10 +43,12 @@ import (
 )
 
 const (
+	ENDPOINT_QUERY_SUBMISSIONS = "/query"
 	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
 	SUBROUTE_SUBMISSION          = "/submission"
 	ENDPOINT_SUBMISSIONS         = "/submissions"
+	ENDPOINT_GET_TAGS = "/tags"
 
 	ORDER_NIL        = 0
 	ORDER_ASCENDING  = 1
@@ -63,6 +65,8 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submission/{id} - Get given submission.
 	// + /submissions/create - Create a submission.
 	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
+	submissions.HandleFunc(ENDPOINT_GET_TAGS, GetAvailableTags).Methods(http.MethodGet)
+	submissions.HandleFunc(ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_ASSIGN_REVIEWERS, RouteAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, RouteUploadReview).Methods(http.MethodPost, http.MethodOptions)
@@ -73,6 +77,41 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 // ------
 // Router Functions
 // ------
+
+// function to send a list of all available tags to the frontend so that users know which tags allow filtering
+// GET /submissions/tags
+func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] GetAvailableTags request received from %v", r.RemoteAddr)
+	stdResp := StandardResponse{}
+
+	// queries the tags from the database
+	categories := []Category{}
+	if dbResp := gormDb.Model(&Category{}).Find(&categories); dbResp.RowsAffected == 0 {
+		stdResp = StandardResponse{Message: "No tags added yet", Error: false}
+		w.WriteHeader(http.StatusNoContent)
+	} else if dbResp.Error != nil {
+		log.Printf("[ERROR] could not query submissions: %v\n", dbResp.Error)
+		stdResp = StandardResponse{Message: "Internal Server Error - could not query submissions", Error: true}
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	// parses tags into an array of strings
+	tags := []string{}
+	for _, category := range categories {
+		tags = append(tags, category.Tag)
+	}
+	// builds response
+	resp := &GetAvailableTagsResponse{
+		StandardResponse: stdResp,
+		Tags: tags,
+	}
+	// sends a response to the client
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else if !resp.Error {
+		log.Print("[INFO] GetAvailableTags request successful\n")
+	}
+}
 
 // function to query a list of submissions with a set of query parameters to filter/order the list
 func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {

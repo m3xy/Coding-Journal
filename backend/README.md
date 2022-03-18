@@ -218,13 +218,44 @@ interface Profile {
 
 ## Submission
 
+### Get available tags
+
+Queries the avaiable tags from the database to allow for their display on the frontend
+
+1. Endpoint
+
+    The endpoint is **GET** `/submissions/tags`
+
+2. Request
+
+    1. Headers
+    2. Body
+
+3. Response
+
+    1. Status
+
+        - 200 - if a non-empty tag array was found and returned
+        - 204 - if no tags are currently in the db
+        - 500 - if anything else goes wrong not pertaining to the client
+
+    2. Body - the object shown below
+
+```typescript
+interface GetAvailableTagsResponse {
+    message: string;
+    error: bool;
+    tags: string[];
+}
+```
+
 ### Submission Query
 
 Querying an ordered list of submissions based upon query parameters
 
 1. Enpoint
 
-    The enpoint to query submissions is **GET** `/submissions`
+    The enpoint to query submissions is **GET** `/submissions/query`
 
 2. Request
 
@@ -236,6 +267,8 @@ Querying an ordered list of submissions based upon query parameters
 
         - orderBy - newest or oldest
         - tags - any existant code tag (i.e. python, java, etc.)
+        - authors - user ID of authors
+        - reviewers - user ID of reviewers
 
 3. Response
 
