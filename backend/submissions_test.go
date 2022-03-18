@@ -24,8 +24,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/gorm/clause"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -124,7 +124,7 @@ func TestGetAvailableTags(t *testing.T) {
 	router.HandleFunc(SUBROUTE_SUBMISSIONS+ENDPOINT_GET_TAGS, GetAvailableTags)
 
 	addTag := func(tag string) {
-		assert.NoError(t, gormDb.Model(&Category{}).Create(&Category{Tag: tag}).Error,"failed to add tag")
+		assert.NoError(t, gormDb.Model(&Category{}).Create(&Category{Tag: tag}).Error, "failed to add tag")
 	}
 	clearTags := func() {
 		gormDb.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(&Category{})
@@ -135,7 +135,9 @@ func TestGetAvailableTags(t *testing.T) {
 		resp := w.Result()
 
 		respData := &GetAvailableTagsResponse{}
-		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "error occurred while parsing response") { return 0, respData }
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "error occurred while parsing response") {
+			return 0, respData
+		}
 		return resp.StatusCode, respData
 	}
 
@@ -143,9 +145,10 @@ func TestGetAvailableTags(t *testing.T) {
 		defer clearTags()
 		status, resp := handleQuery()
 		switch {
-			case !assert.False(t, resp.Error, "error field should be false in response"),
-				!assert.Equal(t, http.StatusNoContent, status, "returned incorrect status code"),
-				!assert.Equal(t, 0, len(resp.Tags), "returned non-empty tag array"): return
+		case !assert.False(t, resp.Error, "error field should be false in response"),
+			!assert.Equal(t, http.StatusNoContent, status, "returned incorrect status code"),
+			!assert.Equal(t, 0, len(resp.Tags), "returned non-empty tag array"):
+			return
 		}
 	})
 
@@ -154,9 +157,10 @@ func TestGetAvailableTags(t *testing.T) {
 		defer clearTags()
 		status, resp := handleQuery()
 		switch {
-			case !assert.False(t, resp.Error, "error field should be false in response"),
-				!assert.Equal(t, http.StatusOK, status, "returned incorrect status code"),
-				!assert.ElementsMatch(t, []string{"python"}, resp.Tags, "returned incorrect tag array"): return
+		case !assert.False(t, resp.Error, "error field should be false in response"),
+			!assert.Equal(t, http.StatusOK, status, "returned incorrect status code"),
+			!assert.ElementsMatch(t, []string{"python"}, resp.Tags, "returned incorrect tag array"):
+			return
 		}
 	})
 
@@ -168,9 +172,10 @@ func TestGetAvailableTags(t *testing.T) {
 		}
 		status, resp := handleQuery()
 		switch {
-			case !assert.False(t, resp.Error, "error field should be false in response"),
-				!assert.Equal(t, http.StatusOK, status, "returned incorrect status code"),
-				!assert.ElementsMatch(t, tags, resp.Tags, "returned incorrect tag array"): return
+		case !assert.False(t, resp.Error, "error field should be false in response"),
+			!assert.Equal(t, http.StatusOK, status, "returned incorrect status code"),
+			!assert.ElementsMatch(t, tags, resp.Tags, "returned incorrect tag array"):
+			return
 		}
 	})
 }
@@ -247,7 +252,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected
-			resp := handleQuery(SUBROUTE_SUBMISSIONS+ENDPOINT_QUERY_SUBMISSIONS)
+			resp := handleQuery(SUBROUTE_SUBMISSIONS + ENDPOINT_QUERY_SUBMISSIONS)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
 				!assert.Contains(t, submissionIDs, resp.Submissions[0].ID, "Missing submission 1 ID"),
@@ -275,6 +280,23 @@ func TestQuerySubmissions(t *testing.T) {
 			// test that the response is as expected
 			queryRoute = fmt.Sprintf("%s%s?orderBy=oldest", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			resp = handleQuery(queryRoute)
+			switch {
+			case !assert.NotEmpty(t, resp, "request response is nil"),
+				!assert.Equal(t, submissionIDs[0], resp.Submissions[1].ID, "Submissions not in correct order"),
+				!assert.Equal(t, submissionIDs[1], resp.Submissions[0].ID, "Submissions not in correct order"):
+				return
+			}
+		})
+
+		t.Run("order alphabetically", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 2)
+			submissionIDs[0] = addTestSubmission("btest", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("atest", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+
+			// test that the response is as expected
+			queryRoute := fmt.Sprintf("%s%s?orderBy=alphabetical", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			resp := handleQuery(queryRoute)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
 				!assert.Equal(t, submissionIDs[0], resp.Submissions[1].ID, "Submissions not in correct order"),

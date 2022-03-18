@@ -30,13 +30,13 @@ import (
 )
 
 const (
-	SUBROUTE_SUBMISSION          = "/submission"
-	SUBROUTE_SUBMISSIONS         = "/submissions"
+	SUBROUTE_SUBMISSION  = "/submission"
+	SUBROUTE_SUBMISSIONS = "/submissions"
 
-	ENDPOINT_QUERY_SUBMISSIONS = "/query"
+	ENDPOINT_QUERY_SUBMISSIONS   = "/query"
 	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
-	ENDPOINT_GET_TAGS = "/tags"
+	ENDPOINT_GET_TAGS            = "/tags"
 
 	ORDER_NIL        = 0
 	ORDER_ASCENDING  = 1
@@ -101,7 +101,7 @@ func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
 	// builds response
 	resp := &GetAvailableTagsResponse{
 		StandardResponse: stdResp,
-		Tags: tags,
+		Tags:             tags,
 	}
 	// sends a response to the client
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -169,7 +169,7 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 	orderBy := ""
 	if len(queryParams["orderBy"]) > 0 {
 		orderBy = queryParams["orderBy"][0]
-		if orderBy != "newest" && orderBy != "oldest" {
+		if orderBy != "newest" && orderBy != "oldest" && orderBy != "alphabetical" {
 			return nil, &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
 		}
 	}
@@ -197,6 +197,8 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 			tx = tx.Order("submissions.created_at ASC")
 		} else if orderBy == "oldest" {
 			tx = tx.Order("submissions.created_at DESC")
+		} else if orderBy == "alphabetical" {
+			tx = tx.Order("submissions.Name")
 		}
 
 		// selects fields and gets submissions
