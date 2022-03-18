@@ -508,7 +508,7 @@ func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
 	}
 
 	// creates the zip archive if it doesn't exist, retrieves it otherwise
-	zipPath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprintf("%s.zip", submission.Name))
+	zipPath := filepath.Join(getSubmissionDirectoryPath(*submission), submission.Name+".zip")
 	if _, err := os.Stat(zipPath); errors.Is(err, os.ErrNotExist) {
 		zipArchive, err := os.Create(zipPath)
 		if err != nil {
@@ -531,8 +531,7 @@ func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
 			zipEntryWriter, err := writer.Create(fmt.Sprintf("%s/%s", submission.Name, file.Path))
 			if err != nil {
 				return nil, err
-			}
-			if _, err = zipEntryWriter.Write(fileBytes); err != nil {
+			} else if _, err := zipEntryWriter.Write(fileBytes); err != nil {
 				return nil, err
 			}
 		}
