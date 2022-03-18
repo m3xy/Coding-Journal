@@ -184,7 +184,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			
+
 			// test that the response is as expected
 			resp := handleQuery(ENDPOINT_SUBMISSIONS)
 			switch {
@@ -200,7 +200,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			
+
 			// test that the response is as expected
 			queryRoute := fmt.Sprintf("%s?orderBy=newest", ENDPOINT_SUBMISSIONS)
 			resp := handleQuery(queryRoute)
@@ -431,12 +431,6 @@ func TestUploadSubmission(t *testing.T) {
 }
 
 // Tests the ability of the submissions file to get a submission from the db
-//
-// Test Depends On:
-// 	- TestCreateSubmissions()
-// 	- TestAddFiles()
-// 	- TestAddReviewers()
-// 	- TestAddAuthors()
 func TestRouteGetSubmission(t *testing.T) {
 	// Set up server and test environment
 	testInit()
@@ -492,6 +486,101 @@ func TestRouteGetSubmission(t *testing.T) {
 		router.ServeHTTP(w, r)
 		resp := w.Result()
 		assert.Equalf(t, http.StatusNotFound, resp.StatusCode, "Request should return nothing, but instead got %d", resp.StatusCode)
+	})
+}
+
+// Tests the ability of the backend to download submissions as zip files
+func TestDownloadSubmission(t *testing.T) {
+	// Set up server and test environment
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_SUBMISSION+"/{id}"+ENDPOINT_DOWNLOAD_SUBMISSION, GetDownloadSubmission)
+
+	// Initialise users and created submissions.
+	globalAuthors, _, err := initMockUsers(t)
+	if err != nil {
+		return
+	}
+	// here we encode the file input to mimic a real submission
+	submission := Submission{
+		Name:    "Test",
+		Authors: []GlobalUser{globalAuthors[0]},
+		Files: []File{
+			{Path: "test.txt", Base64Value: base64.StdEncoding.EncodeToString([]byte("test"))},
+			{Path: "test/test.txt", Base64Value: base64.StdEncoding.EncodeToString([]byte("test"))},
+		},
+		MetaData: &SubmissionData{
+			Abstract: "Test",
+		},
+	}
+	submissionID, err := addSubmission(&submission)
+	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+		return
+	}
+
+	// valid requests
+	t.Run("Valid Request", func(t *testing.T) {
+		// this function takes care of sending a request and parsing the submission from the downloaded zip
+		downloadSubmission := func(submissionID uint) []File {
+			// sends the download request
+			url := fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSION, submissionID, ENDPOINT_DOWNLOAD_SUBMISSION)
+			r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			resp := w.Result()
+
+			// decodes the response body from base64 and unzips it
+			encodedBytes := make([]byte, 1000)
+			n, err := resp.Body.Read(encodedBytes)
+			encodedBytes = encodedBytes[0:n]
+			if !assert.NoError(t, err, "error occurred while getting download response body") {
+				return nil
+			}
+			files, err := getFileArrayFromZipBase64(string(encodedBytes)) // this function will base64 encode file contents to be stored
+			if !assert.NoError(t, err, "error occurred while getting the file array from the zip base 64") {
+				return nil
+			}
+			return files
+		}
+
+		t.Run("download valid submission", func(t *testing.T) {
+			filesVerified := 0 // counts the number of files from the submission we have compared
+			files := downloadSubmission(submissionID)
+
+			// Note that the files in the zip archive are not base64 encoded though they are here (done by getFileArrayFromZipBase64)
+			// and the zip files are wrapped with a directory of the same name as the submission
+			for _, downloadedFile := range files {
+				for _, addedFile := range submission.Files {
+					if downloadedFile.Path == (submission.Name+"/"+addedFile.Path) &&
+						downloadedFile.Base64Value == addedFile.Base64Value {
+						filesVerified += 1
+					}
+				}
+			}
+			assert.Equal(t, len(submission.Files), filesVerified, "zip is missing files")
+		})
+	})
+
+	t.Run("Request Validation", func(t *testing.T) {
+		t.Run("non-existant submission", func(t *testing.T) {
+			// sends the download request
+			url := fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSION, submissionID+1, ENDPOINT_DOWNLOAD_SUBMISSION)
+			r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			resp := w.Result()
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "incorrect status returned for non-existant submission")
+		})
+
+		t.Run("submission id as string", func(t *testing.T) {
+			// sends the download request
+			url := fmt.Sprintf("%s/%s%s", SUBROUTE_SUBMISSION, "nonid", ENDPOINT_DOWNLOAD_SUBMISSION)
+			r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			resp := w.Result()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status returned for non-existant submission")
+		})
 	})
 }
 
