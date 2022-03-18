@@ -1,36 +1,31 @@
-import jwt_decode from "jwt-decode";
+import jwt_decode from "jwt-decode"
 
 class JwtService {
-  getRefreshToken() {
-    return localStorage.getItem("refreshToken");
-  }
+	getRefreshToken() {
+		return localStorage.getItem("refreshToken")
+	}
 
-  getAccessToken() {
-    return sessionStorage.getItem("accessToken");
-  }
+	getAccessToken() {
+		return sessionStorage.getItem("accessToken")
+	}
 
-  updateAccessToken(token) {
-    sessionStorage.setItem("accessToken", token);
-  }
+	setUser(token, refresh_token) {
+		sessionStorage.setItem("accessToken", token)
+		localStorage.setItem("refreshToken", refresh_token)
+	}
 
-  setUser(token, refresh_token) {
-    sessionStorage.setItem("accessToken", token);
-    localStorage.setItem("refreshToken", refresh_token);
-  }
+	rmUser() {
+		sessionStorage.removeItem("accessToken")
+		localStorage.removeItem("refreshToken")
+	}
 
-  rmUser() {
-    sessionStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-  }
-
-  getUserID() {
-	  let token = this.getAccessToken();
-	  if (token) {
-		  console.log(jwt_decode(token))
-		  return jwt_decode(token).userId;
-	  }
-	  else return null;
-  }
+	getUserID() {
+		let token = this.getAccessToken()
+		if (token) {
+			console.log(jwt_decode(token))
+			return jwt_decode(token).userId
+		} else return null
+	}
 }
 
-export default new JwtService();
+export default new JwtService()
