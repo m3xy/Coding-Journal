@@ -43,12 +43,12 @@ import (
 )
 
 const (
-	ENDPOINT_QUERY_SUBMISSIONS = "/query"
+	ENDPOINT_QUERY_SUBMISSIONS   = "/query"
 	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
 	SUBROUTE_SUBMISSION          = "/submission"
 	ENDPOINT_SUBMISSIONS         = "/submissions"
-	ENDPOINT_GET_TAGS = "/tags"
+	ENDPOINT_GET_TAGS            = "/tags"
 
 	ORDER_NIL        = 0
 	ORDER_ASCENDING  = 1
@@ -67,7 +67,7 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_GET_TAGS, GetAvailableTags).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmissionByZip).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_ASSIGN_REVIEWERS, RouteAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, RouteUploadReview).Methods(http.MethodPost, http.MethodOptions)
 	submissions.HandleFunc("/{id}"+ENDPOINT_CHANGE_STATUS, RouteUpdateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
@@ -102,7 +102,7 @@ func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
 	// builds response
 	resp := &GetAvailableTagsResponse{
 		StandardResponse: stdResp,
-		Tags: tags,
+		Tags:             tags,
 	}
 	// sends a response to the client
 	if err := json.NewEncoder(w).Encode(resp); err != nil {

@@ -112,7 +112,7 @@ type UploadSubmissionByZipBody struct {
 	Tags           []string `json:"tags"`
 	Authors        []string `json:"authors" validate:"required"`
 	Reviewers      []string `json:"reviewers"`
-	ZipBase64Value string   `json:"base64" validate:"base64url,required"`
+	ZipBase64Value string   `json:"base64" validate:"base64,required"`
 }
 
 // --- JWT Claim types --- //
