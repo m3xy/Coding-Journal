@@ -6,7 +6,7 @@ import { FormText, FormAdder, FormFile } from "../../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
 import { CSSTransition } from "react-transition-group"
 import styles from "./Upload.module.css"
-import transitionStyles from "./Alert.module.css"
+import FadeInStyles from "../../Components/Transitions/FadeIn.module.css"
 
 const defaultMsgs = {
 	submissionName: "A name is required!",
@@ -251,7 +251,7 @@ const Upload = () => {
 				in={show}
 				timeout={100}
 				unmountOnExit
-				classNames={{ ...transitionStyles }}>
+				classNames={{ ...FadeInStyles }}>
 				<div className={styles.UploadAlert}>
 					<Alert
 						variant="danger"
