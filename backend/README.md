@@ -370,6 +370,33 @@ interface GlobalUser {
 }
 ```
 
+### Submission Download
+
+Download a given submission as a zip archive. Available to any user
+
+1. Endpoint
+
+    The endpoint for downloads is **GET** `/submission/{id}/download` where id is submission ID as a uint
+
+2. Request 
+
+    1. Headers - n/a
+
+    2. Body - n/a
+
+3. Response
+
+    1. Status
+
+        - 200 - if the request succeeds and the zip is returned
+        - 400 - if the request is malformatted (i.e. submission id is "a" or similar)
+        - 404 - if the submission is not found
+        - 500 - something has gone wrong in the server not relating to the request
+
+    2. Body
+
+        The response body is a base64 Standard Encoded version of the zip file with content type `application/zip`
+
 ## Approval
 
 ### Assigning Reviewers 
@@ -394,7 +421,7 @@ interface AssignReviewersBody {
 
 3. Response
 
-    1. Status:
+    1. Status
 
         - 200 - if the request fully succeeds
         - 400 - if the request is malformatted or one of the given userIDs does not have reviewer permissions
@@ -402,7 +429,7 @@ interface AssignReviewersBody {
         - 409 - if the submission status has been finalised (i.e. approved/dissaproved)
         - 500 - unexpected error
 
-    2. Body:
+    2. Body
 
 ### Review Upload
 
