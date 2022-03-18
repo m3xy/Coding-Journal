@@ -23,6 +23,7 @@
 package main
 
 import (
+	"archive/zip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -34,7 +35,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"archive/zip"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
@@ -43,10 +43,10 @@ import (
 )
 
 const (
-	ENDPOINT_UPLOAD_SUBMISSION = "/create"
+	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
-	SUBROUTE_SUBMISSION        = "/submission"
-	ENDPOINT_SUBMISSIONS       = "/submissions"
+	SUBROUTE_SUBMISSION          = "/submission"
+	ENDPOINT_SUBMISSIONS         = "/submissions"
 
 	ORDER_NIL        = 0
 	ORDER_ASCENDING  = 1
@@ -455,7 +455,7 @@ func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
 	w.Write(zipContent)
 }
 
-// Controller for the 
+// Controller for the
 //
 // Params:
 // 	submissionID (uint) : the unique ID of the submission being downloaded
@@ -499,10 +499,10 @@ func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
 		}
 		writer.Close() // flushes the contents of the buffer into the file
 
-	// any other error occurred
+		// any other error occurred
 	} else if err != nil {
 		return nil, err
-	} 
+	}
 
 	// read byte-array from the zip file, encode it to base64 and return
 	zipContent, err := os.ReadFile(zipPath)
@@ -513,42 +513,6 @@ func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
 	base64.StdEncoding.Encode(retVal, zipContent)
 	return retVal, nil
 }
-
-
-
-// // builds a zip file for a given submission given its submission ID and
-// // writes it to the filesystem
-// //
-// // Params:
-// // 	submissionID (uint) : the unique ID of the submission in the database
-// // Returns:
-// // 	(error) : an error if one occurs
-// func BuildSubmissionZip(submissionID uint) error {
-// 	submission, err := getSubmission(submissionID)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// creates the zip archive
-// 	zipPath := filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprintf("%s.zip", submission.Name))
-// 	zipArchive, err := os.Create(zipPath)
-// 	writer := zip.NewWriter(zipArchive)
-// 	for _, file := range submission.Files {
-// 		// decodes file content into a byte array to be made into a zip
-// 		fileBytes, err := base64.StdEncoding.DecodeString(file.Base64Value)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		// creates a new zip entry for the given file
-// 		zipEntryWriter, err := writer.Create(file.Path)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		zipEntryWriter.Write(fileBytes)
-// 	}
-// 	writer.Close() // flushes the contents of the buffer into the file
-// 	return nil
-// }
 
 // ------
 // Helper Functions
@@ -813,4 +777,3 @@ func getSubmissionMetaData(submissionID uint) (*SubmissionData, error) {
 	}
 	return submissionData, nil
 }
-

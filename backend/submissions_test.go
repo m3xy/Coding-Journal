@@ -184,7 +184,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			
+
 			// test that the response is as expected
 			resp := handleQuery(ENDPOINT_SUBMISSIONS)
 			switch {
@@ -200,7 +200,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			
+
 			// test that the response is as expected
 			queryRoute := fmt.Sprintf("%s?orderBy=newest", ENDPOINT_SUBMISSIONS)
 			resp := handleQuery(queryRoute)
@@ -535,9 +535,13 @@ func TestDownloadSubmission(t *testing.T) {
 			encodedBytes := make([]byte, 1000)
 			n, err := resp.Body.Read(encodedBytes)
 			encodedBytes = encodedBytes[0:n]
-			if !assert.NoError(t, err, "error occurred while getting download response body") { return nil }
+			if !assert.NoError(t, err, "error occurred while getting download response body") {
+				return nil
+			}
 			files, err := getFileArrayFromZipBase64(string(encodedBytes)) // this function will base64 encode file contents to be stored
-			if !assert.NoError(t, err, "error occurred while getting the file array from the zip base 64") { return nil }
+			if !assert.NoError(t, err, "error occurred while getting the file array from the zip base 64") {
+				return nil
+			}
 			return files
 		}
 
@@ -549,7 +553,7 @@ func TestDownloadSubmission(t *testing.T) {
 			// and the zip files are wrapped with a directory of the same name as the submission
 			for _, downloadedFile := range files {
 				for _, addedFile := range submission.Files {
-					if downloadedFile.Path == (submission.Name+"/"+addedFile.Path) && 
+					if downloadedFile.Path == (submission.Name+"/"+addedFile.Path) &&
 						downloadedFile.Base64Value == addedFile.Base64Value {
 						filesVerified += 1
 					}
