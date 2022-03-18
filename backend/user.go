@@ -22,7 +22,7 @@ func getUserSubroutes(r *mux.Router) {
 	// + GET /user/{id} - Get given user profile.
 	// + GET /user/{id}/submissions - Get given user's authored submissions.
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
-	user.HandleFunc("/{id}"+ENDPOINT_SUBMISSIONS, getAllAuthoredSubmissions).Methods(http.MethodGet)
+	user.HandleFunc("/{id}"+SUBROUTE_SUBMISSIONS, GetAllAuthoredSubmissions).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {

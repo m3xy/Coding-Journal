@@ -3,21 +3,8 @@
 // Authors: 190010425
 // Created: November 18, 2021
 //
-// TODO: write functionality for popularity statistics and an ordering algorithm
-// for suggested submissions
-//
-// This file handles the reading/writing of all submissions (just the submission
-// with its data, not the files themselves)
-//
-// Submission ID (as stored in db submissions table)
-// 	> <submission_name>/ (as stored in the submissions table)
-// 		... (submission directory structure)
-// 	> .data/
-// 		> submission_data.json
-// 		... (submission directory structure)
-// notice that in the filesystem, the .data dir structure mirrors the
-// submission, so that each file in the submission can have a .json file storing
-// its data which is named in the same way as the source code
+// This file handles over-arching functionality of writing/reading submissions
+// to/from the database
 // =============================================================================
 
 package main
@@ -43,11 +30,12 @@ import (
 )
 
 const (
+	SUBROUTE_SUBMISSION          = "/submission"
+	SUBROUTE_SUBMISSIONS         = "/submissions"
+
 	ENDPOINT_QUERY_SUBMISSIONS = "/query"
 	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
-	SUBROUTE_SUBMISSION          = "/submission"
-	ENDPOINT_SUBMISSIONS         = "/submissions"
 	ENDPOINT_GET_TAGS = "/tags"
 
 	ORDER_NIL        = 0
@@ -57,21 +45,32 @@ const (
 
 // Describe mux routing for submission-based endpoints.
 func getSubmissionsSubRoutes(r *mux.Router) {
-	submissions := r.PathPrefix(ENDPOINT_SUBMISSIONS).Subrouter()
 	submission := r.PathPrefix(SUBROUTE_SUBMISSION).Subrouter()
+	submission.Use(jwtMiddleware)
+	submissions := r.PathPrefix(SUBROUTE_SUBMISSIONS).Subrouter()
 	submissions.Use(jwtMiddleware)
 
 	// Submission routes:
 	// + /submission/{id} - Get given submission.
-	// + /submissions/create - Create a submission.
+	// + /submission/{id}/download - Downloads a submission as a zip archive
+	// + /submission/{id}/assignreviewers - Assign reviewers to a given submission (in approval.go)
+	// + /submission/{id}/review - upload a review for a submission (in approval.go)
+	// + /submission/{id}/approve - change submission status to approve/dissaprove (in approval.go)
+	// + /submission/{id}/export/{groupNumber} - export submission to another journal in the supergroup (in journal.go)
 	submission.HandleFunc("/{id}", RouteGetSubmission).Methods(http.MethodGet)
+	submission.HandleFunc("/{id}"+ENDPOINT_DOWNLOAD_SUBMISSION, GetDownloadSubmission).Methods(http.MethodGet)
+	submission.HandleFunc("/{id}"+ENDPOINT_ASSIGN_REVIEWERS, PostAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
+	submission.HandleFunc("/{id}"+ENPOINT_REVIEW, PostUploadReview).Methods(http.MethodPost, http.MethodOptions)
+	submission.HandleFunc("/{id}"+ENDPOINT_CHANGE_STATUS, PostUpdateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
+	submission.HandleFunc("/{id}"+ENDPOINT_EXPORT_SUBMISSION+"/{groupNumber}", PostExportSubmission).Methods(http.MethodPost, http.MethodOptions)
+
+	// Submissions routes:
+	// + /submissions/tags - gets all available tags currently stored in the database
+	// + /submissions/query - queries a list of submissions based upon parameters
+	// + /submissions/create - Create a submissions
 	submissions.HandleFunc(ENDPOINT_GET_TAGS, GetAvailableTags).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
-	submissions.HandleFunc("/{id}"+ENDPOINT_ASSIGN_REVIEWERS, RouteAssignReviewers).Methods(http.MethodPost, http.MethodOptions)
-	submissions.HandleFunc("/{id}"+ENPOINT_REVIEW, RouteUploadReview).Methods(http.MethodPost, http.MethodOptions)
-	submissions.HandleFunc("/{id}"+ENDPOINT_CHANGE_STATUS, RouteUpdateSubmissionStatus).Methods(http.MethodPost, http.MethodOptions)
-	submissions.HandleFunc("/{id}"+ENDPOINT_EXPORT_SUBMISSION+"/{groupNumber}", PostExportSubmission).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ------
@@ -114,6 +113,7 @@ func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
 }
 
 // function to query a list of submissions with a set of query parameters to filter/order the list
+// GET /submissions/query
 func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] GetQuerySubmissions request received from %v", r.RemoteAddr)
 	var err error
@@ -215,14 +215,7 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 
 // Router function to get the names and id's of every submission of a given user
 // if no user id is given in the query parameters, return all valid submissions
-//
-// Response Codes:
-//	200 : if the action completed successfully
-// 	401 : if the proper security token was not given in the request
-//	500 : otherwise
-// Response Body:
-//	A JSON object of form: {...<submission id>:<submission name>...}
-func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
+func GetAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] GetAllAuthoredSubmissions request received from %v", r.RemoteAddr)
 	// gets the userID from the URL
 	var userID string
@@ -257,6 +250,7 @@ func getAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 // Router function to upload new submissions to the db. The body of the
 // sent request should be a valid submission Json objects as specified
 // in backend/README.md
+// POST /submissions/upload
 func PostUploadSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] PostUploadSubmission request received from %v", r.RemoteAddr)
 	// parses the Json request body into a submission struct
@@ -431,6 +425,7 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 
 // Send submission data to the frontend for display. ID included for file
 // and comment queries.
+// GET /submission/{id}
 func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")

@@ -42,7 +42,7 @@ type GetAvailableTagsResponse struct {
 	Tags []string `json:"tags"`
 }
 
-// GET /submissions
+// GET /submissions/query
 type QuerySubmissionsResponse struct {
 	StandardResponse
 	Submissions []Submission `json:"submissions"` // submissions only contain ID and name
