@@ -265,6 +265,7 @@ Querying an ordered list of submissions based upon query parameters
 
     3. Parameters:
 
+        - name - submission name for searching with a query (spaces should be replaced w/ + in URL)
         - orderBy - newest | oldest | alphabetical
         - tags - any existant code tag (i.e. python, java, etc.)
         - authors - user ID of authors

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
@@ -166,6 +167,10 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 	tags := queryParams["tags"]
 	authors := queryParams["authors"]
 	reviewers := queryParams["reviewers"]
+	submissionName := ""
+	if len(queryParams["name"]) > 0 {
+		submissionName = queryParams["name"][0]
+	}
 	orderBy := ""
 	if len(queryParams["orderBy"]) > 0 {
 		orderBy = queryParams["orderBy"][0]
@@ -198,6 +203,19 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 		if len(reviewers) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
 				"reviewers_submission").Select("submission_id").Where("global_user_id IN ?", reviewers))
+		}
+		// RegEx filtering for submission name
+		if submissionName != "" {
+			params := map[string]interface{}{"full": submissionName}
+			whereString := "submissions.name REGEXP @full"
+			// only adds multiple regex conditions if the name given is multiple words
+			if wordList := strings.Fields(submissionName); len(wordList) > 1 {
+				for index, field := range wordList {
+					whereString = whereString + " OR submissions.name REGEXP @"+fmt.Sprint(index)
+					params[fmt.Sprint(index)] = field
+				}
+			}
+			tx = tx.Where(whereString, params)
 		}
 		// order of submissions
 		if orderBy == "newest" {
