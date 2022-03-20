@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from "react"
 import { Card, Button } from "react-bootstrap"
 import styles from "./SubmissionList.module.css"
+import { useNavigate } from "react-router-dom"
+import axiosInstance from "../../Web/axiosInstance"
 
-export default ({ queryLambda, display }) => {
+export default ({ query, display }) => {
 	const [submissions, setSubmissions] = useState([])
-	const [error, setError] = useState(false)
+	const [error, setError] = useState(null)
+	const navigate = useNavigate()
 
 	useEffect(() => {
-		let { retSubs, retErr } = queryLambda()
-		setSubmissions(retSubs)
-		setError(retErr)
-	})
+		axiosInstance
+			.get("/submissions/query", {
+				params: query
+			})
+			.then((response) => {
+				setSubmissions(response.data.submissions)
+			})
+			.catch(() => {
+				setError(true)
+			})
+	}, [])
 
 	const getCards = (submissions) => {
 		return submissions.map((submission) => {
@@ -24,7 +34,7 @@ export default ({ queryLambda, display }) => {
 					className="shadow rounded">
 					<Card.Body>
 						<Card.Title>{cutShort(submission.name, 40)}</Card.Title>
-						<Card.Subtitle className="mb-2 text-muted">
+						{/*<Card.Subtitle className="mb-2 text-muted">
 							{" "}
 							{submission.authors.length > 1
 								? "Authors:"
@@ -32,22 +42,22 @@ export default ({ queryLambda, display }) => {
 							{submission.authors.map((author, index) => {
 								return (index === 0 ? " " : ", ") + author
 							})}{" "}
-						</Card.Subtitle>
+						 </Card.Subtitle>*/}
 					</Card.Body>
 					<Card.Body
 						style={{
 							height: "60%",
 							whiteSpace: "normal"
 						}}>
-						<Card.Text>
+						{/*<Card.Text>
 							{cutShort(submission.abstract, 200)}
-						</Card.Text>
+						 </Card.Text>*/}
 					</Card.Body>
 					<Card.Body>
 						<Button
 							variant="primary"
 							onClick={() => {
-								navigate("/submissions/" + submission.id)
+								navigate("/submission/" + submission.ID)
 							}}>
 							Explore
 						</Button>
@@ -74,7 +84,7 @@ export default ({ queryLambda, display }) => {
 		<div className={styles.scrollerComponent}>
 			<h2>{display}</h2>
 			<div className={styles.ScrollerContainer}>
-				{error !== null
+				{error
 					? "Something went wrong, please try again later..."
 					: submissions.length > 0
 					? getCards(submissions)
