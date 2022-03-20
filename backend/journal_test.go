@@ -96,7 +96,7 @@ func TestExportSubmission(t *testing.T) {
 
 	// Create local server
 	router := mux.NewRouter()
-	route := ENDPOINT_SUBMISSIONS + "/{id}" + ENDPOINT_EXPORT_SUBMISSION + "/{groupNumber}"
+	route := SUBROUTE_SUBMISSIONS + "/{id}" + ENDPOINT_EXPORT_SUBMISSION + "/{groupNumber}"
 	router.HandleFunc(route, PostExportSubmission)
 
 	// Create mock global server
@@ -143,7 +143,7 @@ func TestExportSubmission(t *testing.T) {
 			return w.Result(), nil
 		}
 		// builds request to the backend
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s/%d", ENDPOINT_SUBMISSIONS,
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s/%d", SUBROUTE_SUBMISSIONS,
 			submissionID, ENDPOINT_EXPORT_SUBMISSION, groupNb), nil)
 		w := httptest.NewRecorder()
 		ctx := context.WithValue(req.Context(), "data", *ctxStruct)
