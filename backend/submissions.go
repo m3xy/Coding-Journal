@@ -173,6 +173,13 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 			return nil, &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
 		}
 	}
+	approved := ""
+	if len(queryParams["approved"]) > 0 {
+		approved = queryParams["approved"][0]
+		if approved != "accepted" && approved != "unapproved" && approved != "rejected" {
+			return nil, &BadQueryParameterError{ParamName: "approved", Value: queryParams["approved"]}
+		}
+	}
 
 	// queries the database
 	var submissions []Submission
@@ -199,6 +206,14 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 			tx = tx.Order("submissions.created_at DESC")
 		} else if orderBy == "alphabetical" {
 			tx = tx.Order("submissions.Name")
+		}
+		// filtering based upon approval status
+		if approved == "accepted" {
+			tx = tx.Where("submissions.approved = ?", true)
+		} else if approved == "rejected" {
+			tx = tx.Where("submissions.approved = ?", false)
+		} else if approved == "unapproved" {
+			tx = tx.Where("submissions.approved IS NULL")
 		}
 
 		// selects fields and gets submissions

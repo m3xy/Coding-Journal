@@ -197,7 +197,7 @@ func TestQuerySubmissions(t *testing.T) {
 	}
 
 	// adds a test submission to the db and filesystem
-	addTestSubmission := func(name string, tags []string, authors []GlobalUser, reviewers []GlobalUser) uint {
+	addTestSubmission := func(name string, approved *bool, tags []string, authors []GlobalUser, reviewers []GlobalUser) uint {
 		categories := []Category{}
 		for _, tag := range tags {
 			categories = append(categories, Category{Tag: tag})
@@ -205,6 +205,7 @@ func TestQuerySubmissions(t *testing.T) {
 		submission := &Submission{
 			Name:       name,
 			License:    "MIT",
+			Approved:   approved,
 			Categories: categories,
 			Authors:    authors,
 			Reviewers:  reviewers,
@@ -248,8 +249,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("no query parameters", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected
 			resp := handleQuery(SUBROUTE_SUBMISSIONS + ENDPOINT_QUERY_SUBMISSIONS)
@@ -264,8 +265,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("order by date", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected
 			queryRoute := fmt.Sprintf("%s%s?orderBy=newest", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
@@ -291,8 +292,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("order alphabetically", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("btest", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("atest", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[0] = addTestSubmission("btest", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("atest", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected
 			queryRoute := fmt.Sprintf("%s%s?orderBy=alphabetical", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
@@ -308,8 +309,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("query by single tag", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			queryRoute := fmt.Sprintf("%s%s?tags=python", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			respData := handleQuery(queryRoute)
@@ -322,9 +323,9 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("query by multiple tags", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 3)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[2] = addTestSubmission("test3", []string{"java", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[2] = addTestSubmission("test3", nil, []string{"java", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			queryRoute := fmt.Sprintf("%s%s?tags=python&tags=go", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			respData := handleQuery(queryRoute)
@@ -339,8 +340,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("query by author", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[1:2], globalReviewers[:1])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[1:2], globalReviewers[:1])
 
 			queryRoute := fmt.Sprintf("%s%s?authors=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS, globalAuthors[0].ID)
 			respData := handleQuery(queryRoute)
@@ -354,8 +355,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("query by reviewer", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
 
 			queryRoute := fmt.Sprintf("%s%s?reviewers=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS, globalReviewers[0].ID)
 			respData := handleQuery(queryRoute)
@@ -364,6 +365,30 @@ func TestQuerySubmissions(t *testing.T) {
 				!assert.Equal(t, submissionIDs[0], respData.Submissions[0].ID, "Submission id incorrect"):
 				return
 			}
+		})
+
+		t.Run("query approval", func(t *testing.T) {
+			defer clearSubmissions()
+			submissionIDs := make([]uint, 3)
+			tval := true
+			fval := false
+			submissionIDs[0] = addTestSubmission("test1", &tval, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", &fval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+			submissionIDs[2] = addTestSubmission("test3", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+
+			// just here for easy swapping of approval type to reduce code duplication
+			test := func(approved string, index int) {
+				queryRoute := fmt.Sprintf("%s%s?approved=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS, approved)
+				respData := handleQuery(queryRoute)
+				switch {
+				case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
+					!assert.Equal(t, submissionIDs[index], respData.Submissions[0].ID, "Submission id incorrect"):
+					return
+				}
+			}
+			test("accepted", 0)
+			test("rejected", 1)
+			test("unapproved", 2)
 		})
 	})
 
@@ -378,8 +403,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("bad value given for query parameter", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
 			queryRoute := fmt.Sprintf("%s%s?orderBy=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			resp := handleQuery(queryRoute)
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Incorrect status code returned")
@@ -388,8 +413,8 @@ func TestQuerySubmissions(t *testing.T) {
 		t.Run("query empty result set", func(t *testing.T) {
 			defer clearSubmissions()
 			submissionIDs := make([]uint, 2)
-			submissionIDs[0] = addTestSubmission("test1", []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
-			submissionIDs[1] = addTestSubmission("test2", []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
+			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
 			queryRoute := fmt.Sprintf("%s%s?tags=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			resp := handleQuery(queryRoute)
 			assert.Equal(t, http.StatusNoContent, resp.StatusCode, "Incorrect status code returned")
