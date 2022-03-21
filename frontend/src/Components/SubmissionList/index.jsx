@@ -110,7 +110,7 @@ export default ({ query, display }) => {
 						</Button>
 					</Card.Body>
 					<Card.Footer className="text-muted">
-						Created: {submission.CreatedAt}
+						Created: {new Date(submission.CreatedAt).toDateString()}
 					</Card.Footer>
 				</Card>
 			)
