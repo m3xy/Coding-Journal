@@ -38,6 +38,7 @@ func getJournalSubroute(r *mux.Router) {
 	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 	journal.HandleFunc(ENDPOINT_IMPORT_SUBMISSION, PostImportSubmission).Methods(http.MethodPost, http.MethodOptions)
 	journal.HandleFunc(ENDPOINT_USER, GetUsers).Methods(http.MethodGet)
+	journal.HandleFunc(ENDPOINT_USER+"/{id}", GetUser).Methods(http.MethodGet)
 }
 
 // ----------
@@ -88,38 +89,39 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
 }
 
-// // gets all users from our Journal as a list
-// // GET /user
-// func GetUsers(w http.ResponseWriter, r *http.Request) {
-// 	log.Printf("[INFO] Received GetUsers request from %v", r.RemoteAddr)
-// 	w.Header().Set("Content-Type", "application/json")
+// gets all users from our Journal as a list
+// GET /user
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received GetUsers request from %v", r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
 
-// 	// gets an array of users
-// 	users := []SupergroupUser{}
-// 	if err := gormDb.Model(&User{}).Find(&users).Error; err != nil {
-// 		log.Printf("[ERROR] error getting users from database: %v\n", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 		return
-// 	}
+	// gets an array of users
+	users := []SupergroupUser{}
+	if err := gormDb.Model(&User{}).Find(&users).Error; err != nil {
+		log.Printf("[ERROR] SQL Query Error: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-// 	// sends response
-// 	if err := json.NewEncoder(w).Encode(users); err != nil {
-// 		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
-// 		w.WriteHeader(http.StatusInternalServerError)
-// 	}
-// 	log.Printf("[INFO] GetUsers request successful")
-// }
+	// sends response
+	if err := json.NewEncoder(w).Encode(users); err != nil {
+		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	log.Printf("[INFO] GetUsers request successful")
+}
 
 // gets user profile by ID
 // GET /user/{id}
-func GetUsers(w http.ResponseWriter, r *http.Request) {
+func GetUser(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] Received GetUsers request from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// queries user using URL parameters
 	vars := mux.Vars(r)
-	user := &GlobalUser{ID: vars["id"]}
-	if res := gormDb.Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
+	user := SupergroupUser{}
+	if res := gormDb.Model(&User{}).Where("users.global_user_id = ?", vars["id"]).
+		Limit(1).Find(&user); res.Error != nil {
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -128,18 +130,9 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	// adapts global to local user format
-	globalUser := &SupergroupUser{
-		ID: user.ID,
-		Email: user.User.Email,
-		FirstName: user.User.FirstName,
-		LastName: user.User.LastName,
-		PhoneNumber: user.User.PhoneNumber,
-		Organization: user.User.Organization,
-	}
 
 	// sends response
-	if err := json.NewEncoder(w).Encode(globalUser); err != nil {
+	if err := json.NewEncoder(w).Encode(user); err != nil {
 		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}

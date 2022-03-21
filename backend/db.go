@@ -151,7 +151,7 @@ type Category struct {
 
 // Supergroup compliant user type
 type SupergroupUser struct {
-	ID string `json:"id"`
+	GlobalUserID string `json:"id"`
 	Email string `json:"email"`
 	FirstName string `json:"firstName"`
 	LastName string `json:"lastName"`
