@@ -88,7 +88,7 @@ func (u *User) getCopy() *User {
 func (g *GlobalUser) getCopy() *GlobalUser {
 	if g != nil {
 		return &GlobalUser{
-			ID: g.ID, User: *g.User.getCopy(), UserType: g.UserType,
+			ID: g.ID, User: g.User.getCopy(), UserType: g.UserType,
 		}
 	} else {
 		return nil

@@ -6,6 +6,7 @@ import axiosInstance from "../../Web/axiosInstance"
 
 export default ({ query, display }) => {
 	const [submissions, setSubmissions] = useState([])
+	const [authors, setAuthors] = useState({})
 	const [error, setError] = useState(null)
 	const navigate = useNavigate()
 
@@ -22,24 +23,56 @@ export default ({ query, display }) => {
 							setSubmissions((submissions) => {
 								return [...submissions, response.data]
 							})
+							response.data.authors.map((author) => {
+								if (!authors.hasOwnProperty(author.userId)) {
+									axiosInstance
+										.get("/user/" + author.userId)
+										.then((response) => {
+											setAuthors((authors) => {
+												return {
+													...authors,
+													[author.userId]:
+														response.data
+												}
+											})
+										})
+										.catch((err) => {
+											console.log(err)
+										})
+								}
+							})
 						})
 						.catch((err) => {
 							console.log(err)
 						})
 				})
 			})
-			.catch(() => {
-				setError(true)
+			.catch((err) => {
+				if (err.response.status !== 204) setError(true)
 			})
 	}, [])
 
+	const getAuthorFullName = (author) => {
+		if (authors.hasOwnProperty(author.userId)) {
+			return (
+				authors[author.userId].profile.firstName +
+				" " +
+				authors[author.userId].profile.lastName
+			)
+		} else {
+			return author.userId
+		}
+	}
+
+	// Get a list of cards from the list of submissions.
 	const getCards = (submissions) => {
 		return submissions.map((submission) => {
 			return (
 				<Card
 					key={submission.ID}
 					style={{
-						minWidth: "18rem",
+						minWidth: "25rem",
+						maxWidth: "25rem",
 						margin: "8px"
 					}}
 					className="shadow rounded">
@@ -52,7 +85,8 @@ export default ({ query, display }) => {
 								: "Author:"}{" "}
 							{submission.authors.map((author, index) => {
 								return (
-									(index === 0 ? " " : ", ") + author.fullName
+									(index === 0 ? " " : ", ") +
+									getAuthorFullName(author)
 								)
 							})}{" "}
 						</Card.Subtitle>
@@ -76,7 +110,7 @@ export default ({ query, display }) => {
 						</Button>
 					</Card.Body>
 					<Card.Footer className="text-muted">
-						Created: {submission.CreatedAt}
+						Created: {new Date(submission.CreatedAt).toDateString()}
 					</Card.Footer>
 				</Card>
 			)
@@ -87,7 +121,11 @@ export default ({ query, display }) => {
 	const cutShort = (text, limit) => {
 		if (text.length > limit) {
 			let short = text.substring(0, limit)
-			return short.substring(0, short.lastIndexOf(" ")) + "..."
+			return (
+				(short.includes(" ")
+					? short.substring(0, short.lastIndexOf(" "))
+					: short.substring(0, limit - 12)) + "..."
+			)
 		} else {
 			return text
 		}

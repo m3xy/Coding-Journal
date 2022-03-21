@@ -64,6 +64,7 @@ const Upload = () => {
 					})
 					.includes(false)
 			case "submissionName":
+				return val.length > 0 && val.length < 127
 			case "tag":
 			case "author":
 				return val.length > 0
