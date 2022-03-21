@@ -60,8 +60,8 @@ type GlobalUser struct {
 	UserType int    `gorm:"default:4" json:"userType"`
 	User     *User  `json:"profile,omitempty"`
 
-	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-" validate:"dive"`
-	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-" validate:"dive"`
+	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"authoredSubmissions" validate:"dive"`
+	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"reviewedSubmissions" validate:"dive"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"-"`
@@ -151,10 +151,10 @@ type Category struct {
 // Supergroup compliant user type
 type SupergroupUser struct {
 	GlobalUserID string `json:"id"`
-	Email string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName string `json:"lastName"`
-	PhoneNumber string `json:"phoneNumber"`
+	Email        string `json:"email"`
+	FirstName    string `json:"firstName"`
+	LastName     string `json:"lastName"`
+	PhoneNumber  string `json:"phoneNumber"`
 	Organization string `json:"organization"`
 }
 

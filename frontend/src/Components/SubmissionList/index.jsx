@@ -23,24 +23,7 @@ export default ({ query, display }) => {
 							setSubmissions((submissions) => {
 								return [...submissions, response.data]
 							})
-							response.data.authors.map((author) => {
-								if (!authors.hasOwnProperty(author.userId)) {
-									axiosInstance
-										.get("/user/" + author.userId)
-										.then((response) => {
-											setAuthors((authors) => {
-												return {
-													...authors,
-													[author.userId]:
-														response.data
-												}
-											})
-										})
-										.catch((err) => {
-											console.log(err)
-										})
-								}
-							})
+							setAuthorsNotFetched(response.data.authors)
 						})
 						.catch((err) => {
 							console.log(err)
@@ -51,6 +34,26 @@ export default ({ query, display }) => {
 				if (err.response.status !== 204) setError(true)
 			})
 	}, [])
+
+	const setAuthorsNotFetched = (authors) => {
+		authors.map((author) => {
+			if (!authors.hasOwnProperty(author.userId)) {
+				axiosInstance
+					.get("/user/" + author.userId)
+					.then((response) => {
+						setAuthors((authors) => {
+							return {
+								...authors,
+								[author.userId]: response.data
+							}
+						})
+					})
+					.catch((err) => {
+						console.log(err)
+					})
+			}
+		})
+	}
 
 	const getAuthorFullName = (author) => {
 		if (authors.hasOwnProperty(author.userId)) {
