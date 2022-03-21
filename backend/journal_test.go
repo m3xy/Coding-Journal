@@ -28,8 +28,8 @@ func TestJournalLogIn(t *testing.T) {
 	// Populate database with valid users.
 	trialUsers := make([]GlobalUser, len(testUsers))
 	for i, u := range testUsers {
-		trialUsers[i] = GlobalUser{User: *u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
-		trialUsers[i].ID, _ = registerUser(trialUsers[i].User, USERTYPE_REVIEWER_PUBLISHER)
+		trialUsers[i] = GlobalUser{User: u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
+		trialUsers[i].ID, _ = registerUser(*trialUsers[i].User, USERTYPE_REVIEWER_PUBLISHER)
 	}
 
 	router := mux.NewRouter()

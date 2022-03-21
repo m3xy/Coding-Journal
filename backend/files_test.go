@@ -27,7 +27,7 @@ import (
 
 const (
 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
-	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
+	TEST_FILES_DIR = "../filesystem_test/" // environment variable set to this value
 )
 
 // NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
