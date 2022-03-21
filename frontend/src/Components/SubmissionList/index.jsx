@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Card, Button } from "react-bootstrap"
+import { Card, Button, Badge } from "react-bootstrap"
 import styles from "./SubmissionList.module.css"
 import { useNavigate } from "react-router-dom"
 import axiosInstance from "../../Web/axiosInstance"
@@ -16,25 +16,31 @@ export default ({ query, display }) => {
 				params: query
 			})
 			.then((response) => {
-				response.data.submissions.map((submission) => {
-					axiosInstance
-						.get("/submission/" + submission.ID)
-						.then((response) => {
-							setSubmissions((submissions) => {
-								return [...submissions, response.data]
-							})
-							setAuthorsNotFetched(response.data.authors)
-						})
-						.catch((err) => {
-							console.log(err)
-						})
-				})
+				setSubmissionsFromPrimitives(response.data.submissions)
 			})
 			.catch((err) => {
 				if (err.response.status !== 204) setError(true)
 			})
 	}, [])
 
+	// Get submission details from their basic types.
+	const setSubmissionsFromPrimitives = (submissionPrimitives) => {
+		submissionPrimitives.map((submission) => {
+			axiosInstance
+				.get("/submission/" + submission.ID)
+				.then((response) => {
+					setSubmissions((submissions) => {
+						return [...submissions, response.data]
+					})
+					setAuthorsNotFetched(response.data.authors)
+				})
+				.catch((err) => {
+					console.log(err)
+				})
+		})
+	}
+
+	// Get authors from their IDs.
 	const setAuthorsNotFetched = (authors) => {
 		authors.map((author) => {
 			if (!authors.hasOwnProperty(author.userId)) {
@@ -55,6 +61,26 @@ export default ({ query, display }) => {
 		})
 	}
 
+	const getBadge = (submission) => {
+		return (
+			<Badge
+				bg={
+					submission.approved
+						? "primary"
+						: submission.approved === null
+						? "secondary"
+						: "danger"
+				}
+				pill>
+				{submission.approved
+					? "Approved"
+					: submission.approved === null
+					? "In review"
+					: "Rejected"}
+			</Badge>
+		)
+	}
+
 	const getAuthorFullName = (author) => {
 		if (authors.hasOwnProperty(author.userId)) {
 			return (
@@ -65,6 +91,22 @@ export default ({ query, display }) => {
 		} else {
 			return author.userId
 		}
+	}
+
+	const getTags = (submission) => {
+		if (submission.hasOwnProperty("categories"))
+			return submission.categories.map((category, i) => {
+				return (
+					<Button
+						key={i}
+						variant="outline-secondary"
+						size="sm"
+						disabled
+						style={{ margin: "3px" }}>
+						{category.category}
+					</Button>
+				)
+			})
 	}
 
 	// Get a list of cards from the list of submissions.
@@ -80,6 +122,9 @@ export default ({ query, display }) => {
 					}}
 					className="shadow rounded">
 					<Card.Body>
+						<Card.Subtitle className="mb-2">
+							{getBadge(submission)}
+						</Card.Subtitle>
 						<Card.Title>{cutShort(submission.name, 40)}</Card.Title>
 						<Card.Subtitle className="mb-2 text-muted">
 							{" "}
@@ -103,6 +148,7 @@ export default ({ query, display }) => {
 							{cutShort(submission.metaData.abstract, 200)}
 						</Card.Text>
 					</Card.Body>
+					<Card.Subtitle>{getTags(submission)}</Card.Subtitle>
 					<Card.Body>
 						<Button
 							variant="primary"

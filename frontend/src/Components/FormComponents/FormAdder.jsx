@@ -17,11 +17,10 @@ const FormAdder = ({
 	const val = useRef()
 	const [array, setArray] = useState([])
 	const [input, setInput] = useState("")
-	const [modded, setModded] = useState(false)
 
 	useEffect(() => {
-		if (modded) onChange({ target: { name: arrName, value: array } })
-	}, [array, modded])
+		onChange({ target: { name: arrName, value: array } })
+	}, [array])
 
 	const valid = (required, val) => {
 		return (
@@ -40,7 +39,6 @@ const FormAdder = ({
 				className={styles.isolatedArrayButton}
 				onClick={() => {
 					setArray((array) => {
-						setModded(true)
 						return array.filter((value) => value !== elem)
 					})
 				}}>
