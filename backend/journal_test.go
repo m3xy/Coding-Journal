@@ -86,6 +86,112 @@ func TestJournalLogIn(t *testing.T) {
 	})
 }
 
+// tests ability of another journal to get all global users from this journal
+func TestGetUsers(t *testing.T) {
+	// Set up test
+	testInit()
+	defer testEnd()
+
+	// Populate database with valid users.
+	trialUsers := map[string]GlobalUser{}
+	var id string // temp loop variable
+	for _, u := range testUsers {
+		id, _ = registerUser(u, USERTYPE_REVIEWER_PUBLISHER)
+		trialUsers[id] = GlobalUser{User: *u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
+	}
+
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_JOURNAL+ENDPOINT_USER, GetUsers)
+
+	t.Run("Get all users", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, SUBROUTE_JOURNAL+ENDPOINT_USER, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+
+		// checks status code
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "status returned not 200") {
+			return
+		}
+
+		// gets the user list from the json response
+		users := []SupergroupUser{}
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&users), "error decoding response body") {
+			return
+		}
+		// tests that the users match
+		var testUser GlobalUser
+		for _, user := range users {
+			testUser = trialUsers[user.GlobalUserID]
+			switch {
+			case !assert.Equal(t, testUser.User.FirstName, user.FirstName, "user names do not match"),
+				!assert.Equal(t, testUser.User.LastName, user.LastName, "user names do not match"),
+				!assert.Equal(t, testUser.User.Email, user.Email, "Emails do not match"),
+				!assert.Equal(t, testUser.User.PhoneNumber, user.PhoneNumber, "Phone numbers do not match"),
+				!assert.Equal(t, testUser.User.Organization, user.Organization, "Phone numbers do not match"):
+				return
+			}
+		}
+	})
+}
+
+// tests ability of another journal to get all global users from this journal
+func TestGetUser(t *testing.T) {
+	// Set up test
+	testInit()
+	defer testEnd()
+
+	// Populate database with valid users.
+	trialUsers := make([]GlobalUser, len(testUsers))
+	for i, u := range testUsers {
+		trialUsers[i] = GlobalUser{User: *u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
+		trialUsers[i].ID, _ = registerUser(trialUsers[i].User, USERTYPE_REVIEWER_PUBLISHER)
+	}
+
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_JOURNAL+ENDPOINT_USER+"/{id}", GetUser)
+
+	t.Run("Get valid user", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, SUBROUTE_JOURNAL+ENDPOINT_USER+"/"+trialUsers[0].ID, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+
+		// checks status code
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "status returned not 200") {
+			return
+		}
+
+		queriedUser := SupergroupUser{}
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&queriedUser), "error decoding response body") {
+			return
+		}
+
+		// test that the retrieved user matches that which was expected
+		switch {
+		case !assert.Equal(t, trialUsers[0].ID, queriedUser.GlobalUserID, "user IDs do not match"),
+			!assert.Equal(t, trialUsers[0].User.Email, queriedUser.Email, "user names do not match"),
+			!assert.Equal(t, trialUsers[0].User.FirstName, queriedUser.FirstName, "user names do not match"),
+			!assert.Equal(t, trialUsers[0].User.LastName, queriedUser.LastName, "user names do not match"),
+			!assert.Equal(t, trialUsers[0].User.Organization, queriedUser.Organization, "user organizations do not match"),
+			!assert.Equal(t, trialUsers[0].User.PhoneNumber, queriedUser.PhoneNumber, "user phone numbers do not match"):
+			return
+		}
+	})
+
+	t.Run("Get invalid user", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, SUBROUTE_JOURNAL+ENDPOINT_USER+"/fausldifvnaunliaekan", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+
+		// checks status code
+		if !assert.Equal(t, http.StatusNotFound, resp.StatusCode, "status returned not 200") {
+			return
+		}
+	})
+}
+
 // Tests the ability of this journal to export submissions to another journal
 func TestExportSubmission(t *testing.T) {
 	// wipes the database and filesystem
