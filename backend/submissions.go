@@ -122,9 +122,14 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	var stdResp StandardResponse
 	var resp *QuerySubmissionsResponse
 	var submissions []Submission
+	// userType := USERTYPE_NIL
 
+	// gets the request context if there is a user logged in
+	if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
+		stdResp = StandardResponse{Message: "Bad Request Context", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
 	// gets the ordered list of submissions
-	if submissions, err = ControllerQuerySubmissions(r.URL.Query()); err != nil {
+	} else if submissions, err = ControllerQuerySubmissions(r.URL.Query(), ctx); err != nil {
 		switch err.(type) {
 		case *BadQueryParameterError:
 			stdResp = StandardResponse{Message: fmt.Sprintf("Bad Request - %s", err.Error()), Error: true}
@@ -160,10 +165,11 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 //
 // Params:
 // 	queryParams (url.Values) : a mapping of query parameters to their values
+// 	userType (int) : the usertype of the currently logged in user (if there is one)
 // Returns:
 // 	([]Submission) : an array of submissions with ID and Name set ordered based upon the query
 // 	(error) : an error if one occurs
-func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
+func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]Submission, error) {
 	// parses the query parameters
 	tags := queryParams["tags"]
 	authors := queryParams["authors"]
@@ -226,15 +232,24 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 		} else if orderBy == "alphabetical" {
 			tx = tx.Order("submissions.Name")
 		}
-		// filtering based upon approval status
-		if approved == "accepted" {
+		// no user logged in, only show approved submissions
+		if ctx == nil {
 			tx = tx.Where("submissions.approved = ?", true)
-		} else if approved == "rejected" {
-			tx = tx.Where("submissions.approved = ?", false)
-		} else if approved == "unapproved" {
-			tx = tx.Where("submissions.approved IS NULL")
-		} else { // default shows all but rejected submissions
-			tx = tx.Where("submissions.approved IS NULL OR submissions.approved = ?", true)
+		// user logged in, check user type
+		} else {
+			// return accepted submissions, or authored submissions
+			if ctx.UserType == USERTYPE_PUBLISHER {
+				tx = tx.Where("approved = ? OR id IN (?)", true,
+					gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+			} else if ctx.UserType == USERTYPE_REVIEWER {
+				tx = tx.Where("approved = ? OR id IN (?)", true, 
+					gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+			} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
+				tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true, 
+					gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
+					gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+			}
+			// note editors can see all submissions
 		}
 
 		// selects fields and gets submissions
