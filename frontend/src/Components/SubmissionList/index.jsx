@@ -15,7 +15,18 @@ export default ({ query, display }) => {
 				params: query
 			})
 			.then((response) => {
-				setSubmissions(response.data.submissions)
+				response.data.submissions.map((submission) => {
+					axiosInstance
+						.get("/submission/" + submission.ID)
+						.then((response) => {
+							setSubmissions((submissions) => {
+								return [...submissions, response.data]
+							})
+						})
+						.catch((err) => {
+							console.log(err)
+						})
+				})
 			})
 			.catch(() => {
 				setError(true)
@@ -34,24 +45,26 @@ export default ({ query, display }) => {
 					className="shadow rounded">
 					<Card.Body>
 						<Card.Title>{cutShort(submission.name, 40)}</Card.Title>
-						{/*<Card.Subtitle className="mb-2 text-muted">
+						<Card.Subtitle className="mb-2 text-muted">
 							{" "}
 							{submission.authors.length > 1
 								? "Authors:"
 								: "Author:"}{" "}
 							{submission.authors.map((author, index) => {
-								return (index === 0 ? " " : ", ") + author
+								return (
+									(index === 0 ? " " : ", ") + author.fullName
+								)
 							})}{" "}
-						 </Card.Subtitle>*/}
+						</Card.Subtitle>
 					</Card.Body>
 					<Card.Body
 						style={{
 							height: "60%",
 							whiteSpace: "normal"
 						}}>
-						{/*<Card.Text>
-							{cutShort(submission.abstract, 200)}
-						 </Card.Text>*/}
+						<Card.Text>
+							{cutShort(submission.metaData.abstract, 200)}
+						</Card.Text>
 					</Card.Body>
 					<Card.Body>
 						<Button
