@@ -16,6 +16,7 @@ import (
 const (
 	ENDPOINT_EXPORT_SUBMISSION = "/export"     // on submissions sub-router
 	ENDPOINT_IMPORT_SUBMISSION = "/submission" // on the journal sub-router
+	ENDPOINT_USER = "/user" // on the journal sub-router
 )
 
 var journalURLs map[int]string = map[int]string{
@@ -36,6 +37,7 @@ func getJournalSubroute(r *mux.Router) {
 	journal.Use(journalMiddleWare)
 	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 	journal.HandleFunc(ENDPOINT_IMPORT_SUBMISSION, PostImportSubmission).Methods(http.MethodPost, http.MethodOptions)
+	journal.HandleFunc(ENDPOINT_USER, GetUsers).Methods(http.MethodGet)
 }
 
 // ----------
@@ -86,6 +88,64 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
 }
 
+// // gets all users from our Journal as a list
+// // GET /user
+// func GetUsers(w http.ResponseWriter, r *http.Request) {
+// 	log.Printf("[INFO] Received GetUsers request from %v", r.RemoteAddr)
+// 	w.Header().Set("Content-Type", "application/json")
+
+// 	// gets an array of users
+// 	users := []SupergroupUser{}
+// 	if err := gormDb.Model(&User{}).Find(&users).Error; err != nil {
+// 		log.Printf("[ERROR] error getting users from database: %v\n", err)
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	// sends response
+// 	if err := json.NewEncoder(w).Encode(users); err != nil {
+// 		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
+// 		w.WriteHeader(http.StatusInternalServerError)
+// 	}
+// 	log.Printf("[INFO] GetUsers request successful")
+// }
+
+// gets user profile by ID
+// GET /user/{id}
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] Received GetUsers request from %v", r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
+
+	// queries user using URL parameters
+	vars := mux.Vars(r)
+	user := &GlobalUser{ID: vars["id"]}
+	if res := gormDb.Preload("User", getUserOutFromUser).Limit(1).Find(&user); res.Error != nil {
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else if res.RowsAffected == 0 {
+		log.Printf("[WARN] No user linked to %s", vars["id"])
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	// adapts global to local user format
+	globalUser := &SupergroupUser{
+		ID: user.ID,
+		Email: user.User.Email,
+		FirstName: user.User.FirstName,
+		LastName: user.User.LastName,
+		PhoneNumber: user.User.PhoneNumber,
+		Organization: user.User.Organization,
+	}
+
+	// sends response
+	if err := json.NewEncoder(w).Encode(globalUser); err != nil {
+		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	log.Printf("[INFO] GetUsers request successful")
+}
+
 // router function to export submissions
 // POST /submission/{id}/export/{groupNumber}
 func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
@@ -101,22 +161,22 @@ func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Given Submission ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-		// checks that group number is valid (note that our group numbers go in intervals of 3 starting at 2 i.e. 2, 5, 8, 11...)
+	// checks that group number is valid (note that our group numbers go in intervals of 3 starting at 2 i.e. 2, 5, 8, 11...)
 	} else if _, ok := journalURLs[groupNumber]; !ok || err2 != nil {
 		resp = &StandardResponse{Message: fmt.Sprintf("Given group number: %d invalid", groupNumber), Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-		// gets context struct and validates it
+	// gets context struct and validates it
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-		// checks that the client has the proper permisssions (i.e. is an editor)
+	// checks that the client has the proper permisssions (i.e. is an editor)
 	} else if ctx.UserType != USERTYPE_EDITOR {
 		resp = &StandardResponse{Message: "The client must have editor permissions to export submissions.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-		// gets supergroup compliant submission and exports it
+	// gets supergroup compliant submission and exports it
 	} else {
 		// gets the supergroup compliant submission
 		globalSubmission, err := localToGlobal(submissionID)

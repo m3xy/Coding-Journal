@@ -149,6 +149,16 @@ type Category struct {
 
 // ---- Supergroup Data Structures ----
 
+// Supergroup compliant user type
+type SupergroupUser struct {
+	ID string `json:"id"`
+	Email string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName string `json:"lastName"`
+	PhoneNumber string `json:"phoneNumber"`
+	Organization string `json:"organization"`
+}
+
 // Supergroup compliant code submissions (never stored in db)
 type SupergroupSubmission struct {
 	Name         string                   `json:"name"`
