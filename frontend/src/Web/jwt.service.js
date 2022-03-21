@@ -25,6 +25,13 @@ class JwtService {
 			return jwt_decode(token).userId
 		} else return null
 	}
+
+	getUserType() {
+		let token = this.getAccessToken()
+		if (token) {
+			return jwt_decode(token).userType
+		} else return null
+	}
 }
 
 export default new JwtService()

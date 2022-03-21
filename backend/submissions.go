@@ -212,7 +212,7 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 			// only adds multiple regex conditions if the name given is multiple words
 			if wordList := strings.Fields(submissionName); len(wordList) > 1 {
 				for index, field := range wordList {
-					whereString = whereString + " OR submissions.name REGEXP @"+fmt.Sprint(index)
+					whereString = whereString + " OR submissions.name REGEXP @" + fmt.Sprint(index)
 					params[fmt.Sprint(index)] = field
 				}
 			}
