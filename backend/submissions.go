@@ -10,7 +10,6 @@
 package main
 
 import (
-	"regexp"
 	"archive/zip"
 	"encoding/base64"
 	"encoding/json"
@@ -22,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -383,7 +383,7 @@ func adaptBodyToSubmission(b *UploadSubmissionBody) *Submission {
 		Files: b.Files, Categories: categories,
 		Authors: authors, Reviewers: reviewers,
 		MetaData: &SubmissionData{
-			Abstract: "test abstract",
+			Abstract: b.Abstract,
 		},
 	}
 }
