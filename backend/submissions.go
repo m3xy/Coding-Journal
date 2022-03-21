@@ -10,6 +10,7 @@
 package main
 
 import (
+	"regexp"
 	"archive/zip"
 	"encoding/base64"
 	"encoding/json"
@@ -169,7 +170,7 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 	reviewers := queryParams["reviewers"]
 	submissionName := ""
 	if len(queryParams["name"]) > 0 {
-		submissionName = queryParams["name"][0]
+		submissionName = regexp.QuoteMeta(queryParams["name"][0])
 	}
 	orderBy := ""
 	if len(queryParams["orderBy"]) > 0 {
