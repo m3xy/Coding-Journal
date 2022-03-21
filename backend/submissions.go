@@ -233,6 +233,8 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 			tx = tx.Where("submissions.approved = ?", false)
 		} else if approved == "unapproved" {
 			tx = tx.Where("submissions.approved IS NULL")
+		} else { // default shows all but rejected submissions
+			tx = tx.Where("submissions.approved IS NULL OR submissions.approved = ?", true)
 		}
 
 		// selects fields and gets submissions

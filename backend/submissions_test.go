@@ -248,16 +248,18 @@ func TestQuerySubmissions(t *testing.T) {
 
 		t.Run("no query parameters", func(t *testing.T) {
 			defer clearSubmissions()
-			submissionIDs := make([]uint, 2)
+			submissionIDs := make([]uint, 3)
+			fval := false
 			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[2] = addTestSubmission("test3", &fval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
-			// test that the response is as expected
+			// test that the response is as expected (submissionIDs[2] should not be in the result set as it is a rejected submission)
 			resp := handleQuery(SUBROUTE_SUBMISSIONS + ENDPOINT_QUERY_SUBMISSIONS)
 			switch {
-			case !assert.NotEmpty(t, resp, "request response is nil"),
-				!assert.Contains(t, submissionIDs, resp.Submissions[0].ID, "Missing submission 1 ID"),
-				!assert.Contains(t, submissionIDs, resp.Submissions[1].ID, "Missing submission 2 ID"):
+			case !assert.Equal(t, 2, len(resp.Submissions), "incorrect number of submissions returned"),
+				!assert.Contains(t, submissionIDs[:2], resp.Submissions[0].ID, "Missing submission 1 ID"),
+				!assert.Contains(t, submissionIDs[:2], resp.Submissions[1].ID, "Missing submission 2 ID"):
 				return
 			}
 		})
