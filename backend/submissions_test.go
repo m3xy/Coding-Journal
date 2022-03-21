@@ -248,16 +248,18 @@ func TestQuerySubmissions(t *testing.T) {
 
 		t.Run("no query parameters", func(t *testing.T) {
 			defer clearSubmissions()
-			submissionIDs := make([]uint, 2)
+			submissionIDs := make([]uint, 3)
+			fval := false
 			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[2] = addTestSubmission("test3", &fval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
-			// test that the response is as expected
+			// test that the response is as expected (submissionIDs[2] should not be in the result set as it is a rejected submission)
 			resp := handleQuery(SUBROUTE_SUBMISSIONS + ENDPOINT_QUERY_SUBMISSIONS)
 			switch {
-			case !assert.NotEmpty(t, resp, "request response is nil"),
-				!assert.Contains(t, submissionIDs, resp.Submissions[0].ID, "Missing submission 1 ID"),
-				!assert.Contains(t, submissionIDs, resp.Submissions[1].ID, "Missing submission 2 ID"):
+			case !assert.Equal(t, 2, len(resp.Submissions), "incorrect number of submissions returned"),
+				!assert.Contains(t, submissionIDs[:2], resp.Submissions[0].ID, "Missing submission 1 ID"),
+				!assert.Contains(t, submissionIDs[:2], resp.Submissions[1].ID, "Missing submission 2 ID"):
 				return
 			}
 		})
@@ -370,11 +372,12 @@ func TestQuerySubmissions(t *testing.T) {
 		// note when querying for names, the query returns all names which exactly match or match 1 word from the name
 		t.Run("query by name", func(t *testing.T) {
 			defer clearSubmissions()
-			submissionIDs := make([]uint, 4)
+			submissionIDs := make([]uint, 5)
 			submissionIDs[0] = addTestSubmission("unique", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[2] = addTestSubmission("test python", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[3] = addTestSubmission("testpython", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
+			submissionIDs[4] = addTestSubmission("[$]python", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			t.Run("full name", func(t *testing.T) {
 				queryRoute := fmt.Sprintf("%s%s?name=unique", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
@@ -391,9 +394,9 @@ func TestQuerySubmissions(t *testing.T) {
 				respData := handleQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, 3, len(respData.Submissions), "too many submissions returned"),
-					!assert.Contains(t, submissionIDs[1:], respData.Submissions[0].ID, "Submission id incorrect"),
-					!assert.Contains(t, submissionIDs[1:], respData.Submissions[1].ID, "Submission id incorrect"),
-					!assert.Contains(t, submissionIDs[1:], respData.Submissions[2].ID, "Submission id incorrect"):
+					!assert.Contains(t, submissionIDs[1:4], respData.Submissions[0].ID, "Submission id incorrect"),
+					!assert.Contains(t, submissionIDs[1:4], respData.Submissions[1].ID, "Submission id incorrect"),
+					!assert.Contains(t, submissionIDs[1:4], respData.Submissions[2].ID, "Submission id incorrect"):
 					return
 				}
 			})
@@ -403,10 +406,20 @@ func TestQuerySubmissions(t *testing.T) {
 				respData := handleQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, 4, len(respData.Submissions), "too many submissions returned"),
-					!assert.Contains(t, submissionIDs, respData.Submissions[0].ID, "Submission id incorrect"),
-					!assert.Contains(t, submissionIDs, respData.Submissions[1].ID, "Submission id incorrect"),
-					!assert.Contains(t, submissionIDs, respData.Submissions[2].ID, "Submission id incorrect"),
-					!assert.Contains(t, submissionIDs, respData.Submissions[3].ID, "Submission id incorrect"):
+					!assert.Contains(t, submissionIDs[:4], respData.Submissions[0].ID, "Submission id incorrect"),
+					!assert.Contains(t, submissionIDs[:4], respData.Submissions[1].ID, "Submission id incorrect"),
+					!assert.Contains(t, submissionIDs[:4], respData.Submissions[2].ID, "Submission id incorrect"),
+					!assert.Contains(t, submissionIDs[:4], respData.Submissions[3].ID, "Submission id incorrect"):
+					return
+				}
+			})
+
+			t.Run("include regex chars", func(t *testing.T) {
+				queryRoute := fmt.Sprintf("%s%s?name=[$]", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+				respData := handleQuery(queryRoute)
+				switch {
+				case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
+					!assert.Equal(t, submissionIDs[4], respData.Submissions[0].ID, "Submission id incorrect"):
 					return
 				}
 			})
