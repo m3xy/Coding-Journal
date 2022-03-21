@@ -202,7 +202,6 @@ User profile information query.
 ```typescript
 interface Content {
   UserID: string;
-  FullName: string;
   Profile: Profile;
 }
 

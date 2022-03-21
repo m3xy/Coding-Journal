@@ -88,7 +88,7 @@ func (u *User) getCopy() *User {
 func (g *GlobalUser) getCopy() *GlobalUser {
 	if g != nil {
 		return &GlobalUser{
-			ID: g.ID, FullName: g.ID, User: *g.User.getCopy(), UserType: g.UserType,
+			ID: g.ID, User: *g.User.getCopy(), UserType: g.UserType,
 		}
 	} else {
 		return nil
@@ -241,7 +241,7 @@ func TestIsUnique(t *testing.T) {
 	// Add test users to database
 	trialObjects := make([]GlobalUser, len(testObjects))
 	for i, u := range testObjects {
-		trialObjects[i] = GlobalUser{ID: u.ID, FullName: u.FullName}
+		trialObjects[i] = GlobalUser{ID: u.ID}
 	}
 	if err := gormDb.Create(&trialObjects).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)
