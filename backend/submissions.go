@@ -161,7 +161,8 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 }
 
 // Controller to do the work of actually building a query to get submissions from
-// the database and order them
+// the database and order them. This function uses helper functions to add filtering
+// clauses to the final query
 //
 // Params:
 // 	queryParams (url.Values) : a mapping of query parameters to their values
@@ -170,86 +171,41 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 // 	([]Submission) : an array of submissions with ID and Name set ordered based upon the query
 // 	(error) : an error if one occurs
 func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]Submission, error) {
-	// parses the query parameters
-	tags := queryParams["tags"]
-	authors := queryParams["authors"]
-	reviewers := queryParams["reviewers"]
-	submissionName := ""
-	if len(queryParams["name"]) > 0 {
-		submissionName = regexp.QuoteMeta(queryParams["name"][0])
-	}
-	orderBy := ""
-	if len(queryParams["orderBy"]) > 0 {
-		orderBy = queryParams["orderBy"][0]
-		if orderBy != "newest" && orderBy != "oldest" && orderBy != "alphabetical" {
-			return nil, &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
-		}
-	}
-	approved := ""
-	if len(queryParams["approved"]) > 0 {
-		approved = queryParams["approved"][0]
-		if approved != "accepted" && approved != "unapproved" && approved != "rejected" {
-			return nil, &BadQueryParameterError{ParamName: "approved", Value: queryParams["approved"]}
-		}
-	}
-
-	// queries the database
 	var submissions []Submission
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		tx = tx.Model(&Submission{})
 		// includes submissions with a given tag
-		if len(tags) > 0 {
+		if len(queryParams["tags"]) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
-				"categories_submissions").Select("submission_id").Where("category_tag IN ?", tags))
+				"categories_submissions").Select("submission_id").Where("category_tag IN ?", queryParams["tags"]))
 		}
-		// authors and reviewers
-		if len(authors) > 0 {
+		// filters submissions by author
+		if len(queryParams["authors"]) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
-				"authors_submission").Select("submission_id").Where("global_user_id IN ?", authors))
+				"authors_submission").Select("submission_id").Where("global_user_id IN ?", queryParams["authors"]))
 		}
-		if len(reviewers) > 0 {
+		// filters submissions by reviewer
+		if len(queryParams["reviewers"]) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
-				"reviewers_submission").Select("submission_id").Where("global_user_id IN ?", reviewers))
+				"reviewers_submission").Select("submission_id").Where("global_user_id IN ?", queryParams["reviewers"]))
 		}
 		// RegEx filtering for submission name
-		if submissionName != "" {
-			params := map[string]interface{}{"full": submissionName}
-			whereString := "submissions.name REGEXP @full"
-			// only adds multiple regex conditions if the name given is multiple words
-			if wordList := strings.Fields(submissionName); len(wordList) > 1 {
-				for index, field := range wordList {
-					whereString = whereString + " OR submissions.name REGEXP @" + fmt.Sprint(index)
-					params[fmt.Sprint(index)] = field
-				}
+		if len(queryParams["name"]) > 0 {
+			tx = filterByName(tx, regexp.QuoteMeta(queryParams["name"][0]))
+		}
+		// orders result set
+		if len(queryParams["orderBy"]) > 0 {
+			orderBy := queryParams["orderBy"][0]
+			if orderBy != "newest" && orderBy != "oldest" && orderBy != "alphabetical" {
+				return &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
 			}
-			tx = tx.Where(whereString, params)
+			tx = orderSubmissionQuery(tx, orderBy)
 		}
-		// order of submissions
-		if orderBy == "newest" {
-			tx = tx.Order("submissions.created_at ASC")
-		} else if orderBy == "oldest" {
-			tx = tx.Order("submissions.created_at DESC")
-		} else if orderBy == "alphabetical" {
-			tx = tx.Order("submissions.Name")
-		}
-		// no user logged in, only show approved submissions
+		// filters by usertype. If usertype is nil, only show approved submissions
 		if ctx == nil {
 			tx = tx.Where("submissions.approved = ?", true)
-		// user logged in, check user type
 		} else {
-			// return accepted submissions, or authored submissions
-			if ctx.UserType == USERTYPE_PUBLISHER {
-				tx = tx.Where("approved = ? OR id IN (?)", true,
-					gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
-			} else if ctx.UserType == USERTYPE_REVIEWER {
-				tx = tx.Where("approved = ? OR id IN (?)", true, 
-					gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
-			} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
-				tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true, 
-					gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
-					gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
-			}
-			// note editors can see all submissions
+			tx = filterByUserType(tx, ctx)
 		}
 
 		// selects fields and gets submissions
@@ -262,9 +218,52 @@ func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]
 	}); err != nil {
 		return nil, err
 	}
-
 	return submissions, nil
 }
+
+// uses SQL REGEX to filter the submissions returned based on their names
+func filterByName(tx *gorm.DB, submissionName string) *gorm.DB {
+	params := map[string]interface{}{"full": submissionName}
+	whereString := "submissions.name REGEXP @full"
+	// only adds multiple regex conditions if the name given is multiple words
+	if wordList := strings.Fields(submissionName); len(wordList) > 1 {
+		for index, field := range wordList {
+			whereString = whereString + " OR submissions.name REGEXP @" + fmt.Sprint(index)
+			params[fmt.Sprint(index)] = field
+		}
+	}
+	return tx.Where(whereString, params)
+}
+// adds a piece to an sql query to order the results
+func orderSubmissionQuery(tx *gorm.DB, orderBy string) *gorm.DB {
+	// order of submissions
+	if orderBy == "newest" {
+		tx = tx.Order("submissions.created_at ASC")
+	} else if orderBy == "oldest" {
+		tx = tx.Order("submissions.created_at DESC")
+	} else if orderBy == "alphabetical" {
+		tx = tx.Order("submissions.Name")
+	}
+	return tx
+}
+// adds usertype filters to a submission query
+func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
+	// return accepted submissions, or authored submissions
+	if ctx.UserType == USERTYPE_PUBLISHER {
+		tx = tx.Where("approved = ? OR id IN (?)", true,
+			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+	} else if ctx.UserType == USERTYPE_REVIEWER {
+		tx = tx.Where("approved = ? OR id IN (?)", true, 
+			gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+	} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
+		tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true, 
+			gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
+			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+	}
+	// note editors can see all submissions and hence no filter is added for editors
+	return tx
+}
+
 
 // Router function to get the names and id's of every submission of a given user
 // if no user id is given in the query parameters, return all valid submissions
