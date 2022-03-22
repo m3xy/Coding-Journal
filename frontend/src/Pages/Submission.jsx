@@ -84,12 +84,11 @@ function Submission() {
             </Row>
             <Row>
                 <Col xs={3}>
-                    <Explorer></Explorer>
+                    <Explorer />
                 <p>(component changes state with setFile())</p>
                 </Col>
                 <Col>
-                    <Code id={submission.files[0].ID}> 
-                </Code>
+                    <Code id={submission.files[0].ID} />
                 </Col>
             </Row>
         </Container>

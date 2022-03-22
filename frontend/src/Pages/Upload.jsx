@@ -72,7 +72,7 @@ class Upload extends React.Component {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = function(e) {
-                    files[i].base64Value = e.target.result.split(',')[1];
+                    files[i].base64Value = e.target.result.split(',')[1]; //Dont need multiple files
                     resolve();                          //Promise(s) resolved/fulfilled once reader has encoded file(s) into base 64
                 }
                 reader.onerror = function() {
@@ -120,10 +120,8 @@ class Upload extends React.Component {
                                 .then((response) => {
                                     console.log(response);
                                     console.log("Submission ID: " + response.data["ID"]);
-
-                                    var submissionPage = window.open("/submission/" + response.data["ID"]);
-
-
+                                    window.location.href = "/submission/" + response.data["ID"];
+                                    // var submissionPage = window.open();
                                     // var codePage = window.open("/code");
                                     // codePage.submissionId = response.data["ID"];
                                     // codePage.submission = files[0];
