@@ -1,0 +1,15 @@
+.SubmissionContainer {
+	width: 80%;
+	margin: 0 auto;
+	margin-top: 15px;
+}
+
+.LeftContainer {
+	flex: 1.5;
+	margin: 15px;
+}
+
+.RightContainer {
+	flex: 1;
+	margin: 15px;
+}
