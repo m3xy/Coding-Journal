@@ -31,7 +31,8 @@ const (
 
 // router function to allow journal editors to assign reviewers to a given submission
 // uses addReviewers in submissions.go
-func RouteAssignReviewers(w http.ResponseWriter, r *http.Request) {
+// POST /submission/{id}/assignreviewers
+func PostAssignReviewers(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] AssignReviewers request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &AssignReviewersBody{}
@@ -70,7 +71,7 @@ func RouteAssignReviewers(w http.ResponseWriter, r *http.Request) {
 
 			case *SubmissionStatusFinalisedError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
-				w.WriteHeader(http.StatusConflict)
+				w.WriteHeader(http.StatusUnauthorized)
 
 			default: // Unexpected error - error out as server error.
 				log.Printf("[ERROR] could not change submission status: %v\n", err)
@@ -90,8 +91,9 @@ func RouteAssignReviewers(w http.ResponseWriter, r *http.Request) {
 }
 
 // router function for reviewer review upload
-func RouteUploadReview(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] RouteUploadReview request received from %v", r.RemoteAddr)
+// POST /submission/{id}/review
+func PostUploadReview(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] UploadReview request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &UploadReviewBody{}
 
@@ -150,13 +152,14 @@ func RouteUploadReview(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if !resp.Error {
-		log.Print("[INFO] RouteUploadReview request successful\n")
+		log.Print("[INFO] UploadReview request successful\n")
 	}
 }
 
 // router function for updating submission status
-func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] updateSubmissionStatus request received from %v", r.RemoteAddr)
+// POST /submission/{id}/approve
+func PostUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] UpdateSubmissionStatus request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &UpdateSubmissionStatusBody{}
 
@@ -190,7 +193,7 @@ func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 			switch err.(type) {
 			case *MissingReviewsError, *MissingApprovalError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
-				w.WriteHeader(http.StatusConflict)
+				w.WriteHeader(http.StatusUnauthorized)
 
 			default: // Unexpected error - error out as server error.
 				log.Printf("[ERROR] could not change submission status: %v\n", err)
@@ -205,7 +208,7 @@ func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if !resp.Error {
-		log.Print("[INFO] updateSubmissionStatus request successful\n")
+		log.Print("[INFO] UpdateSubmissionStatus request successful\n")
 	}
 }
 
@@ -213,6 +216,13 @@ func RouteUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 // Helper Functions
 // ------------
 
+// assigns reviewers to a given submission
+//
+// Params:
+// 	reviewerIDs ([]string) : a list of reviewers IDs to be added to the submission
+// 	submissionID (uint) : the ID of the submission which reviewer IDs are to be added to
+// Returns:
+// 	(error) : an error if one occurs
 func assignReviewers(reviewerIDs []string, submissionID uint) error {
 	// builds array of reviewers
 	reviewers := make([]GlobalUser, len(reviewerIDs))
@@ -291,6 +301,9 @@ func updateSubmissionStatus(status bool, submissionID uint) error {
 
 	// maps reviewer ID to review approval status
 	reviews := make(map[string]bool)
+	if len(submission.Reviewers) == 0 && status {
+		return &MissingReviewsError{SubmissionID: submissionID}
+	}
 	for _, review := range submission.MetaData.Reviews {
 		reviews[review.ReviewerID] = review.Approved
 	}

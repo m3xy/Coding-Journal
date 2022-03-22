@@ -36,7 +36,13 @@ type NewCommentResponse struct {
 	ID uint `json:"id"`
 }
 
-// GET /submissions
+// GET /submissions/tags
+type GetAvailableTagsResponse struct {
+	StandardResponse
+	Tags []string `json:"tags"`
+}
+
+// GET /submissions/query
 type QuerySubmissionsResponse struct {
 	StandardResponse
 	Submissions []Submission `json:"submissions"` // submissions only contain ID and name
@@ -106,7 +112,7 @@ type UploadSubmissionByZipBody struct {
 	Tags           []string `json:"tags"`
 	Authors        []string `json:"authors" validate:"required"`
 	Reviewers      []string `json:"reviewers"`
-	ZipBase64Value string   `json:"base64" validate:"base64url,required"`
+	ZipBase64Value string   `json:"base64" validate:"base64,required"`
 }
 
 // --- JWT Claim types --- //

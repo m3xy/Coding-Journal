@@ -1,0 +1,15 @@
+.UploadCard {
+	min-width: 26rem;
+	max-width: 40rem;
+	margin-right: auto;
+	margin-left: auto;
+	margin-top: 15px;
+	text-align: center;
+}
+
+.UploadAlert {
+	min-width: 30rem;
+	max-width: 42rem;
+	margin: 0 auto;
+	margin-top: 15px;
+}

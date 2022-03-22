@@ -27,7 +27,6 @@ import {
     Submission
 } from "../Pages"
 import Navigation from "../Components/Navbar"
-import HomePage from "../Pages/HomePage/HomePage"
 
 function App() {
     return(

@@ -202,7 +202,6 @@ User profile information query.
 ```typescript
 interface Content {
   UserID: string;
-  FullName: string;
   Profile: Profile;
 }
 
@@ -218,13 +217,44 @@ interface Profile {
 
 ## Submission
 
+### Get available tags
+
+Queries the avaiable tags from the database to allow for their display on the frontend
+
+1. Endpoint
+
+    The endpoint is **GET** `/submissions/tags`
+
+2. Request
+
+    1. Headers
+    2. Body
+
+3. Response
+
+    1. Status
+
+        - 200 - if a non-empty tag array was found and returned
+        - 204 - if no tags are currently in the db
+        - 500 - if anything else goes wrong not pertaining to the client
+
+    2. Body - the object shown below
+
+```typescript
+interface GetAvailableTagsResponse {
+    message: string;
+    error: bool;
+    tags: string[];
+}
+```
+
 ### Submission Query
 
 Querying an ordered list of submissions based upon query parameters
 
 1. Enpoint
 
-    The enpoint to query submissions is **GET** `/submissions`
+    The enpoint to query submissions is **GET** `/submissions/query`
 
 2. Request
 
@@ -234,8 +264,11 @@ Querying an ordered list of submissions based upon query parameters
 
     3. Parameters:
 
-        - orderBy - newest or oldest
+        - name - submission name for searching with a query (spaces should be replaced w/ + in URL)
+        - orderBy - newest | oldest | alphabetical
         - tags - any existant code tag (i.e. python, java, etc.)
+        - authors - user ID of authors
+        - reviewers - user ID of reviewers
 
 3. Response
 
@@ -370,6 +403,33 @@ interface GlobalUser {
 }
 ```
 
+### Submission Download
+
+Download a given submission as a zip archive. Available to any user
+
+1. Endpoint
+
+    The endpoint for downloads is **GET** `/submission/{id}/download` where id is submission ID as a uint
+
+2. Request 
+
+    1. Headers - n/a
+
+    2. Body - n/a
+
+3. Response
+
+    1. Status
+
+        - 200 - if the request succeeds and the zip is returned
+        - 400 - if the request is malformatted (i.e. submission id is "a" or similar)
+        - 404 - if the submission is not found
+        - 500 - something has gone wrong in the server not relating to the request
+
+    2. Body
+
+        The response body is a base64 Standard Encoded version of the zip file with content type `application/zip`
+
 ## Approval
 
 ### Assigning Reviewers 
@@ -394,7 +454,7 @@ interface AssignReviewersBody {
 
 3. Response
 
-    1. Status:
+    1. Status
 
         - 200 - if the request fully succeeds
         - 400 - if the request is malformatted or one of the given userIDs does not have reviewer permissions
@@ -402,7 +462,7 @@ interface AssignReviewersBody {
         - 409 - if the submission status has been finalised (i.e. approved/dissaproved)
         - 500 - unexpected error
 
-    2. Body:
+    2. Body
 
 ### Review Upload
 

@@ -37,6 +37,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 
 	// Initialise message, response, and parameters.
 	var message string
+	var authorCtx RequestContext
 	var encodable interface{}
 	req := &NewCommentPostBody{}
 
@@ -49,6 +50,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 
 		// gets context struct and validates it
 	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+		authorCtx = ctx
 		message = "No user logged in"
 		w.WriteHeader(http.StatusUnauthorized)
 
@@ -60,7 +62,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 
 	// Get author ID from request, and add comment.
 	if commentID, err := addComment(&Comment{
-		AuthorID: r.Context().Value("userId").(string), FileID: uint(fileID64),
+		AuthorID: authorCtx.ID, FileID: uint(fileID64),
 		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber,
 	}); err != nil {
 		message = "Comment creation failed."

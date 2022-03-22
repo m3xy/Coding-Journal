@@ -131,7 +131,7 @@ func TestSignUp(t *testing.T) {
 
 			var exists bool
 			if err := gormDb.Model(&GlobalUser{}).Select("count(*) > 0").
-				Where(&GlobalUser{User: testUsers[i]}).Find(&exists).Error; err != nil {
+				Where(&GlobalUser{User: &testUsers[i]}).Find(&exists).Error; err != nil {
 				t.Errorf("Global ID test query error: %v", err)
 			}
 			assert.NotEqual(t, false, exists, "ID should be in database!")

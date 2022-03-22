@@ -372,8 +372,7 @@ func registerUser(user User, UserType int) (string, error) {
 
 	registeredUser := GlobalUser{
 		UserType: UserType,
-		FullName: user.FirstName + " " + user.LastName,
-		User:     user,
+		User:     &user,
 	}
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user
