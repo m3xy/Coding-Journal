@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from "react"
-import axiosInstance from "../../Web/axiosInstance"
 import styles from "./HomePage.module.css"
 import SubmissionList from "../../Components/SubmissionList"
 import JwtService from "../../Web/jwt.service"
-import { Card, Button } from "react-bootstrap"
-import { useNavigate } from "react-router-dom"
 
 export default () => {
-	const navigate = useNavigate()
 	const [list, setList] = useState([
 		{
 			display: "Assigned submissions",
@@ -41,7 +37,7 @@ export default () => {
 							</div>
 						)
 					} else {
-						return <div></div>
+						return <div key={i}></div>
 					}
 				})}
 			</div>
