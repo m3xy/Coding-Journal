@@ -97,7 +97,7 @@ function Profile() {
 									? "Approved"
 									: submission.approved === null
 									? "In review"
-									: "Unapproved"}
+									: "Rejected"}
 							</Badge>
 							<label>{cutShort(submission.name, 50)}</label>
 						</ListGroup.Item>
