@@ -487,11 +487,13 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	var encodable interface{}
 
 	// Check path, execute controller, check errors.
+	var err error
+	var submission *Submission
 	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
 	if err != nil {
 		encodable = StandardResponse{Message: "Given ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
-	} else if submission, err := getSubmission(uint(submissionID64)); err != nil {
+	} else if submission, err = getSubmission(uint(submissionID64)); err != nil {
 		switch err.(type) {
 		case *NoSubmissionError: // The given submission doesn't exist
 			encodable = StandardResponse{Message: err.(*NoSubmissionError).Error(), Error: true}
@@ -504,6 +506,35 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		encodable = submission
+	}
+
+	// submission not approved, can only be displayed for editors, authors or reviewers
+	if submission != nil && (submission.Approved == nil || !*submission.Approved) {
+		if ctx, ok := r.Context().Value("data").(RequestContext); ok && validate.Struct(ctx) != nil {
+			encodable = &StandardResponse{Message: "Error getting request context", Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		} else if ctx.UserType != USERTYPE_EDITOR {
+			// if the user is not an editor, check that they are either a reviewer or author for the given submission
+			var allowed = false
+			for _, author := range submission.Authors {
+				if author.ID == ctx.ID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				for _, reviewer := range submission.Reviewers {
+					if reviewer.ID == ctx.ID {
+						allowed = true
+						break
+					}
+				}
+			}
+			if !allowed {
+				encodable = &StandardResponse{Message: "Not authorized to access the given submission", Error: true}
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		}
 	}
 
 	// writes JSON data for the submission to the HTTP connection

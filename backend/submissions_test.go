@@ -652,13 +652,14 @@ func TestRouteGetSubmission(t *testing.T) {
 	router.HandleFunc(SUBROUTE_SUBMISSION+"/{id}", RouteGetSubmission)
 
 	// Initialise users and created submissions.
-	globalAuthors, _, err := initMockUsers(t)
+	globalAuthors, globalReviewers, err := initMockUsers(t)
 	if err != nil {
 		return
 	}
 	submission := Submission{
 		Name:    "Test",
 		Authors: []GlobalUser{globalAuthors[0]},
+		Reviewers: []GlobalUser{globalReviewers[0]},
 		MetaData: &SubmissionData{
 			Abstract: "Test",
 		},
@@ -668,17 +669,83 @@ func TestRouteGetSubmission(t *testing.T) {
 		return
 	}
 
-	// tests that a single valid submission with one reviewer and one author can be retrieved
-	t.Run("Get Valid Submission", func(t *testing.T) {
+	// tests that a valid unapproved submission can be viewed by an author
+	t.Run("Get unapproved submission as author", func(t *testing.T) {
 		// Create submission, then send request.
 		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
-		r, w := httptest.NewRequest(http.MethodPost, url, nil), httptest.NewRecorder()
+		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
+		ctx := context.WithValue(r.Context(), "data", RequestContext{
+			ID: globalAuthors[0].ID, UserType: USERTYPE_PUBLISHER})
+		router.ServeHTTP(w, r.WithContext(ctx))
+		resp := w.Result()
+
+		// Read result and check success.
+		var respBody Submission
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Should succeed, but got error") {
+			return
+		} else if err := json.NewDecoder(resp.Body).Decode(&respBody); !assert.NoError(t, err, "Response schema is invalid.") {
+			return
+		}
+		switch {
+		case !assert.Equal(t, id, respBody.ID, "Returned submission should be the same as the one created."),
+			!assert.Equal(t, submission.Authors[0].ID, respBody.Authors[0].ID, "Authors should be returned by the request."),
+			!assert.Equal(t, submission.MetaData.Abstract, respBody.MetaData.Abstract, "Metadata should be included in the result."):
+			return
+		}
+	})
+
+	// tests that a single valid submission that is unapproved can be viewed by an editor
+	t.Run("Get unapproved submission as editor", func(t *testing.T) {
+		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
+		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
+		ctx := context.WithValue(r.Context(), "data", RequestContext{
+			ID: globalAuthors[1].ID, UserType: USERTYPE_EDITOR})
+		router.ServeHTTP(w, r.WithContext(ctx))
+		resp := w.Result()
+
+		// Read result and check success.
+		var respBody Submission
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Should succeed, but got error") {
+			return
+		} else if err := json.NewDecoder(resp.Body).Decode(&respBody); !assert.NoError(t, err, "Response schema is invalid.") {
+			return
+		}
+		switch {
+		case !assert.Equal(t, id, respBody.ID, "Returned submission should be the same as the one created."),
+			!assert.Equal(t, submission.Authors[0].ID, respBody.Authors[0].ID, "Authors should be returned by the request."),
+			!assert.Equal(t, submission.MetaData.Abstract, respBody.MetaData.Abstract, "Metadata should be included in the result."):
+			return
+		}
+	})
+
+	// tests that a single valid submission with one reviewer and one author can be retrieved
+	t.Run("Get unapproved submission as non-author", func(t *testing.T) {
+		// Create submission, then send request.
+		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
+		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+		resp := w.Result()
+		// make sure the response is unauthorized
+		if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "User should be unauthorized") {
+			return
+		} 
+	})
+
+	// tests that a single valid submission that is unapproved can be viewed by an editor
+	t.Run("Get approved submission as nil user", func(t *testing.T) {
+		// marks the submission approved
+		addReview(&Review{ReviewerID: globalReviewers[0].ID, Approved: true, Base64Value:"review"}, id)
+		updateSubmissionStatus(true, id)
+
+		// sends the request
+		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
+		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
 		router.ServeHTTP(w, r)
 		resp := w.Result()
 
 		// Read result and check success.
 		var respBody Submission
-		if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "Should succeed, but got error %d", resp.StatusCode) {
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Should succeed, but got error") {
 			return
 		} else if err := json.NewDecoder(resp.Body).Decode(&respBody); !assert.NoError(t, err, "Response schema is invalid.") {
 			return
