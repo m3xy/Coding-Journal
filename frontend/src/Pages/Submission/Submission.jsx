@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react"
 import styles from "./Submission.module.css"
 import axiosInstance from "../../Web/axiosInstance"
 import { useParams, useNavigate } from "react-router-dom"
-import { Badge } from "react-bootstrap"
+import { Abstract, FileViewer } from "./Children"
+import { Badge, Card, Button, Collapse } from "react-bootstrap"
 
 function Submission() {
 	// Router hooks
@@ -25,6 +26,8 @@ function Submission() {
 	const [reviewers, setReviewers] = useState([])
 	const [showError, setShowError] = useState(false)
 	const [errMsg, setErrMsg] = useState("")
+	const [showFile, setShowFile] = useState(false)
+	const [fileId, setFileId] = useState(-1)
 
 	useEffect(() => {
 		if (!params.hasOwnProperty("id")) {
@@ -90,32 +93,51 @@ function Submission() {
 
 	return (
 		<div className={styles.SubmissionContainer}>
+			{showFile ? (
+				<div style={{ display: "flex" }}>
+					<p>{getBadge()}</p>
+					<h5 style={{ marginLeft: "15px" }}>{submission.name}</h5>
+				</div>
+			) : (
+				<div style={{ display: "flex" }}>
+					<h2>{getBadge()}</h2>
+					<h1 style={{ marginLeft: "15px" }}>{submission.name}</h1>
+				</div>
+			)}
+			<Collapse in={!showFile}>
+				<div className="text-muted">
+					<h5>
+						Author
+						{authors.length > 1 ? "s: " : ": "}
+						{authors.length > 0
+							? authors.map(
+									(author, i) =>
+										(i === 0 ? " " : ", ") +
+										getUserFullName(author)
+							  )
+							: "No authors..."}
+					</h5>
+					<h5>
+						Reviewer
+						{reviewers.length > 1 ? "s: " : ": "}
+						{reviewers.length > 0
+							? reviewers.map((reviewer, i) =>
+									i === 0 ? " " : ", "
+							  )
+							: "No reviewers..."}
+					</h5>
+				</div>
+			</Collapse>
 			<div style={{ display: "flex" }}>
-				<h2>{getBadge()}</h2>
-				<h1 style={{ marginLeft: "15px" }}>{submission.name}</h1>
-			</div>
-			<div className="text-muted">
-				<h4>
-					Author
-					{authors.length > 1 ? "s: " : ": "}
-					{authors.length > 0
-						? authors.map(
-								(author, i) =>
-									(i === 0 ? " " : ", ") +
-									getUserFullName(author)
-						  )
-						: "No authors..."}
-				</h4>
-				<h4>
-					Reviewer
-					{reviewers.length > 1 ? "s: " : ": "}
-					{reviewers.length > 0
-						? reviewers.map((reviewer, i) => (i === 0 ? " " : ", "))
-						: "No reviewers..."}
-				</h4>
-			</div>
-			<div style={{ display: "flex" }}>
-				<div className={styles.LeftContainer}></div>
+				<div className={styles.LeftContainer}>
+					<Abstract
+						markdown={submission.metaData.abstract}
+						show={showFile}
+						setShow={(e) => setShowFile(e)}
+						inversed
+					/>
+					<FileViewer id={fileId} show={showFile} />
+				</div>
 				<div className={styles.RightContainer}>There</div>
 			</div>
 		</div>
