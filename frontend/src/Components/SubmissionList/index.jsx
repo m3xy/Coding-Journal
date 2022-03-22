@@ -16,10 +16,12 @@ export default ({ query, display }) => {
 				params: query
 			})
 			.then((response) => {
-				setSubmissionsFromPrimitives(response.data.submissions)
+				if (response.data.hasOwnProperty(submissions))
+					setSubmissionsFromPrimitives(response.data.submissions)
 			})
 			.catch((err) => {
-				if (err.response.status !== 204) setError(true)
+				console.log(err)
+				setError(true)
 			})
 	}, [])
 
@@ -42,23 +44,23 @@ export default ({ query, display }) => {
 
 	// Get authors from their IDs.
 	const setAuthorsNotFetched = (authors) => {
+		localAuthors = {}
 		authors.map((author) => {
-			if (!authors.hasOwnProperty(author.userId)) {
+			if (!localAuthors.hasOwnProperty(author.userId)) {
 				axiosInstance
 					.get("/user/" + author.userId)
 					.then((response) => {
-						setAuthors((authors) => {
-							return {
-								...authors,
-								[author.userId]: response.data
-							}
-						})
+						localAuthors = {
+							...localAuthors,
+							[author.userId]: response.data
+						}
 					})
 					.catch((err) => {
 						console.log(err)
 					})
 			}
 		})
+		setAuthors(localAuthors)
 	}
 
 	const getBadge = (submission) => {
@@ -111,10 +113,10 @@ export default ({ query, display }) => {
 
 	// Get a list of cards from the list of submissions.
 	const getCards = (submissions) => {
-		return submissions.map((submission) => {
+		return submissions.map((submission, i) => {
 			return (
 				<Card
-					key={submission.ID}
+					key={i}
 					style={{
 						minWidth: "25rem",
 						maxWidth: "25rem",
