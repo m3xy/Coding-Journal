@@ -301,7 +301,7 @@ func updateSubmissionStatus(status bool, submissionID uint) error {
 
 	// maps reviewer ID to review approval status
 	reviews := make(map[string]bool)
-	if len(submission.Reviewers) == 0 {
+	if len(submission.Reviewers) == 0 && status {
 		return &MissingReviewsError{SubmissionID: submissionID}
 	}
 	for _, review := range submission.MetaData.Reviews {
