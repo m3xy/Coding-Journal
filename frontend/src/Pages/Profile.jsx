@@ -63,11 +63,11 @@ function Profile() {
 	//Get user comments
 	const comments = []
 	const userTypes = [
-		"None",
+		"User",
 		"Publisher",
 		"Reviewer",
 		"Reviewer-Publisher",
-		"User"
+		"Editor"
 	]
 
 	const getSubmissionsList = (submissions) => {
