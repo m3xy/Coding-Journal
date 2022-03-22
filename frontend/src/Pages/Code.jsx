@@ -13,7 +13,7 @@ import Comments from "./Comments";
 
 const fileEndpoint = '/file'
 
-function Code(props) {
+function Code({id}) {
 
     const [file, setFile] = useState({ID:null, submissionId:null, path:"", CreatedAt:"", UpdatedAt:""});
     const [code, setCode] = useState("// type your code...");
@@ -25,10 +25,10 @@ function Code(props) {
     const [showComments, setShowComments] = useState(false);
 
     useEffect(() => {
-        if(props.id == null) return;
+        if(id == null) return;
 
         //Get File
-        axiosInstance.get(fileEndpoint + "/" + props.id)
+        axiosInstance.get(fileEndpoint + "/" + id)
             .then((response) => {
                 console.log(response.data);
 
@@ -38,7 +38,7 @@ function Code(props) {
             }).catch((error) => {
                 console.log(error);
             })
-    }, [props.id])
+    }, [id])
 
     const editorDidMount = (editor, monaco) => {
         console.log('editorDidMount', editor);
@@ -139,7 +139,7 @@ function Code(props) {
                         </Col>
                     </Row>
                     <Row>
-                        <Comments id={props.id} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
+                        <Comments id={id} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
                     </Row>
                     <Row>
                         <Col>
