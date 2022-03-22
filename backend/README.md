@@ -269,7 +269,6 @@ Querying an ordered list of submissions based upon query parameters
         - tags - any existant code tag (i.e. python, java, etc.)
         - authors - user ID of authors
         - reviewers - user ID of reviewers
-        - approved - accepted | rejected | unapproved
 
 3. Response
 

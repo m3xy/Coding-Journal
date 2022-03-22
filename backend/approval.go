@@ -71,7 +71,7 @@ func PostAssignReviewers(w http.ResponseWriter, r *http.Request) {
 
 			case *SubmissionStatusFinalisedError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
-				w.WriteHeader(http.StatusConflict)
+				w.WriteHeader(http.StatusUnauthorized)
 
 			default: // Unexpected error - error out as server error.
 				log.Printf("[ERROR] could not change submission status: %v\n", err)
@@ -193,7 +193,7 @@ func PostUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 			switch err.(type) {
 			case *MissingReviewsError, *MissingApprovalError:
 				resp = &StandardResponse{Message: err.Error(), Error: true}
-				w.WriteHeader(http.StatusConflict)
+				w.WriteHeader(http.StatusUnauthorized)
 
 			default: // Unexpected error - error out as server error.
 				log.Printf("[ERROR] could not change submission status: %v\n", err)

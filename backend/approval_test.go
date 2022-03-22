@@ -164,7 +164,7 @@ func TestPostAssignReviewers(t *testing.T) {
 		}
 		// makes sure the request did not succeed
 		status := testAssignReviewers(reqStruct, submissionID, ctx)
-		if !assert.Equalf(t, http.StatusConflict, status, "request did not succeed!") {
+		if !assert.Equalf(t, http.StatusUnauthorized, status, "request did not succeed!") {
 			return
 		}
 	})
@@ -380,7 +380,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 	t.Run("Change Status", func(t *testing.T) {
 		t.Run("Review not added", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusConflict, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 409 Conflict")
+			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 409 Conflict")
 		})
 
 		// adds a review from the one reviewer to allow for submission approval
@@ -449,7 +449,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 		}
 		reqStruct := &UpdateSubmissionStatusBody{Status:true}
 		respCode := changeStatus(subID, editorID, USERTYPE_EDITOR, reqStruct)
-		assert.Equal(t, http.StatusConflict, respCode, "incorrect status code returned")
+		assert.Equal(t, http.StatusUnauthorized, respCode, "incorrect status code returned")
 	})
 }
 
