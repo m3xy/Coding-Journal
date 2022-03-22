@@ -520,7 +520,17 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
 			queryRoute := fmt.Sprintf("%s%s?tags=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			resp := handleQuery(queryRoute)
-			assert.Equal(t, http.StatusNoContent, resp.StatusCode, "Incorrect status code returned")
+			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Incorrect status code returned") {return}
+
+			respData := &QuerySubmissionsResponse{}
+			switch {
+			case !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body"),
+				!assert.Falsef(t, respData.StandardResponse.Error,
+					"Error returned on query - %v", respData.StandardResponse.Message),
+				!assert.Empty(t, respData.Submissions, "submissions array not empty"):
+				return
+			}
+
 		})
 	})
 }

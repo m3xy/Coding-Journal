@@ -136,7 +136,7 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 		case *ResultSetEmptyError:
 			stdResp = StandardResponse{Message: "No submissions fit search queries", Error: false}
-			w.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusOK)
 		default:
 			log.Printf("[ERROR] could not query submissions: %v\n", err)
 			stdResp = StandardResponse{Message: "Internal Server Error - could not query submissions", Error: true}
@@ -248,7 +248,6 @@ func orderSubmissionQuery(tx *gorm.DB, orderBy string) *gorm.DB {
 }
 // adds usertype filters to a submission query
 func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
-	// return accepted submissions, or authored submissions
 	if ctx.UserType == USERTYPE_PUBLISHER {
 		tx = tx.Where("approved = ? OR id IN (?)", true,
 			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
