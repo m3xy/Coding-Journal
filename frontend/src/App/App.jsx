@@ -21,6 +21,7 @@ import {
 	About,
 	Contact,
 	Footer,
+	Home,
 	Upload,
 	Profile,
 	Submissions,
@@ -34,7 +35,7 @@ function App() {
             <Router>
                 <Navigation />
                 <Routes>
-                    <Route path="/" element = {<HomePage />} />
+                    <Route path="/" element = {<Home />} />
                     <Route path="/login" element = {<Login />} />
                     <Route path="/register" element = {<Register />} />
                     <Route path="/about" element = {<About />} />
