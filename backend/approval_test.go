@@ -363,7 +363,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 		if !assert.NoError(t, err, "Error while marshalling request body!") {
 			return -1
 		}
-		// sends the request to upload a review
+		// sends the request to change submission status
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 		w := httptest.NewRecorder()
 
@@ -416,7 +416,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 			if !assert.NoError(t, err, "Error while marshalling request body!") {
 				return
 			}
-			// sends the request to upload a review
+			// sends the request to change submission status
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -433,6 +433,23 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 400")
 			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID, editorID, USERTYPE_EDITOR, nil), "Wrong error code, was expecting 400")
 		})
+	})
+
+
+	t.Run("no reviewers assigned", func(t *testing.T) {
+		// adds a new submission without reviewers
+		submission := Submission{
+			Name:      "Test",
+			Authors:   []GlobalUser{globalAuthors[0]},
+			MetaData: &SubmissionData{Abstract: "Test"},
+		}
+		subID, err := addSubmission(&submission)
+		if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+			return
+		}
+		reqStruct := &UpdateSubmissionStatusBody{Status:true}
+		respCode := changeStatus(subID, editorID, USERTYPE_EDITOR, reqStruct)
+		assert.Equal(t, http.StatusConflict, respCode, "incorrect status code returned")
 	})
 }
 
