@@ -102,7 +102,9 @@ func TestGetFile(t *testing.T) {
 			AuthorID:reviewerID, Base64Value:"testComment1"})
 		commentID3, _ := addComment(&Comment{ParentID:&commentID2, FileID:fileID,
 			AuthorID:reviewerID, Base64Value:"testComment1"})
-
+		commentID4, _ := addComment(&Comment{ParentID:&commentID3, FileID:fileID,
+			AuthorID:reviewerID, Base64Value:"testComment1"})
+	
 		// builds the request url inserting query parameters
 		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
 		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
@@ -124,8 +126,12 @@ func TestGetFile(t *testing.T) {
 			!assert.Equal(t, submissionID, respData.File.SubmissionID, "Submission IDs do not match"),
 			!assert.Equal(t, testFile.Base64Value, respData.File.Base64Value, "File Content does not match"),
 			!assert.Equal(t, commentID1, respData.File.Comments[0].ID, "top level comment does not match"),
-			!assert.Equal(t, commentID2, respData.File.Comments[0].Comments[0].ID, "second level comment does not match"),
-			!assert.Equal(t, commentID3, respData.File.Comments[0].Comments[0].Comments[0].ID, "third level comment does not match"):
+			!assert.Equal(t, commentID2, respData.File.Comments[0].
+				Comments[0].ID, "second level comment does not match"),
+			!assert.Equal(t, commentID3, respData.File.Comments[0].
+				Comments[0].Comments[0].ID, "third level comment does not match"),
+			!assert.Equal(t, commentID4, respData.File.Comments[0].
+				Comments[0].Comments[0].Comments[0].ID,"fourth level comment does not match"):
 			return
 		}
 	})

@@ -185,6 +185,10 @@ func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 // Clear every table rows in the database.
 func gormClear(db *gorm.DB) error {
 	// deletes comments w/ associations
+	if err := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
+		Model(&Comment{}).Update("parent_id", nil).Error; err != nil {
+		return err
+	}
 	var comments []Comment
 	if err := db.Find(&comments).Error; err != nil {
 		return err
