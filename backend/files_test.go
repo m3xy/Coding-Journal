@@ -1,14 +1,10 @@
-// ===================================================================
+// ====================================================
 // files_test.go
 // Authors: 190010425
 // Created: November 23, 2021
 //
-// test file for files.go
-// Note that the tests are written dependency wise from top to bottom.
-// Hence if a test breaks, fix the top one first and then re-run.
-//
 // This file depends heavily on submissions_test.go
-// ===================================================================
+// ====================================================
 
 package main
 
@@ -30,8 +26,6 @@ const (
 	TEST_FILES_DIR = "../filesystem_test/" // environment variable set to this value
 )
 
-// NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
-// as to prevent adding a file with the same SubmissionID twice
 var testFiles []File = []File{
 	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
 	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
@@ -43,21 +37,14 @@ var testFiles []File = []File{
 
 // Tests the basic ability of the files.go code to load the data from a
 // valid file path passed to it via HTTP request
-//
-// TODO : test whether having / in file path query param breaks the function
-//
-// Test Depends On:
-// 	- TestAddSubmission (in submissions_test.go)
-// 	- TestAddFile
 func TestGetFile(t *testing.T) {
-	// Set up server and configures filesystem/db
 	testInit()
 	defer testEnd()
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
 	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}", getFile)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}", GetFile)
 
 	// adds a submission to the database and filesystem
 	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
@@ -72,47 +59,50 @@ func TestGetFile(t *testing.T) {
 	}
 	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
+
+	testSubmission.Files = []File{testFile}
 	submissionID, err := addSubmission(&testSubmission)
 	if !assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err) {
 		return
 	}
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
+	fileID := testFile.ID
 
 	// tests getting a single valid file without comments
 	t.Run("Get One File no comments", func(t *testing.T) {
-		// adds a file to the database and filesystem
-		fileID, err := addFileTo(&testFile, submissionID)
-		if !assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Path, err) {
-			return
-		}
-
 		// builds the request url inserting query parameters
 		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
 		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 		resp := w.Result()
-
-		if !assert.NoErrorf(t, err, "Error occurred in request: %v", err) {
-			return
-		}
 		defer resp.Body.Close()
 		if !assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode) {
 			return
-		} // fails if status code is not 200
-
+		}
 		// marshals the json response into a file struct
-		file := &File{}
-		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&file), "Error decoding JSON in server response") {
+		respData := &GetFileResponse{}
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&respData), "Error decoding JSON in server response") {
 			return
 		}
-
 		// tests that the file was retrieved with the correct information
 		switch {
-		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"),
-			!assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"),
-			!assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
+		case !assert.Equal(t, testFile.Path, respData.File.Path, "file paths do not match"),
+			!assert.Equal(t, submissionID, respData.File.SubmissionID, "Submission IDs do not match"),
+			!assert.Equal(t, testFile.Base64Value, respData.File.Base64Value, "File Content does not match"):
 			return
 		}
+	})
 
+	t.Run("non-existant file ID", func(t *testing.T) {
+		// builds the request url inserting query parameters
+		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID+1)
+		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+		if !assert.Equalf(t, http.StatusBadRequest, resp.StatusCode, "returned incorrect status code") {
+			return
+		}
 	})
 }
 

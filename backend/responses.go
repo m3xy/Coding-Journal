@@ -55,6 +55,13 @@ type UploadSubmissionResponse struct {
 	SubmissionID uint `json:"ID"`
 }
 
+// GET /file/{id} body
+type GetFileResponse struct {
+	StandardResponse
+	File *File `json:"file"`
+}
+
+
 // --- Request bodies --- //
 
 // POST /auth/login body.

@@ -37,6 +37,12 @@ type NoSubmissionError struct {
 
 func (e *NoSubmissionError) Error() string { return fmt.Sprintf("Submission %d doesn't exist!", e.ID) }
 
+type FileNotFoundError struct {
+	ID uint
+}
+
+func (e *FileNotFoundError) Error() string { return fmt.Sprintf("File %d could not be found!", e.ID) }
+
 // Handles the case where the result of a given query is empty
 type ResultSetEmptyError struct{}
 
