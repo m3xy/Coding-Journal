@@ -241,7 +241,6 @@ func loadComments(tx *gorm.DB, c Comment) error {
 		}
 	}
 	return nil
-
 }
 
 // Get file content from filesystem.

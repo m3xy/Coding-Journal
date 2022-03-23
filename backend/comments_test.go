@@ -105,6 +105,7 @@ func TestUploadUserComment(t *testing.T) {
 		// formats the request body to send to the server to add a comment
 		reqBody, err := json.Marshal(&NewCommentPostBody{
 			ParentID:    &commentID,
+			LineNumber:  0,
 			Base64Value: testReply.Base64Value,
 		})
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)

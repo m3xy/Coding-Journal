@@ -54,7 +54,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		message = "No user logged in"
 		w.WriteHeader(http.StatusUnauthorized)
 
-	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil || validate.Struct(req) != nil {
 		message = "Request format is invalid."
 		w.WriteHeader(http.StatusBadRequest)
 		goto RETURN
