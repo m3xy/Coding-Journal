@@ -125,50 +125,55 @@ function Code({id}) {
             <Card.Body>
             <Card.Title>{file.path}</Card.Title>
             <Card.Text>Created: {file.CreatedAt}</Card.Text>
-            <Container fluid>
-                    <Row>
-                        <Col>
-                            <InputGroup size="sm" className="mb-3">
-                                <InputGroup.Text id="inputGroup-sizing-sm">Language: </InputGroup.Text>
-                                <Form.Select defaultValue={language} size="sm" onChange={(e) => { setLanguage(e.target.value) }}>
-                                    <option value="javascript">Javascript</option>
-                                    <option value="html">HTML</option>
-                                    <option value="css">CSS</option>
-                                    <option value="json">JSON</option>
-                                    <option value="java">Java</option>
-                                    <option value="python">Python</option>
-                                </Form.Select>
-                            </InputGroup>
-                        </Col>
-                        <Col>
-                            <InputGroup size="sm" className="mb-3">
-                                <InputGroup.Text id="inputGroup-sizing-sm">Theme: </InputGroup.Text>
-                                <Form.Select size="sm" onChange={(e) => { setTheme(e.target.value) }}>
-                                    <option value="vs">Visual Studio</option>
-                                    <option value="vs-dark">Visual Studio Dark</option>
-                                    <option value="hc-black">High Contrast Dark</option>
-                                </Form.Select>
-                            </InputGroup>
-                        </Col>
-                    </Row>
-                    <Row>
-                        <Comments id={id} comments={comments} setComments={setComments} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
-                    </Row>
-                    <Row>
-                        <Col>
-                            <MonacoEditor
-                                ref={monacoRef}
-                                height="1000"
-                                language={language}
-                                theme={theme}
-                                value={code}
-                                options={options}
-                                onChange={onChange}
-                                editorDidMount={editorDidMount}
-                            />
-                        </Col>
-                    </Row>
-            </Container>
+            {file.path.split(".").pop() !== "pdf" ? 
+                <Container fluid>
+                        <Row>
+                            <Col>
+                                <InputGroup size="sm" className="mb-3">
+                                    <InputGroup.Text id="inputGroup-sizing-sm">Language: </InputGroup.Text>
+                                    <Form.Select defaultValue={language} size="sm" onChange={(e) => { setLanguage(e.target.value) }}>
+                                        <option value="javascript">Javascript</option>
+                                        <option value="html">HTML</option>
+                                        <option value="css">CSS</option>
+                                        <option value="json">JSON</option>
+                                        <option value="java">Java</option>
+                                        <option value="python">Python</option>
+                                    </Form.Select>
+                                </InputGroup>
+                            </Col>
+                            <Col>
+                                <InputGroup size="sm" className="mb-3">
+                                    <InputGroup.Text id="inputGroup-sizing-sm">Theme: </InputGroup.Text>
+                                    <Form.Select size="sm" onChange={(e) => { setTheme(e.target.value) }}>
+                                        <option value="vs">Visual Studio</option>
+                                        <option value="vs-dark">Visual Studio Dark</option>
+                                        <option value="hc-black">High Contrast Dark</option>
+                                    </Form.Select>
+                                </InputGroup>
+                            </Col>
+                        </Row>
+                        <Row>
+                            <Comments id={id} comments={comments} setComments={setComments} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
+                        </Row>
+                        <Row>
+                            <Col>
+                                <MonacoEditor
+                                    ref={monacoRef}
+                                    height="1000"
+                                    language={language}
+                                    theme={theme}
+                                    value={code}
+                                    options={options}
+                                    onChange={onChange}
+                                    editorDidMount={editorDidMount}
+                                />
+                            </Col>
+                        </Row>
+                </Container>
+            :
+                <embed height="1000" width="100%" src={"data:application/pdf;base64," + file.base64Value} />
+            }
+                
             </Card.Body>
             <Card.Footer className="text-muted">Last updated: {file.UpdatedAt}</Card.Footer>
         </Card>
