@@ -16,7 +16,7 @@ export default ({ query, display }) => {
 				params: query
 			})
 			.then((response) => {
-				if (response.data.hasOwnProperty(submissions))
+				if (response.data.hasOwnProperty("submissions"))
 					setSubmissionsFromPrimitives(response.data.submissions)
 			})
 			.catch((err) => {
@@ -31,10 +31,10 @@ export default ({ query, display }) => {
 			axiosInstance
 				.get("/submission/" + submission.ID)
 				.then((response) => {
+					setAuthorsNotFetched(response.data.authors)
 					setSubmissions((submissions) => {
 						return [...submissions, response.data]
 					})
-					setAuthorsNotFetched(response.data.authors)
 				})
 				.catch((err) => {
 					console.log(err)
@@ -44,23 +44,23 @@ export default ({ query, display }) => {
 
 	// Get authors from their IDs.
 	const setAuthorsNotFetched = (authors) => {
-		localAuthors = {}
 		authors.map((author) => {
-			if (!localAuthors.hasOwnProperty(author.userId)) {
+			if (!authors.hasOwnProperty(author.userId)) {
 				axiosInstance
 					.get("/user/" + author.userId)
 					.then((response) => {
-						localAuthors = {
-							...localAuthors,
-							[author.userId]: response.data
-						}
+						setAuthors((authors) => {
+							return {
+								...authors,
+								[author.userId]: response.data
+							}
+						})
 					})
 					.catch((err) => {
 						console.log(err)
 					})
 			}
 		})
-		setAuthors(localAuthors)
 	}
 
 	const getBadge = (submission) => {

@@ -21,7 +21,7 @@ import {
 	About,
 	Contact,
 	Footer,
-	Code,
+	Submission,
 	Home,
 	Upload,
 	Profile,
@@ -40,12 +40,12 @@ function App() {
 					<Route path="/login" element={<Login />} />
 					<Route path="/register" element={<Register />} />
 					<Route path="/about" element={<About />} />
-					<Route path="/code" element={<Code />} />
+					<Route path="/code" element={<Submission />} />
 					<Route path="/comment" element={<Comment />} />
 					<Route path="/contact" element={<Contact />} />
 					<Route path="/upload" element={<Upload />} />
 					<Route path="/profile" element={<Profile />} />
-					<Route path="/submission/:id" element={<Code />} />
+					<Route path="/submission/:id" element={<Submission />} />
 					<Route path="/submissions" element={<Submissions />} />
 				</Routes>
 				<Footer />

@@ -11,7 +11,7 @@ import JwtService from "./jwt.service"
 // Axios instance used for making needed requests.
 const axiosInstance = axios.create({
 	baseURL: process.env.BACKEND_ADDRESS,
-	timeout: 1000,
+	timeout: 4000,
 	headers: {
 		"Content-Type": "application/json"
 	}

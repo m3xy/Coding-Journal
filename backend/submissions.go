@@ -72,7 +72,7 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submissions/create - Create a submissions
 	submissions.HandleFunc(ENDPOINT_GET_TAGS, GetAvailableTags).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmissionByZip).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ------
@@ -128,7 +128,7 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
 		stdResp = StandardResponse{Message: "Bad Request Context", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
-	// gets the ordered list of submissions
+		// gets the ordered list of submissions
 	} else if submissions, err = ControllerQuerySubmissions(r.URL.Query(), ctx); err != nil {
 		switch err.(type) {
 		case *BadQueryParameterError:
@@ -234,6 +234,7 @@ func filterByName(tx *gorm.DB, submissionName string) *gorm.DB {
 	}
 	return tx.Where(whereString, params)
 }
+
 // adds a piece to an sql query to order the results
 func orderSubmissionQuery(tx *gorm.DB, orderBy string) *gorm.DB {
 	// order of submissions
@@ -246,23 +247,23 @@ func orderSubmissionQuery(tx *gorm.DB, orderBy string) *gorm.DB {
 	}
 	return tx
 }
+
 // adds usertype filters to a submission query
 func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
 	if ctx.UserType == USERTYPE_PUBLISHER {
 		tx = tx.Where("approved = ? OR id IN (?)", true,
 			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
 	} else if ctx.UserType == USERTYPE_REVIEWER {
-		tx = tx.Where("approved = ? OR id IN (?)", true, 
+		tx = tx.Where("approved = ? OR id IN (?)", true,
 			gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
 	} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
-		tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true, 
+		tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true,
 			gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
 			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
 	}
 	// note editors can see all submissions and hence no filter is added for editors
 	return tx
 }
-
 
 // Router function to get the names and id's of every submission of a given user
 // if no user id is given in the query parameters, return all valid submissions
