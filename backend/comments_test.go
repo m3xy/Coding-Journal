@@ -54,9 +54,6 @@ func TestUploadUserComment(t *testing.T) {
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
 	testSubmission := testSubmissions[0]
-	// testAuthor := testAuthors[1] // author of the comment
-	// testComment := testComments[0]
-	// testReply := testComments[1]
 
 	// Register test users.
 	globalAuthors, globalReviewers, err := initMockUsers(t)
@@ -66,12 +63,12 @@ func TestUploadUserComment(t *testing.T) {
 
 	// Add submission, and test file linked to submission.
 	testSubmission.Authors = globalAuthors[:1]
-	submissionID, err := addSubmission(&testSubmission)
-	assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err)
-	fileID, err := addFileTo(&testFile, submissionID)
-	if !assert.NoErrorf(t, err, "error occurred while adding test file: %v", err) {
-		return
-	}
+	testSubmission.Files = []File{testFile}
+	_, err = addSubmission(&testSubmission)
+	if !assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err) { return }
+	// gets the file ID from the files table
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
+	fileID := testFile.ID
 
 	// clears the comments for the test file
 	clearComments := func() {
@@ -237,17 +234,13 @@ func TestAddComment(t *testing.T) {
 	}
 	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
-	// Create submission with given reviewer and author.
-	submissionID, err := addSubmission(&testSubmission)
-	if !assert.NoErrorf(t, err, "failed to add submission: %v", err) {
-		return
-	}
-
-	// Create file and add it to the submission.
-	fileID, err := addFileTo(&testFile, submissionID)
-	if !assert.NoErrorf(t, err, "failed to add file to submission: %v", err) {
-		return
-	}
+	// Add submission, and test file linked to submission.
+	testSubmission.Files = []File{testFile}
+	_, err = addSubmission(&testSubmission)
+	if !assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err) { return }
+	// gets the file ID from the files table
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
+	fileID := testFile.ID
 
 	// adds a test user to author a comment
 	commentAuthorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)

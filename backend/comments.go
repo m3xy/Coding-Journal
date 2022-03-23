@@ -84,7 +84,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 //	(uint) : the id of the added comment
 //	(error) : an error if one occurs, nil otherwise
 func addComment(comment *Comment) (uint, error) {
-	// Check parameters.
+	// Check parameters
 	if comment == nil {
 		return 0, errors.New("Comment cannot be nil")
 	} else if comment.AuthorID == "" {
