@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Form, Modal, Toast } from 'react-bootstrap';
 import axiosInstance from '../Web/axiosInstance';
 import JwtService from "../Web/jwt.service";
@@ -7,16 +7,16 @@ import Comment from "./Comment"
 const fileEndpoint = '/file'
 const commentEndpoint = '/comment'
 
-function Comments({id, comments, setComments, line, show, setShow}) {
+function Comments({id, comments, setComments, line, show, setShow, getFile}) {
 
 	const [text, setText] = useState("");
 	const [showComment, setShowComment] = useState(true);
 	const [isLoading, setLoading] = useState(false);
 
-	const postComment = (e, parentID, comment) => {
+	const postComment = (e, parentID, content, line) => {
 		e.preventDefault();
 
-		if (comment == null || comment == "") {
+		if (content == null || content == "") {
 			console.log("No comment written");
 			return;
 		}
@@ -27,17 +27,19 @@ function Comments({id, comments, setComments, line, show, setShow}) {
 			return;
 		}
 
-		// authorId: userId - Should have author?
-		// fileId: file.ID
-		let data = {
-			parentId:parentID,
-			base64Value: btoa(comment)
+		let comment = {
+			parentId: parentID,
+			base64Value: btoa(content),
+			lineNumber: line,
+			author: userId
 		}
-		console.log(data);
-		axiosInstance.post(fileEndpoint + "/" + id + commentEndpoint, data)
+		console.log(comment);
+		axiosInstance.post(fileEndpoint + "/" + id + commentEndpoint, comment)
 					.then((response) => {
 						console.log(response);
-						document.getElementById("CommentText").value = "";
+						getFile();
+						// setComments(comments => [...comments, comment]);
+						// document.getElementById("CommentText").value = "";
 					})
 					.catch((error) => {
 						console.log(error);
@@ -51,22 +53,24 @@ function Comments({id, comments, setComments, line, show, setShow}) {
 		setTimeout(() => {setLoading(false)}, 1000)
 	}
 
-	const commentsHTML = comments.map((comment) => {
-		return (<Comment 
-					ID={comment.ID} 
-					author={comment.author} 
-					line={comment.line} 
-					b64={comment.base64Value} 
-					replies={comment.replies} 
-					show={showComment} 
-					setShow={setShowComment} 
-					replyLine={line} 
-					postReply={postComment}/>)
-	})
+	const commentsHTML = comments !== undefined ? 
+		comments.map((comment) => {
+			return (<Comment 
+						ID={comment.ID} 
+						author={comment.author} 
+						line={comment.lineNumber} 
+						b64={comment.base64Value} 
+						replies={comment.comments} 
+						show={showComment} 
+						setShow={setShowComment} 
+						replyLine={line} 
+						postReply={postComment}/>)
+		})
+		: ""
 
 	return (
 		<Modal show={show} onHide={() => setShow(false)} size="lg">
-			<Form onSubmit={(e) => {setText(""); postComment(e, null, text)}}>
+			<Form onSubmit={(e) => {setText(""); postComment(e, null, text, line)}}>
 				<Modal.Header closeButton>
 					<Modal.Title>Comments</Modal.Title>
 				</Modal.Header>

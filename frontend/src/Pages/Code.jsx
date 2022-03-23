@@ -7,7 +7,7 @@
 
 import React, {useState, useEffect, useRef} from "react";
 import axiosInstance from "../Web/axiosInstance";
-import {Container, Row, Col, Form, InputGroup, Card} from "react-bootstrap"
+import {Container, Row, Col, Form, InputGroup, Card, Button} from "react-bootstrap"
 import MonacoEditor from 'react-monaco-editor';
 import Comments from "./Comments";
 
@@ -24,34 +24,35 @@ function Code({id}) {
     const [lineNumber, setLineNumber] = useState(1);
 
     const [comments, setComments] = useState([
-		{base64Value: "TG9va3MgZ29vZCE=", line:1, ID:0, author: "John Doe", replies:[
-			{base64Value: "SSBkaXNhZ3JlZS4=", line:1, ID:1, author: "Jane Doe", replies:[
-				{base64Value: "SSBoYXZlIDUwMCBtb3JlIGNpdGF0aW9ucyB0aGFuIGJvdGggb2YgeW91LCBJIGNhbiBhc3N1cmUgeW91LCB0aGlzIGNvZGUgaXMgbWVkaW9jcmUu", line:1, ID:2, author: "Jim Doe", replies:[]}
+		{base64Value: "TG9va3MgZ29vZCE=", line:1, ID:0, author: "John Doe", comments:[
+			{base64Value: "SSBkaXNhZ3JlZS4=", line:1, ID:1, author: "Jane Doe", comments:[
+				{base64Value: "SSBoYXZlIDUwMCBtb3JlIGNpdGF0aW9ucyB0aGFuIGJvdGggb2YgeW91LCBJIGNhbiBhc3N1cmUgeW91LCB0aGlzIGNvZGUgaXMgbWVkaW9jcmUu", line:1, ID:2, author: "Jim Doe", comments:[]}
 			]}
 		]},
-		{base64Value: "VGhpcyBzZWVtcyBxdWl0ZSBpbmVmZmljaWVudC4=", line:1, ID:4, author: "Joe Doe", replies:[]},
+		{base64Value: "VGhpcyBzZWVtcyBxdWl0ZSBpbmVmZmljaWVudC4=", line:1, ID:4, author: "Joe Doe", comments:[]},
 	])
     const [showComments, setShowComments] = useState(false);
 
     useEffect(() => {
-        if(id == null) return;
+        getFile()
+    }, [id])
 
-        //Get File
+    const getFile = () => {
+        console.log(id);
+        if(id == null || id == -1) return;
         axiosInstance.get(fileEndpoint + "/" + id)
             .then((response) => {
                 console.log(response.data);
 
-                //Set file and code
-                setFile(response.data);
-                setCode(atob(response.data.base64Value));
-
-                //Set comments
-                // setComments(response.data.comments);
+                //Set file, code and comments
+                setFile(response.data.file);
+                setCode(atob(response.data.file.base64Value));
+                setComments(response.data.file.comments);
 
             }).catch((error) => {
                 console.log(error);
             })
-    }, [id])
+    }
 
     const editorDidMount = (editor, monaco) => {
         console.log('editorDidMount', editor);
@@ -115,8 +116,8 @@ function Code({id}) {
 
     const options = {
         selectOnLineNumbers: true,
-        glyphMargin: true
-        // readOnly: true
+        glyphMargin: true,
+        readOnly: true
     };
 
     return(
@@ -153,9 +154,6 @@ function Code({id}) {
                             </Col>
                         </Row>
                         <Row>
-                            <Comments id={id} comments={comments} setComments={setComments} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
-                        </Row>
-                        <Row>
                             <Col>
                                 <MonacoEditor
                                     ref={monacoRef}
@@ -173,7 +171,8 @@ function Code({id}) {
             :
                 <embed height="1000" width="100%" src={"data:application/pdf;base64," + file.base64Value} />
             }
-                
+            <Button variant="dark" onClick={() => setShowComments(!showComments)}>Show comments</Button>
+            <Comments id={id} comments={comments} setComments={setComments} line={lineNumber} show={showComments} setShow={setShowComments} getFile={getFile}></Comments>
             </Card.Body>
             <Card.Footer className="text-muted">Last updated: {file.UpdatedAt}</Card.Footer>
         </Card>

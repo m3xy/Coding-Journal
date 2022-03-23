@@ -36,8 +36,8 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - Given File ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct and validates it
-	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - No user logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
@@ -45,7 +45,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// creates the comment using the given helper method
+		// creates the comment using the given helper method
 	} else if commentID, err := addComment(&Comment{AuthorID: ctx.ID, FileID: uint(fileID64),
 		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber}); err != nil {
 		log.Printf("[ERROR] Comment creation failed: %v", err)

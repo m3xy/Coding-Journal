@@ -6,17 +6,19 @@ function Comment({ID, author, line, b64, replies, show, setShow, replyLine, post
     const [text, setText] = useState("");
     const [showReplies, setShowReplies] = useState(false);
 
-    const repliesHTML = replies.map((reply) => {
+    const repliesHTML = (replies !== undefined ? replies.map((reply) => {
+        console.log(reply);
         return (<Comment 
             ID={reply.ID} 
             author={reply.author}
-            line={reply.line} 
+            line={reply.lineNumber} 
             b64={reply.base64Value} 
-            replies={reply.replies} 
+            replies={reply.comments} 
             show={showReplies} 
             setShow={setShowReplies} 
             postReply={postReply}/>)
     })
+    : "")
 
     return (
         show ? 
@@ -30,9 +32,9 @@ function Comment({ID, author, line, b64, replies, show, setShow, replyLine, post
                     {atob(b64)}<p/>
                     <InputGroup className="mb-3" size="sm">
                         <FormControl placeholder={"Enter a reply (Line: " + replyLine +  ")"} onChange={(e) => setText(e.target.value)} value={text}/>
-                        <Button variant="outline-secondary" onClick={(e) => {setText(""); postReply(e, ID, text)}}>Reply</Button>
+                        <Button variant="outline-secondary" onClick={(e) => {setText(""); postReply(e, ID, text, replyLine)}}>Reply</Button>
                     </InputGroup>
-                    {replies.length !== 0 ? 
+                    {replies !== undefined ? 
                         <Button variant='link' size='sm' onClick={() => setShowReplies(!showReplies)}>{showReplies ? <>Hide Replies</> : <>Show Replies</>}</Button>
                     : <></>}      
                 </Toast.Body> 
