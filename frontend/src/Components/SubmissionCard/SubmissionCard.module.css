@@ -1,0 +1,7 @@
+.SubmissionCard {
+	min-width: 25rem !important;
+	max-width: 25rem !important;
+	margin: 8px;
+	box-shadow: 20px;
+	border-radius: 5px;
+}
