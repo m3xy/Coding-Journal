@@ -49,7 +49,7 @@ func TestUploadUserComment(t *testing.T) {
 	defer testEnd()
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_NEWCOMMENT, PostUploadUserComment)
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
@@ -305,14 +305,14 @@ func TestAddComment(t *testing.T) {
 
 		// checks for equality with comment structure
 		switch {
-		case !assert.Equal(t, fileID, queriedComment.FileID, "file IDs do not match"):
-		case !assert.Equal(t, fileID, queriedReply.FileID, "file IDs do not match"):
-		case !assert.Equal(t, testComment.AuthorID, queriedComment.AuthorID, "Comment author ID mismatch"):
-		case !assert.Equal(t, testReply.AuthorID, queriedReply.AuthorID, "Reply author ID mismatch"):
-		case !assert.Equal(t, testComment.Base64Value, queriedComment.Base64Value, "Comment content does not match"):
-		case !assert.Equal(t, testReply.Base64Value, queriedReply.Base64Value, "Reply content does not match"):
-		case !assert.Empty(t, testComment.ParentID, "ParentID for parent comment is not nil"):
-		case !assert.Equal(t, queriedComment.ID, *queriedReply.ParentID, "ParentID of child comment does not match its parent's ID"):
+		case !assert.Equal(t, fileID, queriedComment.FileID, "file IDs do not match"),
+			!assert.Equal(t, fileID, queriedReply.FileID, "file IDs do not match"),
+			!assert.Equal(t, testComment.AuthorID, queriedComment.AuthorID, "Comment author ID mismatch"),
+			!assert.Equal(t, testReply.AuthorID, queriedReply.AuthorID, "Reply author ID mismatch"),
+			!assert.Equal(t, testComment.Base64Value, queriedComment.Base64Value, "Comment content does not match"),
+			!assert.Equal(t, testReply.Base64Value, queriedReply.Base64Value, "Reply content does not match"),
+			!assert.Empty(t, testComment.ParentID, "ParentID for parent comment is not nil"),
+			!assert.Equal(t, queriedComment.ID, *queriedReply.ParentID, "ParentID of child comment does not match its parent's ID"):
 			return
 		}
 	})

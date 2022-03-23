@@ -22,17 +22,10 @@ import (
 // Router Functions
 // -----------
 
-// upload comment router function. Takes in a POST request and
-// uses it to add a comment to the given file
-//
-// Response Codes:
-// 	200 : comment was added succesfully
-// 	401 : if the request does not have the proper security token
-// 	400 : if the comment was not sent in the proper format
-// 	500 : if something else goes wrong in the backend
-// Response Body: {ID: <comment ID>}
-func uploadUserComment(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
+// upload comment router function.
+// POST /file/{id}/newcomment
+func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] PostUploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 	resp := &NewCommentResponse{}
 	req := &NewCommentPostBody{}
@@ -67,7 +60,7 @@ func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
-		log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
+		log.Printf("[INFO] PostUploadUserComment request from %v successful.", r.RemoteAddr)
 	}
 }
 
