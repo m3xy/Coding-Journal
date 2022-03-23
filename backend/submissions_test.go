@@ -560,7 +560,7 @@ func TestUploadSubmission(t *testing.T) {
 				return false
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       globalAuthors[0].ID,
 				UserType: globalAuthors[0].UserType,
 			})
@@ -610,7 +610,7 @@ func TestUploadSubmission(t *testing.T) {
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			if authed {
-				ctx := context.WithValue(req.Context(), "data", RequestContext{
+				ctx := context.WithValue(req.Context(), "data", &RequestContext{
 					ID:       globalAuthors[0].ID,
 					UserType: globalAuthors[0].UserType,
 				})
@@ -684,7 +684,7 @@ func TestRouteGetSubmission(t *testing.T) {
 		// Create submission, then send request.
 		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
 		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
-		ctx := context.WithValue(r.Context(), "data", RequestContext{
+		ctx := context.WithValue(r.Context(), "data", &RequestContext{
 			ID: globalAuthors[0].ID, UserType: USERTYPE_PUBLISHER})
 		router.ServeHTTP(w, r.WithContext(ctx))
 		resp := w.Result()
@@ -708,7 +708,7 @@ func TestRouteGetSubmission(t *testing.T) {
 	t.Run("Get unapproved submission as editor", func(t *testing.T) {
 		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
 		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
-		ctx := context.WithValue(r.Context(), "data", RequestContext{
+		ctx := context.WithValue(r.Context(), "data", &RequestContext{
 			ID: globalAuthors[1].ID, UserType: USERTYPE_EDITOR})
 		router.ServeHTTP(w, r.WithContext(ctx))
 		resp := w.Result()
@@ -1154,7 +1154,7 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 	route := SUBROUTE_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
 	router := mux.NewRouter()
 	router.HandleFunc(route, PostUploadSubmissionByZip)
-	reqCtx := RequestContext{
+	reqCtx := &RequestContext{
 		ID:       authors[0].ID,
 		UserType: authors[0].UserType,
 	}

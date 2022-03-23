@@ -128,7 +128,7 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
 		stdResp = StandardResponse{Message: "Bad Request Context", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
-		// gets the ordered list of submissions
+
 	} else if submissions, err = ControllerQuerySubmissions(r.URL.Query(), ctx); err != nil {
 		switch err.(type) {
 		case *BadQueryParameterError:
@@ -202,11 +202,7 @@ func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]
 			tx = orderSubmissionQuery(tx, orderBy)
 		}
 		// filters by usertype. If usertype is nil, only show approved submissions
-		if ctx == nil {
-			tx = tx.Where("submissions.approved = ?", true)
-		} else {
-			tx = filterByUserType(tx, ctx)
-		}
+		tx = filterByUserType(tx, ctx)
 
 		// selects fields and gets submissions
 		if res := tx.Select("id, name").Find(&submissions); res.Error != nil {
@@ -250,16 +246,20 @@ func orderSubmissionQuery(tx *gorm.DB, orderBy string) *gorm.DB {
 
 // adds usertype filters to a submission query
 func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
-	if ctx.UserType == USERTYPE_PUBLISHER {
-		tx = tx.Where("approved = ? OR id IN (?)", true,
-			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
-	} else if ctx.UserType == USERTYPE_REVIEWER {
-		tx = tx.Where("approved = ? OR id IN (?)", true,
-			gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
-	} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
-		tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true,
-			gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
-			gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+	if ctx == nil {
+		tx = tx.Where("submissions.approved = ?", true)
+	} else {
+		if ctx.UserType == USERTYPE_PUBLISHER {
+			tx = tx.Where("approved = ? OR id IN (?)", true,
+				gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+		} else if ctx.UserType == USERTYPE_REVIEWER {
+			tx = tx.Where("approved = ? OR id IN (?)", true,
+				gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+		} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
+			tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true,
+				gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
+				gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+		}
 	}
 	// note editors can see all submissions and hence no filter is added for editors
 	return tx
@@ -315,7 +315,7 @@ func PostUploadSubmission(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 
 		// gets context struct
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
 		log.Printf("[ERROR] Could not validate request body")
 		resp.Message = "Request body could not be validated."
 		resp.Error = true
@@ -412,7 +412,7 @@ func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
 		resp.Message = "Could not decode body to correct format - " + err.Error()
 		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok ||
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok ||
 		validate.Struct(ctx) != nil {
 		resp.Message = "The client is unauthorized from making such request - not logged in."
 		resp.Error = true
@@ -510,9 +510,12 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 
 	// submission not approved, can only be displayed for editors, authors or reviewers
 	if submission != nil && (submission.Approved == nil || !*submission.Approved) {
-		if ctx, ok := r.Context().Value("data").(RequestContext); ok && validate.Struct(ctx) != nil {
+		if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
 			encodable = &StandardResponse{Message: "Error getting request context", Error: true}
 			w.WriteHeader(http.StatusBadRequest)
+		} else if ctx == nil {
+			encodable = &StandardResponse{Message: "Non-user cannot view unapproved submission", Error: true}
+			w.WriteHeader(http.StatusUnauthorized)
 		} else if ctx.UserType != USERTYPE_EDITOR {
 			// if the user is not an editor, check that they are either a reviewer or author for the given submission
 			var allowed = false

@@ -252,7 +252,7 @@ func TestExportSubmission(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s/%d", SUBROUTE_SUBMISSIONS,
 			submissionID, ENDPOINT_EXPORT_SUBMISSION, groupNb), nil)
 		w := httptest.NewRecorder()
-		ctx := context.WithValue(req.Context(), "data", *ctxStruct)
+		ctx := context.WithValue(req.Context(), "data", ctxStruct)
 		router.ServeHTTP(w, req.WithContext(ctx))
 		resp := w.Result()
 		return resp
