@@ -37,19 +37,6 @@ var testFiles []File = []File{
 	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
 }
 
-var testComments []*Comment = []*Comment{
-	{
-		AuthorID:    "",
-		Base64Value: "Hello World",
-		Comments:    []Comment{},
-	},
-	{
-		AuthorID:    "",
-		Base64Value: "Goodbye World",
-		Comments:    []Comment{},
-	},
-}
-
 // -----------
 // Router Function Tests
 // -----------

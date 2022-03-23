@@ -34,55 +34,41 @@ import (
 func uploadUserComment(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] uploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
-
-	// Initialise message, response, and parameters.
-	var message string
-	var authorCtx RequestContext
-	var encodable interface{}
+	resp := &NewCommentResponse{}
 	req := &NewCommentPostBody{}
 
 	// Check function parameters in path and body.
 	fileID64, err := strconv.ParseUint(mux.Vars(r)["id"], 10, 32)
 	if err != nil {
-		message = "File ID given is not a number."
+		resp.StandardResponse = StandardResponse{Message: "Bad Request - Given File ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
-		goto RETURN
 
-		// gets context struct and validates it
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
-		authorCtx = ctx
-		message = "No user logged in"
+	// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp.StandardResponse = StandardResponse{Message: "Bad Request - No user logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
 	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil || validate.Struct(req) != nil {
-		message = "Request format is invalid."
+		resp.StandardResponse = StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
-		goto RETURN
-	}
 
-	// Get author ID from request, and add comment.
-	if commentID, err := addComment(&Comment{
-		AuthorID: authorCtx.ID, FileID: uint(fileID64),
-		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber,
-	}); err != nil {
-		message = "Comment creation failed."
+	// creates the comment using the given helper method
+	} else if commentID, err := addComment(&Comment{AuthorID: ctx.ID, FileID: uint(fileID64),
+		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber}); err != nil {
+		log.Printf("[ERROR] Comment creation failed: %v", err)
+		resp.StandardResponse = StandardResponse{Message: "Internal Server Error - Comment creation failed.", Error: true}
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
-		encodable = NewCommentResponse{ID: commentID}
-		goto RETURN
+		resp.ID = commentID
 	}
 
-RETURN:
 	// Encode response - set as error if empty
-	if encodable == nil {
-		encodable = StandardResponse{Message: message, Error: true}
-	} else if err := json.NewEncoder(w).Encode(encodable); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
 		log.Printf("[INFO] uploadUserComment request from %v successful.", r.RemoteAddr)
 	}
-	return
 }
 
 // -----------
