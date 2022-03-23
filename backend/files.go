@@ -167,12 +167,15 @@ func getFileData(fileID uint) (*File, error) {
 			Find(&comments, "file_id = ?", fileID).Error; err != nil {
 			return err
 		}
+		var err error
+		fileComments := []Comment{}
 		for _, comment := range comments {
-			if err := loadComments(tx, comment); err != nil {
+			if comment.Comments, err = loadComments(tx, &comment); err != nil {
 				return err
 			}
+			fileComments = append(fileComments, comment)
 		}
-		file.Comments = comments
+		file.Comments = fileComments
 
 		// queries the submission name
 		if err := gormDb.Select("Name, ID, created_at").Find(submission, file.SubmissionID).Error; err != nil {
@@ -195,23 +198,32 @@ func getFileData(fileID uint) (*File, error) {
 	return file, nil
 }
 
+
 // Recursive functions for loading comment replies.
 // 
 // Params:
 // 	tx (*gorm.DB) - A gorm.DB instance to be query on (as this is used in transactions only)
 // 	c (Comment) - the comment to get the children of
 // Returns:
+// 	([]Commment) - c's list of child comments
 // 	(error) - an error if one occurs
-func loadComments(tx *gorm.DB, c Comment) error {
-	for _, child := range c.Comments {
-		if err := tx.Preload("Comments").Order("created_at desc").
-			Where("comments.parent_id = ?", c.ID).Find(&child).Error; err != nil {
-			return err
-		} else if err := loadComments(tx, child); err != nil {
-			return err
+func loadComments(tx *gorm.DB, c *Comment) ([]Comment, error) {
+	// gets c's child comments as an array
+	var err error
+	childArray := []Comment{} // array of child comments
+	if err = tx.Model(&Comment{}).Where("parent_id = ?", c.ID).Find(&childArray).Error; err != nil {
+		return nil, err
+	}
+	// array of child comments with their nested comments to allow for memory re-alloc (so that nesting is preserved)
+	nestedChildArray := []Comment{}
+	for _, child := range childArray {
+		if child.Comments, err = loadComments(tx, &child); err != nil {
+			return nil, err
+		} else {
+			nestedChildArray = append(nestedChildArray, child)
 		}
 	}
-	return nil
+	return nestedChildArray, nil
 }
 
 // Get base64 encoded file content from filesystem.
