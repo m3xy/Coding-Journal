@@ -27,19 +27,20 @@ export default ({ query, display }) => {
 
 	// Get submission details from their basic types.
 	const setSubmissionsFromPrimitives = (submissionPrimitives) => {
-		submissionPrimitives.map((submission) => {
-			axiosInstance
-				.get("/submission/" + submission.ID)
-				.then((response) => {
-					setAuthorsNotFetched(response.data.authors)
-					setSubmissions((submissions) => {
-						return [...submissions, response.data]
+		if (submissionPrimitives !== null)
+			submissionPrimitives.map((submission) => {
+				axiosInstance
+					.get("/submission/" + submission.ID)
+					.then((response) => {
+						setAuthorsNotFetched(response.data.authors)
+						setSubmissions((submissions) => {
+							return [...submissions, response.data]
+						})
 					})
-				})
-				.catch((err) => {
-					console.log(err)
-				})
-		})
+					.catch((err) => {
+						console.log(err)
+					})
+			})
 	}
 
 	// Get authors from their IDs.
