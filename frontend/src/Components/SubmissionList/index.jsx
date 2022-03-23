@@ -65,21 +65,14 @@ export default ({ query, display }) => {
 	}
 
 	const getBadge = (submission) => {
+		const [bg, text] = submission.approved
+			? ["primary", "Approved"]
+			: submission.approved === null
+			? ["secondary", "In review"]
+			: ["danger", "Rejected"]
 		return (
-			<Badge
-				bg={
-					submission.approved
-						? "primary"
-						: submission.approved === null
-						? "secondary"
-						: "danger"
-				}
-				pill>
-				{submission.approved
-					? "Approved"
-					: submission.approved === null
-					? "In review"
-					: "Rejected"}
+			<Badge bg={bg} pill>
+				{text}
 			</Badge>
 		)
 	}
