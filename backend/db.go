@@ -108,9 +108,8 @@ type File struct {
 	gorm.Model
 	SubmissionID uint   `json:"submissionId"` // foreign key linking files and submissions tables
 	Path         string `json:"path"`         // this path is relative from submission root
-	// Name string `json:"name"`
 
-	// association to other tables
+	// association to comments table
 	Comments []Comment `json:"comments,omitempty"`
 
 	// stored in filesystem
@@ -144,52 +143,6 @@ type Category struct {
 
 	CreatedAt time.Time `json:"-"`
 	DeletedAt time.Time `json:"-"`
-}
-
-// ---- Supergroup Data Structures ----
-
-// Supergroup compliant user type
-type SupergroupUser struct {
-	GlobalUserID string `json:"id"`
-	Email        string `json:"email"`
-	FirstName    string `json:"firstName"`
-	LastName     string `json:"lastName"`
-	PhoneNumber  string `json:"phoneNumber"`
-	Organization string `json:"organization"`
-}
-
-// Supergroup compliant code submissions (never stored in db)
-type SupergroupSubmission struct {
-	Name         string                   `json:"name"`
-	MetaData     SupergroupSubmissionData `json:"metadata"`
-	CodeVersions []SupergroupCodeVersion  `json:"codeVersions"`
-}
-
-// supergroup compliant structure for meta-data of the submission
-type SupergroupSubmissionData struct {
-	CreationDate time.Time `json:"creationDate"`
-	Abstract     string    `json:"abstract"`
-	License      string    `json:"license"`
-
-	Categories []string           `json:"categories"`
-	Authors    []SuperGroupAuthor `json:"authors"`
-}
-
-type SuperGroupAuthor struct {
-	ID      string `json:"userId"`
-	Journal string `json:"journal"`
-}
-
-// struct to store a supergroup compliant version of a submission
-type SupergroupCodeVersion struct {
-	TimeStamp time.Time        `json:"timestamp"`
-	Files     []SupergroupFile `json:"files"`
-}
-
-// Supergroup compliant file structure (never stored in db)
-type SupergroupFile struct {
-	Name        string `json:"filename"` // actually a file path not basename
-	Base64Value string `json:"base64Value"`
 }
 
 // ---- Database and reflect utilities ----

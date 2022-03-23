@@ -14,7 +14,7 @@ const (
 // request context object for logged in users
 type RequestContext struct {
 	ID       string `validate:"required"`
-	UserType int    `validate:"required"`
+	UserType int    `validate:"oneof=0 1 2 3 4"` // matches the 5 user types
 }
 
 // Middleware for user authentication and security key verification.

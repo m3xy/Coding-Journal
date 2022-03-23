@@ -544,7 +544,6 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Print("[INFO] success\n")
-	return
 }
 
 // Compresses a given submission and returns it to the frontend to be downloaded

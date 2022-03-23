@@ -1,24 +1,11 @@
-// ================================================================================
+// =================================================================
 // files.go
 // Authors: 190010425, 190014935
 // Created: November 23, 2021
 //
 // This file handles reading/writing code files along with their
 // data.
-//
-// The directory structure for the filesystem is as follows:
-//
-// Submission ID (as stored in db submissions table)
-// 	> <submission_name>/ (as stored in the submissions table)
-// 		... (submission directory structure)
-// 	> .data/
-// 		> submission_data.json
-// 		... (submission directory structure)
-// notice that in the filesystem, the .data dir structure mirrors the
-// submission, so that each file in the submission can have a .json file storing
-// its data which is named in the same way as the source code (the only difference
-// being the extension)
-// ================================================================================
+// =================================================================
 
 package main
 
@@ -44,12 +31,10 @@ const (
 	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories
 	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
-	// Subroutes and endpoints for files
 	SUBROUTE_FILE       = "/file"
 	ENDPOINT_NEWFILE    = "/upload"
 	ENDPOINT_NEWCOMMENT = "/comment"
 
-	// File Mode Constants
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for submission files
 )
@@ -61,82 +46,61 @@ func getFilesSubRoutes(r *mux.Router) {
 	// File subroutes:
 	// + GET /file/{id} - Get given file.
 	// + POST /file/{id}/comment - Post a new comment
-	files.HandleFunc("/{id}", getFile).Methods(http.MethodGet)
-	files.HandleFunc("/{id}"+ENDPOINT_NEWCOMMENT, uploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}", GetFile).Methods(http.MethodGet)
+	files.HandleFunc("/{id}"+ENDPOINT_NEWCOMMENT, PostUploadUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
-
-// -----
-// Router functions
-// -----
 
 // Get the path to the submissions directory.
 func getSubmissionDirectoryPath(s Submission) string {
 	return filepath.Join(FILESYSTEM_ROOT, fmt.Sprintf("%d-%d", s.ID, s.CreatedAt.Unix()))
 }
 
-// Retrieve code files from filesystem. Returns
-// file with comments and metadata. Recieves a request
-// with a file ID as a URL parameter
-//
-// Response Codes:
-// 	200 : File exists, retrieved successfully
-// 	401 : if the request does not have the proper security token
-// 	400 : malformatted request, or non-existent file ID
-// 	500 : if something else goes wrong in the backend
-// Response Body:
-// 	file: object
-// 		ID: uint
-//		CreatedAt: string
-// 		UpdatedAt: string
-// 		DeletedAt: string
-// 		FilePath: string
-// 		FileName: string
-// 		SubmissionID: int
-// 		Base64Value: string
-// 		Comments: array
-// 			Comment: object
-// 				author: int
-// 				CreatedAt: datetime string
-// 				base64Value: string
-// 				comments: array of objects (same as comments)
-func getFile(w http.ResponseWriter, r *http.Request) {
+// -----
+// Router functions
+// -----
+
+// Returns file with comments and metadata.
+// GET /file/{id}
+func GetFile(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
+	var err error
+	resp := &GetFileResponse{}
 
 	// gets the fileID from the URL parameters as uint. Must unwrap from uint64
 	params := mux.Vars(r)
 	fileID64, err := strconv.ParseUint(params["id"], 10, 32) // specifies width as 32
 	if err != nil {
-		log.Printf("[ERROR] FileID: %s unable to be parsed", params["id"])
-		w.WriteHeader(http.StatusBadRequest) // TODO: maybe use GOTO here
-		return
-	}
-	fileID := uint(fileID64) // gets uint from uint64
+		resp.StandardResponse = StandardResponse{Message: "Bad Request - file ID unable to be parsed", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
 
-	// gets the file data from the db and filesystem
-	file, err := getFileData(fileID)
-	if err != nil {
-		log.Printf("[ERROR] unable to get file data: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	// calls helper function to get the file struct for the given ID
+	} else if resp.File, err = getFileData(uint(fileID64)); err != nil {
+		switch err.(type) {
+		case *FileNotFoundError:
+			resp.StandardResponse = StandardResponse{Message: "Bad Request - no file exists for the given ID", Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		default:
+			resp.StandardResponse = StandardResponse{Message: "Internal Server Error - undisclosed", Error: true}
+			log.Printf("[ERROR] unable to get file data: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 
-	// writes JSON data for the file to the HTTP connection if no error has occured
-	response, err := json.Marshal(file)
-	if err != nil {
-		log.Printf("[ERROR] JSON formatting failed: %v", err)
+	// Encode response - set as error if empty
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+	} else {
+		log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
 	}
-	log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
-	w.Write(response)
 }
 
 // -----
 // Helper Functions
 // -----
 
-// Add file into submission, and store it to filesystem and database
+// Add file to submission, and store it in filesystem and database
 // Note: Need valid submission. No comments exist on file
 // creation.
 //
@@ -191,11 +155,12 @@ func getFileData(fileID uint) (*File, error) {
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// queries the file from the database
 		file.ID = fileID
-		if err := gormDb.Model(file).Find(file).Error; err != nil {
-			return err
+		if res := gormDb.Model(file).Find(file); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected == 0 {
+			return &FileNotFoundError{ID: fileID}
 		}
-		// gets the file comments
-		// Order comments by newest.
+		// gets the file comments ordered by newest.
 		var comments []Comment
 		if err := gormDb.Model(&Comment{}).Order("created_at desc").
 			Preload("Comments").Where("comments.parent_id IS NULL").
@@ -230,7 +195,13 @@ func getFileData(fileID uint) (*File, error) {
 	return file, nil
 }
 
-// Recursive functions for loading replies.
+// Recursive functions for loading comment replies.
+// 
+// Params:
+// 	tx (*gorm.DB) - A gorm.DB instance to be query on (as this is used in transactions only)
+// 	c (Comment) - the comment to get the children of
+// Returns:
+// 	(error) - an error if one occurs
 func loadComments(tx *gorm.DB, c Comment) error {
 	for _, child := range c.Comments {
 		if err := tx.Preload("Comments").Order("created_at desc").
@@ -241,10 +212,10 @@ func loadComments(tx *gorm.DB, c Comment) error {
 		}
 	}
 	return nil
-
 }
 
-// Get file content from filesystem.
+// Get base64 encoded file content from filesystem.
+//
 // Params:
 // 	filePath (string): an absolute path to the file
 // Returns:
@@ -260,7 +231,12 @@ func getFileContent(filePath string) (string, error) {
 }
 
 // Unzip a zip file into a file array, from the zip's base 64.
-// Returns the array of files.
+//
+// Params:
+// 	base64value (string) : the base64 value of the entire zip file
+// Returns:
+// 	([]File) : the file array contained within the zip
+// 	(error) : and error if one occurs
 func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 	// Decode zip to temporary file for reading.
 	var reader *zip.ReadCloser
@@ -294,6 +270,12 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 }
 
 // Unzip a file to some temporary folder. Returns folder path.
+// 
+// Params:
+// 	base64value (string) : the base64 encoded value of the entire zip file
+// Returns:
+// 	(string) : the path to the file
+// 	(error) : an error if one occurs
 func TmpStoreZip(base64value string) (string, error) {
 	zipBytes, err := base64.StdEncoding.DecodeString(base64value)
 
