@@ -108,9 +108,8 @@ type File struct {
 	gorm.Model
 	SubmissionID uint   `json:"submissionId"` // foreign key linking files and submissions tables
 	Path         string `json:"path"`         // this path is relative from submission root
-	// Name string `json:"name"`
 
-	// association to other tables
+	// association to comments table
 	Comments []Comment `json:"comments,omitempty"`
 
 	// stored in filesystem

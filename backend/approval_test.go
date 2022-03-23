@@ -26,7 +26,6 @@ import (
 // ------------
 
 func TestPostAssignReviewers(t *testing.T) {
-	// wipes the database and filesystem
 	testInit()
 	defer testEnd()
 
