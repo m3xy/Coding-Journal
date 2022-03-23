@@ -2,24 +2,19 @@ import React, { useState } from 'react';
 import { Button, Form, Modal, Toast } from 'react-bootstrap';
 import axiosInstance from '../Web/axiosInstance';
 import JwtService from "../Web/jwt.service";
+import Comment from "./Comment"
 
 const fileEndpoint = '/file'
 const commentEndpoint = '/comment'
 
-function Comments(props) {
+function Comments({id, comments, setComments, line, show, setShow}) {
 
-	const [show, setShow] = useState(false);
-	const [comments, setComments] = useState({
-		1:[ {submissionId: null, filePath: null, author: "John Doe", base64Value: "Looks Good!"}, 
-			{submissionId: null, filePath: null, author: "Jane Doe", base64Value: "I disagree."},
-			{submissionId: null, filePath: null, author: "Jim Doe", base64Value: "I have 500 more citations than both of you, I can assure you, this code is mediocre."}
-		  ]
-	});
+	const [text, setText] = useState("");
+	const [showComment, setShowComment] = useState(true);
 	const [isLoading, setLoading] = useState(false);
 
-	const postComment = (e) => {
+	const postComment = (e, parentID, comment) => {
 		e.preventDefault();
-		let comment = document.getElementById("CommentText").value;
 
 		if (comment == null || comment == "") {
 			console.log("No comment written");
@@ -35,11 +30,11 @@ function Comments(props) {
 		// authorId: userId - Should have author?
 		// fileId: file.ID
 		let data = {
-			parentId:null,
+			parentId:parentID,
 			base64Value: btoa(comment)
 		}
 		console.log(data);
-		axiosInstance.post(fileEndpoint + "/" + props.id + commentEndpoint, data)
+		axiosInstance.post(fileEndpoint + "/" + id + commentEndpoint, data)
 					.then((response) => {
 						console.log(response);
 						document.getElementById("CommentText").value = "";
@@ -56,24 +51,22 @@ function Comments(props) {
 		setTimeout(() => {setLoading(false)}, 1000)
 	}
 
-	const commentsHTML = Object.entries(comments).map((line, i) => {
-		return line[1].map((comment, j) => {
-			return (
-				<Toast className="d-inline-block m-1" key={i + ":" + j}>
-					<Toast.Header closeButton={false}>
-						{/* <img src="holder.js/20x20?text=%20" className="rounded me-2" alt="" /> */}
-						<strong className="me-auto">{comment.author}</strong>
-						<small>{"Line: " + line[0]}</small>
-					</Toast.Header>
-					<Toast.Body>{comment.base64Value}</Toast.Body>
-				</Toast>
-			);
-		})
+	const commentsHTML = comments.map((comment) => {
+		return (<Comment 
+					ID={comment.ID} 
+					author={comment.author} 
+					line={comment.line} 
+					b64={comment.base64Value} 
+					replies={comment.replies} 
+					show={showComment} 
+					setShow={setShowComment} 
+					replyLine={line} 
+					postReply={postComment}/>)
 	})
 
 	return (
-		<Modal show={props.show} onHide={() => props.setShow(false)} size="lg">
-			<Form onSubmit={postComment}>
+		<Modal show={show} onHide={() => setShow(false)} size="lg">
+			<Form onSubmit={(e) => {setText(""); postComment(e, null, text)}}>
 				<Modal.Header closeButton>
 					<Modal.Title>Comments</Modal.Title>
 				</Modal.Header>
@@ -87,12 +80,12 @@ function Comments(props) {
 					<br />
 					<Form.Group className="mb-3" controlId="CommentText">
 						<Form.Label>Enter a comment below:</Form.Label>
-						<Form.Control as="textarea" rows={3} aria-describedby="lineNumber"/>
-						<Form.Text id="lineNumber" muted>(Line: {props.line})</Form.Text>
+						<Form.Control as="textarea" rows={3} aria-describedby="lineNumber" onChange={(e) => {setText(e.target.value)}} value={text}/>
+						<Form.Text id="lineNumber" muted>(Line: {line})</Form.Text>
 					</Form.Group>              
 				</Modal.Body>
 				<Modal.Footer>
-					<Button variant="secondary" onClick={() => props.setShow(false)}>
+					<Button variant="secondary" onClick={() => setShow(false)}>
 						Close
 					</Button>
 					<Button variant="primary" type="submit">

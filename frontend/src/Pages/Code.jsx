@@ -22,6 +22,15 @@ function Code({id}) {
     const [theme, setTheme] = useState('vs');
     const [language, setLanguage] = useState('javascript');
     const [lineNumber, setLineNumber] = useState(1);
+
+    const [comments, setComments] = useState([
+		{base64Value: "TG9va3MgZ29vZCE=", line:1, ID:0, author: "John Doe", replies:[
+			{base64Value: "SSBkaXNhZ3JlZS4=", line:1, ID:1, author: "Jane Doe", replies:[
+				{base64Value: "SSBoYXZlIDUwMCBtb3JlIGNpdGF0aW9ucyB0aGFuIGJvdGggb2YgeW91LCBJIGNhbiBhc3N1cmUgeW91LCB0aGlzIGNvZGUgaXMgbWVkaW9jcmUu", line:1, ID:2, author: "Jim Doe", replies:[]}
+			]}
+		]},
+		{base64Value: "VGhpcyBzZWVtcyBxdWl0ZSBpbmVmZmljaWVudC4=", line:1, ID:4, author: "Joe Doe", replies:[]},
+	])
     const [showComments, setShowComments] = useState(false);
 
     useEffect(() => {
@@ -35,6 +44,10 @@ function Code({id}) {
                 //Set file and code
                 setFile(response.data);
                 setCode(atob(response.data.base64Value));
+
+                //Set comments
+                // setComments(response.data.comments);
+
             }).catch((error) => {
                 console.log(error);
             })
@@ -139,7 +152,7 @@ function Code({id}) {
                         </Col>
                     </Row>
                     <Row>
-                        <Comments id={id} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
+                        <Comments id={id} comments={comments} setComments={setComments} line={lineNumber} show={showComments} setShow={setShowComments}></Comments>
                     </Row>
                     <Row>
                         <Col>
