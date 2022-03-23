@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react"
 import styles from "./Submission.module.css"
 import axiosInstance from "../../Web/axiosInstance"
 import { useParams, useNavigate } from "react-router-dom"
+import { CSSTransition, SwitchTransition } from "react-transition-group"
+import FadeInTransition from "../../Components/Transitions/FadeIn.module.css"
 import { Abstract, FileViewer } from "./Children"
 import { Badge, Card, Button, Collapse } from "react-bootstrap"
 
@@ -93,17 +95,28 @@ function Submission() {
 
 	return (
 		<div className={styles.SubmissionContainer}>
-			{showFile ? (
-				<div style={{ display: "flex" }}>
-					<p>{getBadge()}</p>
-					<h5 style={{ marginLeft: "15px" }}>{submission.name}</h5>
-				</div>
-			) : (
-				<div style={{ display: "flex" }}>
-					<h2>{getBadge()}</h2>
-					<h1 style={{ marginLeft: "15px" }}>{submission.name}</h1>
-				</div>
-			)}
+			<SwitchTransition>
+				<CSSTransition
+					key={!showFile}
+					timeout={100}
+					classNames={{ ...FadeInTransition }}>
+					{showFile ? (
+						<div style={{ display: "flex" }}>
+							<p>{getBadge()}</p>
+							<h5 style={{ marginLeft: "15px" }}>
+								{submission.name}
+							</h5>
+						</div>
+					) : (
+						<div style={{ display: "flex" }}>
+							<h2>{getBadge()}</h2>
+							<h1 style={{ marginLeft: "15px" }}>
+								{submission.name}
+							</h1>
+						</div>
+					)}
+				</CSSTransition>
+			</SwitchTransition>
 			<Collapse in={!showFile}>
 				<div className="text-muted">
 					<h5>

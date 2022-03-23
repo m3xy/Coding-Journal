@@ -70,8 +70,6 @@ func getAuthSubRoutes(r *mux.Router) {
   		Returns: { message: string, error: bool }
 */
 func PostAuthLogIn(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received Auth Log-In request from %s.", r.RemoteAddr)
-
 	// Check if the body's correctly formed.
 	var credentials AuthLoginPostBody
 	var encodable interface{}
@@ -312,7 +310,6 @@ func createToken(ID string, userType int, scope string) (string, error) {
   Failure: 400, bad request
 */
 func signUp(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received sign up request from %s.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
