@@ -80,7 +80,7 @@ func TestPostAssignReviewers(t *testing.T) {
 			submissionID, ENDPOINT_ASSIGN_REVIEWERS), bytes.NewBuffer(reqBody))
 		w := httptest.NewRecorder()
 
-		ctx := context.WithValue(req.Context(), "data", *ctxStruct)
+		ctx := context.WithValue(req.Context(), "data", ctxStruct)
 		router.ServeHTTP(w, req.WithContext(ctx))
 		resp := w.Result()
 
@@ -216,7 +216,7 @@ func TestUploadReview(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       globalReviewers[0].ID,
 				UserType: globalReviewers[0].UserType,
 			})
@@ -259,7 +259,7 @@ func TestUploadReview(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       globalReviewers[0].ID,
 				UserType: globalReviewers[0].UserType,
 			})
@@ -285,7 +285,7 @@ func TestUploadReview(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       reviewerID,
 				UserType: userType,
 			})
@@ -366,7 +366,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 		w := httptest.NewRecorder()
 
-		ctx := context.WithValue(req.Context(), "data", RequestContext{
+		ctx := context.WithValue(req.Context(), "data", &RequestContext{
 			ID:       editorID,
 			UserType: userType,
 		})
