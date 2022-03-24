@@ -183,7 +183,7 @@ func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]
 		}
 		// RegEx filtering for submission name
 		if len(queryParams["name"]) > 0 {
-			tx = filterByName(tx, regexp.QuoteMeta(queryParams["name"][0]))
+			tx = filterBySubmissionName(tx, regexp.QuoteMeta(queryParams["name"][0]))
 		}
 		// orders result set
 		if len(queryParams["orderBy"]) > 0 {
@@ -210,13 +210,13 @@ func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]
 }
 
 // uses SQL REGEX to filter the submissions returned based on their names
-func filterByName(tx *gorm.DB, submissionName string) *gorm.DB {
+func filterBySubmissionName(tx *gorm.DB, submissionName string) *gorm.DB {
 	params := map[string]interface{}{"full": submissionName}
 	whereString := "submissions.name REGEXP @full"
 	// only adds multiple regex conditions if the name given is multiple words
 	if wordList := strings.Fields(submissionName); len(wordList) > 1 {
 		for index, field := range wordList {
-			whereString = whereString + " OR submissions.name REGEXP @" + fmt.Sprint(index)
+			whereString = whereString + fmt.Sprintf(" OR submissions.name REGEXP @%d", index)
 			params[fmt.Sprint(index)] = field
 		}
 	}

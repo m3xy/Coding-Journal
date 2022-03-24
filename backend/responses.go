@@ -12,6 +12,12 @@ type AuthLogInResponse struct {
 	Expires      int64  `json:"expires"`
 }
 
+// GET /user/query
+type QueryUsersResponse struct {
+	StandardResponse
+	Users []GlobalUser `json:"users"`
+}
+
 // ----------
 // Submissions Endpoints
 // ----------

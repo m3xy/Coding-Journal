@@ -160,7 +160,7 @@ func TestQuerySubmissions(t *testing.T) {
 			resp := w.Result()
 
 			respData := &QuerySubmissionsResponse{}
-			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
+			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding response body") {
 				return nil
 			} else if !assert.Falsef(t, respData.StandardResponse.Error,
 				"Error returned on query - %v", respData.StandardResponse.Message) {
