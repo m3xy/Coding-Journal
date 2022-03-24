@@ -21,15 +21,16 @@ services:
       - file_sys:/filesystem
     environment:
       LOG_PATH: "/var/tmp/cs3099-log/cs3099-backend.log"
-      DATABASE_URL: "myuser:mypass@tcp(0.0.0.0:3307)"
+      DATABASE_URL: "myuser:mypass@tcp(db:3306)"
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: ./frontend/Dockerfile.production
+
     depends_on:
       - backend
     ports:
       - "23409:23409"
-    environment:
-      NODE_ENV: "development"
     volumes:
       - ./frontend:/usr/src/app

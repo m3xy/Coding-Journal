@@ -30,19 +30,17 @@ export default ({ files, onClick }) => {
 	}
 
 	return (
-		<Card>
-			<Card.Body>
-				<h4>File Explorer</h4>
-				<FileBrowser
-					files={fileArray}
-					icons={Icons.FontAwesome(4)}
-					onSelect={(file) => {
-						if (file !== undefined) onClick(file.fileId)
-					}}
-					canFilter={false}
-					detailRenderer={() => null}
-				/>
-			</Card.Body>
+		<Card body>
+			<h4>File Explorer</h4>
+			<FileBrowser
+				files={fileArray}
+				icons={Icons.FontAwesome(4)}
+				onSelect={(file) => {
+					if (file !== undefined) onClick(file.fileId)
+				}}
+				canFilter={false}
+				detailRenderer={() => null}
+			/>
 		</Card>
 	)
 }
