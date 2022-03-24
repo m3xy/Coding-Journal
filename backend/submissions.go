@@ -258,35 +258,6 @@ func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
 	return tx
 }
 
-// Router function to get the names and id's of every submission of a given user
-// if no user id is given in the query parameters, return all valid submissions
-func GetAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
-	// gets the userID from the URL
-	var userID string
-	params := r.URL.Query()
-	userIDs := params["authorID"]
-	if userIDs == nil {
-		userID = "*"
-	} else {
-		userID = userIDs[0]
-	}
-
-	// set content type for return
-	w.Header().Set("Content-Type", "application/json")
-	// uses getAuthoredSubmissions to get all user submissions by setting authorID = *
-	submissions, err := getAuthoredSubmissions(userID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	// marshals and returns the map as JSON
-	if err := json.NewEncoder(w).Encode(submissions); err != nil {
-		log.Printf("[ERROR] error formatting response: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-}
-
 // Router function to upload new submissions to the db. The body of the
 // sent request should be a valid submission Json objects as specified
 // in backend/README.md
