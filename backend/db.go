@@ -57,7 +57,7 @@ type User struct {
 // User global identification.
 type GlobalUser struct {
 	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
-	UserType int    `gorm:"default:4" json:"userType"`
+	UserType int    `gorm:"default:0" json:"userType"`
 	User     *User  `json:"profile,omitempty"`
 
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"authoredSubmissions" validate:"dive"`

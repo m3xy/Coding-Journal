@@ -68,7 +68,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // edit existing comment
-// POST /file/{id}/editcomment
+// POST /file/{id}/comment/edit
 func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var resp *StandardResponse
@@ -83,7 +83,7 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// creates the comment using the given helper method
+	// edits the comment using the given controller method
 	} else if err := ControllerEditComment(req, ctx.ID); err != nil {
 		switch err.(type) {
 		case *CommentNotFoundError:
