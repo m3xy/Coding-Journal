@@ -34,7 +34,6 @@ const (
 // uses addReviewers in submissions.go
 // POST /submission/{id}/assignreviewers
 func PostAssignReviewers(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] AssignReviewers request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &AssignReviewersBody{}
 
@@ -82,15 +81,12 @@ func PostAssignReviewers(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] AssignReviewers request successful\n")
 	}
 }
 
 // router function for reviewer review upload
 // POST /submission/{id}/review
 func PostUploadReview(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] UploadReview request received from %v", r.RemoteAddr)
 	reqBody := &UploadReviewBody{}
 	resp := &StandardResponse{}
 
@@ -149,15 +145,12 @@ func PostUploadReview(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] UploadReview request successful\n")
 	}
 }
 
 // router function for updating submission status (i.e. accepting or rejecting)
 // POST /submission/{id}/approve
 func PostUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] UpdateSubmissionStatus request received from %v", r.RemoteAddr)
 	resp := &StandardResponse{}
 	reqBody := &UpdateSubmissionStatusBody{}
 
@@ -204,8 +197,6 @@ func PostUpdateSubmissionStatus(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] UpdateSubmissionStatus request successful\n")
 	}
 }
 

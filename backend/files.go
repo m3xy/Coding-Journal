@@ -62,7 +62,6 @@ func getSubmissionDirectoryPath(s Submission) string {
 // Returns file with comments and metadata.
 // GET /file/{id}
 func GetFile(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 	var err error
 	resp := &GetFileResponse{}
@@ -91,8 +90,6 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
 	}
 }
 

@@ -82,7 +82,6 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 // function to send a list of all available tags to the frontend so that users know which tags allow filtering
 // GET /submissions/tags
 func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetAvailableTags request received from %v", r.RemoteAddr)
 	stdResp := StandardResponse{}
 
 	// queries the tags from the database
@@ -109,20 +108,16 @@ func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] GetAvailableTags request successful\n")
 	}
 }
 
 // function to query a list of submissions with a set of query parameters to filter/order the list
 // GET /submissions/query
 func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetQuerySubmissions request received from %v", r.RemoteAddr)
 	var err error
 	var stdResp StandardResponse
 	var resp *QuerySubmissionsResponse
 	var submissions []Submission
-	// userType := USERTYPE_NIL
 
 	// gets the request context if there is a user logged in
 	if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
@@ -155,8 +150,6 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] GetSubmissionWithParams request successful\n")
 	}
 }
 
@@ -268,7 +261,6 @@ func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
 // Router function to get the names and id's of every submission of a given user
 // if no user id is given in the query parameters, return all valid submissions
 func GetAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetAllAuthoredSubmissions request received from %v", r.RemoteAddr)
 	// gets the userID from the URL
 	var userID string
 	params := r.URL.Query()
@@ -288,15 +280,11 @@ func GetAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// marshals and returns the map as JSON
-	jsonString, err := json.Marshal(submissions)
-	if err != nil {
-		log.Printf("[ERROR] JSON formatting failed: %v", err)
+	if err := json.NewEncoder(w).Encode(submissions); err != nil {
+		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// writes json string
-	log.Printf("[INFO] GetAllSubmission request from %v successful", r.RemoteAddr)
-	w.Write(jsonString)
 }
 
 // Router function to upload new submissions to the db. The body of the
@@ -304,7 +292,6 @@ func GetAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
 // in backend/README.md
 // POST /submissions/upload
 func PostUploadSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] PostUploadSubmission request received from %v", r.RemoteAddr)
 	// parses the Json request body into a submission struct
 	resp := UploadSubmissionResponse{}
 	reqBody := UploadSubmissionBody{}
@@ -353,8 +340,6 @@ func PostUploadSubmission(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] PostUploadSubmission request successful\n")
 	}
 }
 
@@ -404,7 +389,6 @@ func adaptBodyToSubmission(b *UploadSubmissionBody) *Submission {
 
 // Router function to upload new submissions by a Zip file with the file contents.
 func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
-	log.Print("[INFO] POST Upload Submission started")
 	var resp UploadSubmissionResponse
 	var reqBody UploadSubmissionByZipBody
 
@@ -479,7 +463,6 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 // and comment queries.
 // GET /submission/{id}
 func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// gets the submission ID from the URL parameters
@@ -543,16 +526,14 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	// writes JSON data for the submission to the HTTP connection
 	if err := json.NewEncoder(w).Encode(encodable); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Print("[INFO] success\n")
 }
 
 // Compresses a given submission and returns it to the frontend to be downloaded
 // GET /submission/{id}/download
 func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetDownloadSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/zip")
 	var zipContent []byte
 
@@ -570,7 +551,6 @@ func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
-	log.Println("[INFO] GetDownloadSubmission request succeeded")
 	w.Write(zipContent)
 }
 
