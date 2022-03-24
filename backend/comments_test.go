@@ -22,21 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testComments []*Comment = []*Comment{
-	{
-		AuthorID:    "",
-		Base64Value: "Hello World",
-		Comments:    []Comment{},
-		LineNumber: 0,
-	},
-	{
-		AuthorID:    "",
-		Base64Value: "Goodbye World",
-		Comments:    []Comment{},
-		LineNumber: 0,
-	},
-}
-
 // -------------
 // Router Function Tests
 // -------------

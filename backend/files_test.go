@@ -26,11 +26,6 @@ const (
 	TEST_FILES_DIR = "../filesystem_test/" // environment variable set to this value
 )
 
-var testFiles []File = []File{
-	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
-	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
-}
-
 // -----------
 // Router Function Tests
 // -----------
