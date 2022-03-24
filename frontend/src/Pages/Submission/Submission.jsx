@@ -4,8 +4,14 @@ import axiosInstance from "../../Web/axiosInstance"
 import { useParams, useNavigate } from "react-router-dom"
 import { CSSTransition, SwitchTransition } from "react-transition-group"
 import FadeInTransition from "../../Components/Transitions/FadeIn.module.css"
-import { Abstract, FileViewer, FileExplorer, TagsList } from "./Children"
-import { Badge, Card, Button, Collapse } from "react-bootstrap"
+import {
+	Abstract,
+	FileViewer,
+	FileExplorer,
+	TagsList,
+	Reviews
+} from "./Children"
+import { Badge, Collapse } from "react-bootstrap"
 
 function Submission() {
 	// Router hooks
@@ -98,7 +104,7 @@ function Submission() {
 		return (
 			<h5>
 				{role}
-				{users.length > 1 ? "s: " : " "}
+				{users.length > 1 ? "s: " : ": "}
 				{users.length > 0
 					? users.map(
 							(user, i) =>
@@ -158,6 +164,16 @@ function Submission() {
 						}}
 					/>
 					<TagsList tags={submission.categories} />
+					{submission.hasOwnProperty("reviews") && (
+						<Reviews
+							reviews={submission.reviews}
+							reviewrIds={
+								submission.hasOwnProperty("reviewers")
+									? submission.reviewers
+									: []
+							}
+						/>
+					)}
 				</div>
 			</div>
 		</div>
