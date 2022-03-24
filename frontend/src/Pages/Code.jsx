@@ -24,12 +24,12 @@ function Code({id}) {
     const [lineNumber, setLineNumber] = useState(1);
 
     const [comments, setComments] = useState([
-		{base64Value: "TG9va3MgZ29vZCE=", line:1, ID:0, author: "John Doe", comments:[
-			{base64Value: "SSBkaXNhZ3JlZS4=", line:1, ID:1, author: "Jane Doe", comments:[
-				{base64Value: "SSBoYXZlIDUwMCBtb3JlIGNpdGF0aW9ucyB0aGFuIGJvdGggb2YgeW91LCBJIGNhbiBhc3N1cmUgeW91LCB0aGlzIGNvZGUgaXMgbWVkaW9jcmUu", line:1, ID:2, author: "Jim Doe", comments:[]}
+		{CreatedAt: "", UpdatedAt: "", DeletedAt: "", base64Value: "TG9va3MgZ29vZCE=", line:1, ID:0, author: "John Doe", comments:[
+			{CreatedAt: "", UpdatedAt: "", DeletedAt: "", base64Value: "SSBkaXNhZ3JlZS4=", line:1, ID:1, author: "Jane Doe", comments:[
+				{CreatedAt: "", UpdatedAt: "", DeletedAt: "", base64Value: "SSBoYXZlIDUwMCBtb3JlIGNpdGF0aW9ucyB0aGFuIGJvdGggb2YgeW91LCBJIGNhbiBhc3N1cmUgeW91LCB0aGlzIGNvZGUgaXMgbWVkaW9jcmUu", line:1, ID:2, author: "Jim Doe", comments:[]}
 			]}
 		]},
-		{base64Value: "VGhpcyBzZWVtcyBxdWl0ZSBpbmVmZmljaWVudC4=", line:1, ID:4, author: "Joe Doe", comments:[]},
+		{CreatedAt: "", UpdatedAt: "", DeletedAt: "", base64Value: "VGhpcyBzZWVtcyBxdWl0ZSBpbmVmZmljaWVudC4=", line:2, ID:4, author: "Joe Doe", comments:[]},
 	])
     const [showComments, setShowComments] = useState(false);
 
@@ -42,7 +42,7 @@ function Code({id}) {
         if(id == null || id == -1) return;
         axiosInstance.get(fileEndpoint + "/" + id)
             .then((response) => {
-                console.log(response.data);
+                console.log(response.data.file);
 
                 //Set file, code and comments
                 setFile(response.data.file);
@@ -97,11 +97,10 @@ function Code({id}) {
         //             range: new monaco.Range(1, 1, 1, 1),
         //             options: { 
         //                 isWholeLine: true,
-        //                 linesDecorationsClassName: 'myLineDecoration',
-        //                 inlineClassName: 'myInlineDecoration',
-        //                 hoverMessage: [{value: "Hello"}, {value: "[link](#comments)"}],
+        //                 className: 'myContentClass',
+        //                 glyphMarginClassName: 'myGlyphMarginClass',
+        //                 hoverMessage: [{value: "**Comments**"}, {value: "[link](#comments)"}],
         //                 glyphMarginHoverMessage: [{value: "Bye"}, {value: "[link](https://www.google.com)"}],
-        //                 glyphMarginClassName: 'myGlyphMarginClass'
         //             }
         //         }
         //     ]
@@ -171,8 +170,16 @@ function Code({id}) {
             :
                 <embed height="1000" width="100%" src={"data:application/pdf;base64," + file.base64Value} />
             }
+            <br/>
             <Button variant="dark" onClick={() => setShowComments(!showComments)}>Show comments</Button>
-            <Comments id={id} comments={comments} setComments={setComments} line={lineNumber} show={showComments} setShow={setShowComments} getFile={getFile}></Comments>
+            <Comments 
+                id={id}
+                comments={comments}
+                line={lineNumber}
+                show={showComments}
+                setShow={setShowComments}
+                refresh={getFile}>
+            </Comments>
             </Card.Body>
             <Card.Footer className="text-muted">Last updated: {file.UpdatedAt}</Card.Footer>
         </Card>

@@ -1,3 +1,10 @@
+/**
+ * Comments.jsx
+ * Author: 190019931
+ * 
+ * React component for displaying comments
+ */
+
 import React, { useEffect, useState } from 'react';
 import { Button, Form, Modal, Toast } from 'react-bootstrap';
 import axiosInstance from '../Web/axiosInstance';
@@ -7,7 +14,7 @@ import Comment from "./Comment"
 const fileEndpoint = '/file'
 const commentEndpoint = '/comment'
 
-function Comments({id, comments, setComments, line, show, setShow, getFile}) {
+function Comments({id, comments, line, show, setShow, refresh}) {
 
 	const [text, setText] = useState("");
 	const [showComment, setShowComment] = useState(true);
@@ -37,9 +44,7 @@ function Comments({id, comments, setComments, line, show, setShow, getFile}) {
 		axiosInstance.post(fileEndpoint + "/" + id + commentEndpoint, comment)
 					.then((response) => {
 						console.log(response);
-						getFile();
-						// setComments(comments => [...comments, comment]);
-						// document.getElementById("CommentText").value = "";
+						refresh();
 					})
 					.catch((error) => {
 						console.log(error);
@@ -61,10 +66,11 @@ function Comments({id, comments, setComments, line, show, setShow, getFile}) {
 						line={comment.lineNumber} 
 						b64={comment.base64Value} 
 						replies={comment.comments} 
-						show={showComment} 
-						setShow={setShowComment} 
-						replyLine={line} 
-						postReply={postComment}/>)
+						created={comment.CreatedAt}
+						updated={comment.UpdatedAt}
+						deleted={comment.DeletedAt}
+						show={showComment}
+						postReply={(e, parentID, content) => {postComment(e, parentID, content, comment.lineNumber)}}/>)
 		})
 		: ""
 

@@ -1,10 +1,19 @@
-import React, { useState } from 'react'
-import { Button, FormControl, InputGroup, Toast } from 'react-bootstrap'
+/**
+ * Comment.jsx
+ * Author: 190019931
+ * 
+ * React component for displaying a comment
+ */
 
-function Comment({ID, author, line, b64, replies, show, setShow, replyLine, postReply}) {
+import React, { useState } from 'react'
+import { Button, Collapse, FormControl, InputGroup, Toast } from 'react-bootstrap'
+import JwtService from "../Web/jwt.service";
+
+function Comment({ID, author, line, b64, replies, created, updated, deleted, show, postReply}) {
 
     const [text, setText] = useState("");
     const [showReplies, setShowReplies] = useState(false);
+    const [openReplies, setOpenReplies] = useState(false);
 
     const repliesHTML = (replies !== undefined ? replies.map((reply) => {
         console.log(reply);
@@ -14,8 +23,10 @@ function Comment({ID, author, line, b64, replies, show, setShow, replyLine, post
             line={reply.lineNumber} 
             b64={reply.base64Value} 
             replies={reply.comments} 
+            created={reply.CreatedAt}
+            updated={reply.UpdatedAt}
+            deleted={reply.DeletedAt}
             show={showReplies} 
-            setShow={setShowReplies} 
             postReply={postReply}/>)
     })
     : "")
@@ -29,14 +40,26 @@ function Comment({ID, author, line, b64, replies, show, setShow, replyLine, post
                     <small>{"Line: " + line}</small>
                 </Toast.Header>
                 <Toast.Body>
-                    {atob(b64)}<p/>
-                    <InputGroup className="mb-3" size="sm">
-                        <FormControl placeholder={"Enter a reply (Line: " + replyLine +  ")"} onChange={(e) => setText(e.target.value)} value={text}/>
-                        <Button variant="outline-secondary" onClick={(e) => {setText(""); postReply(e, ID, text, replyLine)}}>Reply</Button>
-                    </InputGroup>
-                    {replies !== undefined ? 
-                        <Button variant='link' size='sm' onClick={() => setShowReplies(!showReplies)}>{showReplies ? <>Hide Replies</> : <>Show Replies</>}</Button>
-                    : <></>}      
+                    {atob(b64)}<p />
+                    <small className="text-muted">{deleted ? "(deleted)" : (created == updated ? created : updated + " (edited)")}</small>
+                    <br />
+
+                    <Button variant='light' onClick={() => setOpenReplies(!openReplies)}>↩</Button>
+                    { JwtService.getUserID() == author ? 
+                      <><Button variant='light'>✎</Button>
+                        <Button variant='light'>🗑</Button></>
+                    : <></>}
+
+                    {replies ? 
+                        <Button variant='light' onClick={() => setShowReplies(!showReplies)}>💬</Button>
+                    : <></>}
+
+                    <Collapse in={openReplies}>
+                        <InputGroup className="mb-3" size="sm">
+                            <FormControl placeholder={"Enter a reply"} onChange={(e) => setText(e.target.value)} value={text}/>
+                            <Button variant="outline-secondary" onClick={(e) => {setText(""); postReply(e, ID, text)}}>Reply</Button>
+                        </InputGroup>
+                    </Collapse>
                 </Toast.Body> 
                 {repliesHTML}
             </Toast>
