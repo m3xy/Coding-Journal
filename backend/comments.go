@@ -19,6 +19,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	ENDPOINT_COMMENT = "/comment"
+	ENDPOINT_EDIT = "/edit"
+)
+
 // -----------
 // Router Functions
 // -----------

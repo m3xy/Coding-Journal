@@ -33,7 +33,7 @@ func TestUploadUserComment(t *testing.T) {
 	defer testEnd()
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_NEWCOMMENT, PostUploadUserComment)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT, PostUploadUserComment)
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
@@ -78,7 +78,7 @@ func TestUploadUserComment(t *testing.T) {
 		reqBody, err := json.Marshal(reqStruct)
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 		// formats and executes the request
-		req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
+		req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_COMMENT),
 			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 		// sends a request to the server to post a user comment
 		rCtx := context.WithValue(req.Context(), "data", ctx)
@@ -173,7 +173,7 @@ func TestEditUserComment(t *testing.T) {
 	defer testEnd()
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_EDIT_COMMENT, PostEditUserComment)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT+ENDPOINT_EDIT, PostEditUserComment)
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
@@ -215,7 +215,7 @@ func TestEditUserComment(t *testing.T) {
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		queryRoute := fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_EDIT_COMMENT)
+		queryRoute := fmt.Sprintf("%s/%d%s%s", SUBROUTE_FILE, fileID, ENDPOINT_COMMENT, ENDPOINT_EDIT)
 		req, w := httptest.NewRequest("POST", fmt.Sprintf(queryRoute),
 			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 

@@ -33,8 +33,6 @@ const (
 
 	SUBROUTE_FILE       = "/file"
 	ENDPOINT_NEWFILE    = "/upload"
-	ENDPOINT_NEWCOMMENT = "/comment"
-	ENDPOINT_EDIT_COMMENT = "/editcomment"
 
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for submission files
@@ -47,8 +45,10 @@ func getFilesSubRoutes(r *mux.Router) {
 	// File subroutes:
 	// + GET /file/{id} - Get given file.
 	// + POST /file/{id}/comment - Post a new comment
+	// + POST /file/{id}/comment/edit - Edit an existing comment
 	files.HandleFunc("/{id}", GetFile).Methods(http.MethodGet)
-	files.HandleFunc("/{id}"+ENDPOINT_NEWCOMMENT, PostUploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}"+ENDPOINT_COMMENT, PostUploadUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+ENDPOINT_EDIT, PostEditUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // Get the path to the submissions directory.
