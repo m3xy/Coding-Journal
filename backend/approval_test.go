@@ -126,10 +126,14 @@ func TestPostAssignReviewers(t *testing.T) {
 		// makes sure the reviewer association was added
 		sub := &Submission{}
 		err := gormDb.Model(&Submission{}).Preload("Reviewers").Find(sub, submissionID).Error
+		reviewerIDs := []string{}
+		for _, reviewer := range sub.Reviewers {
+			reviewerIDs = append(reviewerIDs, reviewer.ID)
+		}
 		switch {
 		case !assert.NoError(t, err, "error querying db"),
-			!assert.Equal(t, globalReviewers[0].ID, sub.Reviewers[0].ID, "first reviewer not added"),
-			!assert.Equal(t, globalReviewers[1].ID, sub.Reviewers[1].ID, "second reviewer not added"):
+			!assert.Contains(t, reviewerIDs, globalReviewers[0].ID, "first reviewer not added"),
+			!assert.Contains(t, reviewerIDs, globalReviewers[1].ID, "second reviewer not added"):
 			return
 		}
 	})
