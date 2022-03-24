@@ -27,7 +27,6 @@ import (
 // -------------
 
 // Tests the basic ability of the CodeFiles module to add a comment to a file
-// given file path and submission id
 func TestUploadUserComment(t *testing.T) {
 	// Set up server and configures filesystem/db
 	testInit()
@@ -51,7 +50,6 @@ func TestUploadUserComment(t *testing.T) {
 	testSubmission.Files = []File{testFile}
 	_, err = addSubmission(&testSubmission)
 	if !assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err) { return }
-	// gets the file ID from the files table
 	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
 	fileID := testFile.ID
 
@@ -75,43 +73,40 @@ func TestUploadUserComment(t *testing.T) {
 		}
 	}
 
+	// sends request to upload a comment
+	handleRequest := func(ctx *RequestContext, reqStruct *NewCommentPostBody) *http.Response {
+		reqBody, err := json.Marshal(reqStruct)
+		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
+		// formats and executes the request
+		req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
+			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+		// sends a request to the server to post a user comment
+		rCtx := context.WithValue(req.Context(), "data", ctx)
+		router.ServeHTTP(w, req.WithContext(rCtx))
+		return w.Result()
+	}
+
 	t.Run("valid upload", func(t *testing.T) {
 		defer clearComments()
 
 		// configures sub-test values
-		commentAuthor := globalReviewers[1]
 		testComment := testComments[0]
 		testComment.FileID = fileID
-		testComment.AuthorID = commentAuthor.ID
+		testComment.AuthorID = globalReviewers[1].ID
 		testReply := testComments[1]
 		testReply.FileID = fileID
-		testReply.AuthorID = commentAuthor.ID
-
-		// sends request to upload a comment
-		handleRequest := func(queryRoute string, fileID uint, reqStruct *NewCommentPostBody) *http.Response {
-			reqBody, err := json.Marshal(reqStruct)
-			assert.NoErrorf(t, err, "Error formatting request body: %v", err)
-			// formats and executes the request
-			req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
-				bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			// sends a request to the server to post a user comment
-			ctx := context.WithValue(req.Context(), "data", &RequestContext{
-				ID: commentAuthor.ID,
-				UserType: USERTYPE_NIL,
-			})
-			router.ServeHTTP(w, req.WithContext(ctx))
-			return w.Result()
-		}
+		testReply.AuthorID = globalReviewers[1].ID
 
 		// upload a single user comment to a valid file in a valid submission
 		t.Run("Upload Single User Comment", func(t *testing.T) {
 			// formats the request body to send to the server to add a comment
-			queryRoute := fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT)
-			resp := handleRequest(queryRoute, fileID, &NewCommentPostBody{
+			ctx := &RequestContext{ID: globalReviewers[1].ID, UserType: USERTYPE_NIL}
+			reqBody := &NewCommentPostBody{
 				ParentID: nil,
 				Base64Value: testComment.Base64Value,
 				LineNumber:  testComment.LineNumber,
-			})
+			}
+			resp := handleRequest(ctx, reqBody)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
@@ -128,19 +123,20 @@ func TestUploadUserComment(t *testing.T) {
 		// upload a single user comment to a valid file in a valid submission
 		t.Run("Upload Single Comment Reply", func(t *testing.T) {
 			// formats the request body to send to the server to add a comment
-			queryRoute := fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT)
-			resp := handleRequest(queryRoute, fileID, &NewCommentPostBody{
-				ParentID:    &testComment.ID,
-				LineNumber:  0,
+			ctx := &RequestContext{ID: globalReviewers[1].ID, UserType: USERTYPE_NIL}
+			reqBody := &NewCommentPostBody{
+				ParentID: &testComment.ID,
 				Base64Value: testReply.Base64Value,
-			})
+				LineNumber:  testReply.LineNumber,
+			}
+			resp := handleRequest(ctx, reqBody)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
 			// gets the added comment via its file to verify the parent -> child structure is correct
 			file, err := getFileData(fileID)
 			assert.NoError(t, err, "error retrieving test file")
-			assert.Equal(t, 1, len(file.Comments), "comment array is incorrect length. Child comment returned on top level of comment tree structure")
+			assert.Equal(t, 1, len(file.Comments), "comment array is incorrect length.")
 			addedReply := file.Comments[0].Comments[0]
 
 			testCommentEquality(testReply, &addedReply)
@@ -148,41 +144,146 @@ func TestUploadUserComment(t *testing.T) {
 	})
 
 	t.Run("Request Validation", func(t *testing.T) {
+		defer clearComments()
 		t.Run("Not logged in", func(t *testing.T) {
-			defer clearComments()
-			reqStruct := &NewCommentPostBody{
+			reqBody := &NewCommentPostBody{
 				ParentID: nil,
 				Base64Value: testComments[0].Base64Value,
 				LineNumber: 0,
 			}
-			reqBody, err := json.Marshal(reqStruct)
-			assert.NoErrorf(t, err, "Error formatting request body: %v", err)
-			// formats and executes the request
-			req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
-				bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-			resp := w.Result()
+			resp := handleRequest(nil, reqBody)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 
 		t.Run("Bad Request Body", func(t *testing.T) {
-			defer clearComments()
-			reqStruct := &NewCommentPostBody{
+			reqBody := &NewCommentPostBody{
 				ParentID: nil,
 				LineNumber: 0,
 			}
-			reqBody, err := json.Marshal(reqStruct)
-			assert.NoErrorf(t, err, "Error formatting request body: %v", err)
-			// formats and executes the request
-			req, w := httptest.NewRequest("POST", fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_NEWCOMMENT),
-				bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			ctx := context.WithValue(req.Context(), "data", &RequestContext{
-				ID: globalReviewers[0].ID,
-				UserType: USERTYPE_NIL,
-			})
-			router.ServeHTTP(w, req.WithContext(ctx))
-			resp := w.Result()
+			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
+			resp := handleRequest(ctx, reqBody)
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "status code incorrect")
+		})
+	})
+}
+
+// Tests the basic ability of the CodeFiles module to edit a comment's content
+func TestEditUserComment(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_EDIT_COMMENT, PostEditUserComment)
+
+	// the test values added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0]
+	testSubmission := testSubmissions[0]
+
+	// Register test users.
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if !assert.NoError(t, err, "error registering mock users") {
+		return
+	}
+
+	// Add submission, and test file linked to submission.
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Files = []File{testFile}
+	_, err = addSubmission(&testSubmission)
+	if !assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err) { return }
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
+	fileID := testFile.ID
+
+	// adds comment to db
+	addComment := func(c *Comment, fileID uint) uint {
+		assert.NoError(t, gormDb.Model(&Comment{}).Create(c).Error,
+			"Comment unable to be added")
+		return c.ID
+	}
+
+	// clears the comments for the test file
+	clearComments := func() {
+		var comments []Comment
+		assert.NoError(t, gormDb.Find(&comments).Error, "error while clearing comments table")
+		for _, comment := range comments {
+			gormDb.Select(clause.Associations).Unscoped().Delete(&comment)
+		}
+	}
+
+	// sends request to edit a comment
+	handleRequest := func(ctx *RequestContext, reqStruct *EditCommentPostBody) *http.Response {
+		reqBody, err := json.Marshal(reqStruct)
+		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
+
+		// formats and executes the request
+		queryRoute := fmt.Sprintf("%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_EDIT_COMMENT)
+		req, w := httptest.NewRequest("POST", fmt.Sprintf(queryRoute),
+			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+
+		// sends a request to the server to post a user comment
+		rCtx := context.WithValue(req.Context(), "data", ctx)
+		router.ServeHTTP(w, req.WithContext(rCtx))
+		return w.Result()
+	}
+
+	t.Run("valid upload", func(t *testing.T) {
+		defer clearComments()
+
+		// adds a test comment
+		comment := &Comment{AuthorID: globalReviewers[0].ID, FileID: fileID, 
+			LineNumber: 0, Base64Value:"test"}
+		addComment(comment, fileID)
+
+		// upload a single user comment to a valid file in a valid submission
+		t.Run("Edit Single User Comment", func(t *testing.T) {
+			newContent := "new content"
+			// formats the request body to send to the server to add a comment
+			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
+			req := &EditCommentPostBody{ID: comment.ID, Base64Value: newContent}
+			resp := handleRequest(ctx, req)
+			defer resp.Body.Close()
+			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
+
+			// gets the comment from the db
+			addedComment := &Comment{}
+			assert.NoError(t, gormDb.Model(&Comment{}).Find(addedComment, comment.ID).Error, "Could not query added comment")
+			assert.Equal(t, newContent, addedComment.Base64Value, "comment content not updated")
+		})
+
+		// upload a single user comment to a valid file in a valid submission
+		t.Run("Edit Again", func(t *testing.T) {
+			newContent := "new new content"
+			// formats the request body to send to the server to add a comment
+			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
+			req := &EditCommentPostBody{ID: comment.ID, Base64Value: newContent}
+			resp := handleRequest(ctx, req)
+			defer resp.Body.Close()
+			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
+
+			// gets the comment from the db
+			addedComment := &Comment{}
+			assert.NoError(t, gormDb.Model(&Comment{}).Find(addedComment, comment.ID).Error, "Could not query added comment")
+			assert.Equal(t, newContent, addedComment.Base64Value, "comment content not updated")
+		})
+	})
+
+	t.Run("Request Validation", func(t *testing.T) {
+		// adds a test comment
+		comment := &Comment{AuthorID: globalReviewers[0].ID, FileID: fileID, 
+			LineNumber: 0, Base64Value:"test"}
+		addComment(comment, fileID)
+		defer clearComments()
+
+		t.Run("Not logged in", func(t *testing.T) {
+			reqStruct := &EditCommentPostBody{ID: comment.ID, Base64Value: "content"}
+			resp := handleRequest(nil, reqStruct)
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
+		})
+
+		t.Run("Incorrect Author", func(t *testing.T) {
+			ctx := &RequestContext{ID: globalAuthors[1].ID, UserType: USERTYPE_NIL}
+			reqStruct := &EditCommentPostBody{ID: comment.ID, Base64Value: "content"}
+			resp := handleRequest(ctx, reqStruct)
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 	})
 }

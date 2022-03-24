@@ -47,6 +47,17 @@ func (e *DuplicateFileError) Error() string {
 }
 
 // -----------
+// Comments Errors
+// -----------
+
+type CommentNotFoundError struct {
+	ID uint
+}
+func (e *CommentNotFoundError) Error() string {
+	return fmt.Sprintf("Comment %d does not exist!", e.ID)
+}
+
+// -----------
 // Approval Errors
 // -----------
 

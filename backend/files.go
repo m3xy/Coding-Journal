@@ -34,6 +34,7 @@ const (
 	SUBROUTE_FILE       = "/file"
 	ENDPOINT_NEWFILE    = "/upload"
 	ENDPOINT_NEWCOMMENT = "/comment"
+	ENDPOINT_EDIT_COMMENT = "/editcomment"
 
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for submission files

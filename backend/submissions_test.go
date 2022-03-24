@@ -931,10 +931,6 @@ func TestAddSubmission(t *testing.T) {
 }
 
 // tests the getSubmission() function, which returns a submission struct
-//
-// Test Depends On:
-// 	- TestAddSubmission
-// 	- TestAddFile
 func TestGetSubmission(t *testing.T) {
 	testInit()
 	defer testEnd()
@@ -1032,9 +1028,6 @@ func TestGetSubmission(t *testing.T) {
 }
 
 // This function tests the getSubmissionMetaData function
-//
-// This test depends on:
-// 	- TestAddSubmission
 func TestGetSubmissionMetaData(t *testing.T) {
 	testInit()
 	defer testEnd()
