@@ -39,6 +39,13 @@ const (
 
 var JwtSecret string // JWT Secret variable.
 
+type JwtClaims struct {
+	ID       string `json:"userId"`
+	UserType int    `json:"userType" validate:"min=0,max=4"`
+	Scope    string
+	jwt.StandardClaims
+}
+
 // Subrouter
 func getAuthSubRoutes(r *mux.Router) {
 	auth := r.PathPrefix(SUBROUTE_AUTH).Subrouter()

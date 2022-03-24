@@ -4,8 +4,14 @@ import axiosInstance from "../../Web/axiosInstance"
 import { useParams, useNavigate } from "react-router-dom"
 import { CSSTransition, SwitchTransition } from "react-transition-group"
 import FadeInTransition from "../../Components/Transitions/FadeIn.module.css"
-import { Abstract, FileViewer } from "./Children"
-import { Badge, Card, Button, Collapse } from "react-bootstrap"
+import {
+	Abstract,
+	FileViewer,
+	FileExplorer,
+	TagsList,
+	Reviews
+} from "./Children"
+import { Badge, Collapse } from "react-bootstrap"
 
 function Submission() {
 	// Router hooks
@@ -22,6 +28,7 @@ function Submission() {
 			abstract: "",
 			reviews: []
 		},
+		files: [],
 		approved: null
 	})
 	const [authors, setAuthors] = useState([])
@@ -93,6 +100,21 @@ function Submission() {
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
+	const getUsersString = (users, role) => {
+		return (
+			<h5>
+				{role}
+				{users.length > 1 ? "s: " : ": "}
+				{users.length > 0
+					? users.map(
+							(user, i) =>
+								(i === 0 ? " " : ", ") + getUserFullName(user)
+					  )
+					: "No " + role + "s..."}
+			</h5>
+		)
+	}
+
 	return (
 		<div className={styles.SubmissionContainer}>
 			<SwitchTransition>
@@ -119,26 +141,8 @@ function Submission() {
 			</SwitchTransition>
 			<Collapse in={!showFile}>
 				<div className="text-muted">
-					<h5>
-						Author
-						{authors.length > 1 ? "s: " : ": "}
-						{authors.length > 0
-							? authors.map(
-									(author, i) =>
-										(i === 0 ? " " : ", ") +
-										getUserFullName(author)
-							  )
-							: "No authors..."}
-					</h5>
-					<h5>
-						Reviewer
-						{reviewers.length > 1 ? "s: " : ": "}
-						{reviewers.length > 0
-							? reviewers.map((reviewer, i) =>
-									i === 0 ? " " : ", "
-							  )
-							: "No reviewers..."}
-					</h5>
+					{getUsersString(authors, "Author")}
+					{getUsersString(reviewers, "Reviewer")}
 				</div>
 			</Collapse>
 			<div style={{ display: "flex" }}>
@@ -151,7 +155,26 @@ function Submission() {
 					/>
 					<FileViewer id={fileId} show={showFile} />
 				</div>
-				<div className={styles.RightContainer}>There</div>
+				<div className={styles.RightContainer}>
+					<FileExplorer
+						files={submission.files}
+						onClick={(id) => {
+							setFileId(id)
+							setShowFile(true)
+						}}
+					/>
+					<TagsList tags={submission.categories} />
+					{submission.hasOwnProperty("reviews") && (
+						<Reviews
+							reviews={submission.reviews}
+							reviewrIds={
+								submission.hasOwnProperty("reviewers")
+									? submission.reviewers
+									: []
+							}
+						/>
+					)}
+				</div>
 			</div>
 		</div>
 	)

@@ -20,9 +20,7 @@ func getUserSubroutes(r *mux.Router) {
 
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
-	// + GET /user/{id}/submissions - Get given user's authored submissions.
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
-	user.HandleFunc("/{id}"+SUBROUTE_SUBMISSIONS, GetAllAuthoredSubmissions).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
@@ -36,8 +34,6 @@ func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
 	Failure: 404, User not found.
 */
 func getUserProfile(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received user credential request from %s", r.RemoteAddr)
-
 	// Get user details from user ID.
 	vars := mux.Vars(r)
 	user := &GlobalUser{ID: vars["id"]}
@@ -52,11 +48,9 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Encode user and send.
-	err := json.NewEncoder(w).Encode(user)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(user); err != nil {
 		log.Printf("[ERROR] User data JSON encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Printf("[INFO] User credential request from %s successful.", r.RemoteAddr)
 }

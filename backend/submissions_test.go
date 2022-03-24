@@ -32,85 +32,6 @@ const (
 	TEST_ZIP_PATH = "../testing/test.zip"
 )
 
-// data to use in the tests
-// NOTE: make sure to use these directly, not as pointers, so that the
-// .ID field will not be set in any test
-var testSubmissions []Submission = []Submission{
-	// valid
-	{
-		Name:       "TestSubmission1",
-		License:    "MIT",
-		Authors:    []GlobalUser{},
-		Reviewers:  []GlobalUser{},
-		Files:      []File{},
-		Categories: []Category{{Tag: "testtag"}},
-		MetaData: &SubmissionData{
-			Abstract: "test abstract",
-			Reviews:  []*Review{},
-		},
-	},
-	{
-		Name:       "TestSubmission2",
-		License:    "MIT",
-		Authors:    []GlobalUser{},
-		Reviewers:  []GlobalUser{},
-		Files:      []File{},
-		Categories: []Category{{Tag: "testtag"}},
-		MetaData: &SubmissionData{
-			Abstract: "test abstract",
-			Reviews:  []*Review{},
-		},
-	},
-}
-
-// TODO: add comments here
-var testSubmissionMetaData = []*SubmissionData{
-	{Abstract: "test abstract, this means nothing", Reviews: nil},
-}
-var testAuthors []User = []User{
-	{Email: "paul@test.com", Password: "123456aB$", FirstName: "paul",
-		LastName: "test", PhoneNumber: "0574349206"},
-	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg"},
-	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-	{Email: "author3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe"},
-}
-var testReviewers []User = []User{
-	{Email: "dave@test.com", Password: "123456aB$", FirstName: "dave",
-		LastName: "smith", PhoneNumber: "0574349206"},
-	{Email: "Geoff@test.com", Password: "dlbjDs2!", FirstName: "Geoff",
-		LastName: "Williams", Organization: "TestOrg"},
-	{Email: "reviewer2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-	{Email: "reviewer3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe"},
-}
-
-// Initialise mock data in the database for use later on in the testing.
-func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
-	// Fill database with users.
-	var err error
-	globalAuthors := make([]GlobalUser, len(testAuthors))
-	for i, user := range testAuthors {
-		if globalAuthors[i].ID, err = registerUser(user, USERTYPE_PUBLISHER); err != nil {
-			t.Errorf("User registration failed: %v", err)
-			return nil, nil, err
-		}
-		globalAuthors[i].UserType = USERTYPE_PUBLISHER
-	}
-	globalReviewers := make([]GlobalUser, len(testReviewers))
-	for i, user := range testReviewers {
-		if globalReviewers[i].ID, err = registerUser(user, USERTYPE_REVIEWER); err != nil {
-			t.Errorf("User registration failed: %v", err)
-			return nil, nil, err
-		}
-		globalReviewers[i].UserType = USERTYPE_REVIEWER
-	}
-	return globalAuthors, globalReviewers, nil
-}
-
 // ------------
 // Router Function Tests
 // ------------
@@ -437,7 +358,7 @@ func TestQuerySubmissions(t *testing.T) {
 			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
 			reqCtx := context.WithValue(req.Context(), "data", &RequestContext{
-				ID: id,
+				ID:       id,
 				UserType: userType,
 			})
 			router.ServeHTTP(w, req.WithContext(reqCtx))
@@ -520,7 +441,9 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
 			queryRoute := fmt.Sprintf("%s%s?tags=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
 			resp := handleQuery(queryRoute)
-			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Incorrect status code returned") {return}
+			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Incorrect status code returned") {
+				return
+			}
 
 			respData := &QuerySubmissionsResponse{}
 			switch {
@@ -560,7 +483,7 @@ func TestUploadSubmission(t *testing.T) {
 				return false
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       globalAuthors[0].ID,
 				UserType: globalAuthors[0].UserType,
 			})
@@ -610,7 +533,7 @@ func TestUploadSubmission(t *testing.T) {
 			}
 			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			if authed {
-				ctx := context.WithValue(req.Context(), "data", RequestContext{
+				ctx := context.WithValue(req.Context(), "data", &RequestContext{
 					ID:       globalAuthors[0].ID,
 					UserType: globalAuthors[0].UserType,
 				})
@@ -667,8 +590,8 @@ func TestRouteGetSubmission(t *testing.T) {
 		return
 	}
 	submission := Submission{
-		Name:    "Test",
-		Authors: []GlobalUser{globalAuthors[0]},
+		Name:      "Test",
+		Authors:   []GlobalUser{globalAuthors[0]},
 		Reviewers: []GlobalUser{globalReviewers[0]},
 		MetaData: &SubmissionData{
 			Abstract: "Test",
@@ -684,7 +607,7 @@ func TestRouteGetSubmission(t *testing.T) {
 		// Create submission, then send request.
 		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
 		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
-		ctx := context.WithValue(r.Context(), "data", RequestContext{
+		ctx := context.WithValue(r.Context(), "data", &RequestContext{
 			ID: globalAuthors[0].ID, UserType: USERTYPE_PUBLISHER})
 		router.ServeHTTP(w, r.WithContext(ctx))
 		resp := w.Result()
@@ -708,7 +631,7 @@ func TestRouteGetSubmission(t *testing.T) {
 	t.Run("Get unapproved submission as editor", func(t *testing.T) {
 		url := fmt.Sprintf("%s/%d", SUBROUTE_SUBMISSION, id)
 		r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
-		ctx := context.WithValue(r.Context(), "data", RequestContext{
+		ctx := context.WithValue(r.Context(), "data", &RequestContext{
 			ID: globalAuthors[1].ID, UserType: USERTYPE_EDITOR})
 		router.ServeHTTP(w, r.WithContext(ctx))
 		resp := w.Result()
@@ -738,13 +661,13 @@ func TestRouteGetSubmission(t *testing.T) {
 		// make sure the response is unauthorized
 		if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "User should be unauthorized") {
 			return
-		} 
+		}
 	})
 
 	// tests that a single valid submission that is unapproved can be viewed by an editor
 	t.Run("Get approved submission as nil user", func(t *testing.T) {
 		// marks the submission approved
-		addReview(&Review{ReviewerID: globalReviewers[0].ID, Approved: true, Base64Value:"review"}, id)
+		addReview(&Review{ReviewerID: globalReviewers[0].ID, Approved: true, Base64Value: "review"}, id)
 		updateSubmissionStatus(true, id)
 
 		// sends the request
@@ -787,6 +710,16 @@ func TestDownloadSubmission(t *testing.T) {
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_SUBMISSION+"/{id}"+ENDPOINT_DOWNLOAD_SUBMISSION, GetDownloadSubmission)
 
+	// Get test Zip file's base 64 value.
+	content, err := ioutil.ReadFile(TEST_ZIP_PATH)
+	if !assert.NoErrorf(t, err, "Zip file failed to open: %v", err) {
+		return
+	}
+	fileArr, err := getFileArrayFromZipBase64(base64.StdEncoding.EncodeToString(content))
+	if !assert.NoErrorf(t, err, "File array getter shouldn'r error!") {
+		return
+	}
+
 	// Initialise users and created submissions.
 	globalAuthors, _, err := initMockUsers(t)
 	if err != nil {
@@ -796,10 +729,7 @@ func TestDownloadSubmission(t *testing.T) {
 	submission := Submission{
 		Name:    "Test",
 		Authors: []GlobalUser{globalAuthors[0]},
-		Files: []File{
-			{Path: "test.txt", Base64Value: base64.StdEncoding.EncodeToString([]byte("test"))},
-			{Path: "test/test.txt", Base64Value: base64.StdEncoding.EncodeToString([]byte("test"))},
-		},
+		Files:   fileArr,
 		MetaData: &SubmissionData{
 			Abstract: "Test",
 		},
@@ -808,11 +738,14 @@ func TestDownloadSubmission(t *testing.T) {
 	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
 		return
 	}
+	if err := storeZip(base64.StdEncoding.EncodeToString(content), submissionID); err != nil {
+		return
+	}
 
 	// valid requests
 	t.Run("Valid Request", func(t *testing.T) {
 		// this function takes care of sending a request and parsing the submission from the downloaded zip
-		downloadSubmission := func(submissionID uint) []File {
+		downloadSubmission := func(submissionID uint) string {
 			// sends the download request
 			url := fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSION, submissionID, ENDPOINT_DOWNLOAD_SUBMISSION)
 			r, w := httptest.NewRequest(http.MethodGet, url, nil), httptest.NewRecorder()
@@ -820,34 +753,20 @@ func TestDownloadSubmission(t *testing.T) {
 			resp := w.Result()
 
 			// decodes the response body from base64 and unzips it
-			encodedBytes := make([]byte, 1000)
+			encodedBytes := make([]byte, 1000000)
 			n, err := resp.Body.Read(encodedBytes)
 			encodedBytes = encodedBytes[0:n]
 			if !assert.NoError(t, err, "error occurred while getting download response body") {
-				return nil
+				return ""
 			}
-			files, err := getFileArrayFromZipBase64(string(encodedBytes)) // this function will base64 encode file contents to be stored
-			if !assert.NoError(t, err, "error occurred while getting the file array from the zip base 64") {
-				return nil
-			}
-			return files
+			return string(encodedBytes)
 		}
 
 		t.Run("download valid submission", func(t *testing.T) {
-			filesVerified := 0 // counts the number of files from the submission we have compared
-			files := downloadSubmission(submissionID)
+			encodedZip := downloadSubmission(submissionID)
 
-			// Note that the files in the zip archive are not base64 encoded though they are here (done by getFileArrayFromZipBase64)
-			// and the zip files are wrapped with a directory of the same name as the submission
-			for _, downloadedFile := range files {
-				for _, addedFile := range submission.Files {
-					if downloadedFile.Path == (submission.Name+"/"+addedFile.Path) &&
-						downloadedFile.Base64Value == addedFile.Base64Value {
-						filesVerified += 1
-					}
-				}
-			}
-			assert.Equal(t, len(submission.Files), filesVerified, "zip is missing files")
+			// Check if the uploaded zip and the downloaded zip are the same.
+			assert.Equal(t, base64.StdEncoding.EncodeToString(content), encodedZip, "ZIP files should be the same.")
 		})
 	})
 
@@ -963,6 +882,14 @@ func TestAddSubmission(t *testing.T) {
 	t.Run("Add Full Submission", func(t *testing.T) {
 		testAddSubmission(&FULL_SUBMISSION)
 	})
+	// tests that a valid runnable submission can be added
+	t.Run("Add Runnable Submission", func(t *testing.T) {
+		runnableSub := FULL_SUBMISSION.getCopy()
+		runnableSub.Runnable = true
+		runnableSub.Files = append(runnableSub.Files,
+			File{Path: "run.sh", Base64Value: "testrunfile"})
+		testAddSubmission(runnableSub)
+	})
 
 	// tests that trying to add a nil submission to the db and filesystem will result in an error
 	t.Run("Invalid cases do not change the database and filesystem's state", func(t *testing.T) {
@@ -991,6 +918,12 @@ func TestAddSubmission(t *testing.T) {
 				},
 			}
 			verifyRollback(&BadFilesSubmission)
+		})
+		t.Run("Invalid Runnable Submission", func(t *testing.T) {
+			notRunnable := FULL_SUBMISSION.getCopy()
+			notRunnable.Runnable = true
+			_, err := addSubmission(notRunnable)
+			assert.Error(t, err, "no error for invalid runnable submission")
 		})
 	})
 }
@@ -1141,7 +1074,7 @@ func TestGetSubmissionMetaData(t *testing.T) {
 
 // Test RouteUploadSubmissionByZip - executes similarly to UploadSubmission,
 // with zip file instead of file array.
-func TestRouteUploadSubmissionByZip(t *testing.T) {
+func TestUploadSubmissionByZip(t *testing.T) {
 	testInit()
 	defer testEnd()
 
@@ -1154,7 +1087,7 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 	route := SUBROUTE_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
 	router := mux.NewRouter()
 	router.HandleFunc(route, PostUploadSubmissionByZip)
-	reqCtx := RequestContext{
+	reqCtx := &RequestContext{
 		ID:       authors[0].ID,
 		UserType: authors[0].UserType,
 	}
@@ -1207,6 +1140,10 @@ func TestRouteUploadSubmissionByZip(t *testing.T) {
 			if !assert.NoErrorf(t, err, "File stat shouldn't fail/ file should exist!") {
 				return
 			}
+		}
+		_, err = os.Stat(filepath.Join(path, "project.zip"))
+		if !assert.NoError(t, err, "ZIP file creation should succeed!") {
+			return
 		}
 	})
 

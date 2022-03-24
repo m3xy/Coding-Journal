@@ -35,7 +35,7 @@ func jwtMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		} else {
 			if !isUnique(gormDb, &GlobalUser{}, "id", id) {
-				ctx := context.WithValue(r.Context(), "data", RequestContext{
+				ctx := context.WithValue(r.Context(), "data", &RequestContext{
 					ID:       id,
 					UserType: userType,
 				})
@@ -65,7 +65,7 @@ func RequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		user, usertype := "-", "-"
-		if ctx, ok := r.Context().Value("data").(RequestContext); ok && validate.Struct(ctx) == nil {
+		if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) == nil {
 			user = ctx.ID
 			userMap := map[int]string{0: "user", 1: "publisher", 2: "reviewer",
 				3: "reviewer-publisher", 4: "editor"}

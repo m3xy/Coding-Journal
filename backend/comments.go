@@ -25,7 +25,6 @@ import (
 // upload comment router function.
 // POST /file/{id}/newcomment
 func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] PostUploadUserComment request received from %v.", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 	resp := &NewCommentResponse{}
 	req := &NewCommentPostBody{}
@@ -59,8 +58,6 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		log.Printf("[INFO] PostUploadUserComment request from %v successful.", r.RemoteAddr)
 	}
 }
 

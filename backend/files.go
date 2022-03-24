@@ -62,7 +62,6 @@ func getSubmissionDirectoryPath(s Submission) string {
 // Returns file with comments and metadata.
 // GET /file/{id}
 func GetFile(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] getFile request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 	var err error
 	resp := &GetFileResponse{}
@@ -74,7 +73,7 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - file ID unable to be parsed", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// calls helper function to get the file struct for the given ID
+		// calls helper function to get the file struct for the given ID
 	} else if resp.File, err = getFileData(uint(fileID64)); err != nil {
 		switch err.(type) {
 		case *FileNotFoundError:
@@ -91,8 +90,6 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] JSON repsonse formatting failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		log.Printf("[INFO] getFile request from %v successful.", r.RemoteAddr)
 	}
 }
 
@@ -167,12 +164,15 @@ func getFileData(fileID uint) (*File, error) {
 			Find(&comments, "file_id = ?", fileID).Error; err != nil {
 			return err
 		}
+		var err error
+		fileComments := []Comment{}
 		for _, comment := range comments {
-			if err := loadComments(tx, comment); err != nil {
+			if comment.Comments, err = loadComments(tx, &comment); err != nil {
 				return err
 			}
+			fileComments = append(fileComments, comment)
 		}
-		file.Comments = comments
+		file.Comments = fileComments
 
 		// queries the submission name
 		if err := gormDb.Select("Name, ID, created_at").Find(submission, file.SubmissionID).Error; err != nil {
@@ -196,22 +196,30 @@ func getFileData(fileID uint) (*File, error) {
 }
 
 // Recursive functions for loading comment replies.
-// 
+//
 // Params:
 // 	tx (*gorm.DB) - A gorm.DB instance to be query on (as this is used in transactions only)
 // 	c (Comment) - the comment to get the children of
 // Returns:
+// 	([]Commment) - c's list of child comments
 // 	(error) - an error if one occurs
-func loadComments(tx *gorm.DB, c Comment) error {
-	for _, child := range c.Comments {
-		if err := tx.Preload("Comments").Order("created_at desc").
-			Where("comments.parent_id = ?", c.ID).Find(&child).Error; err != nil {
-			return err
-		} else if err := loadComments(tx, child); err != nil {
-			return err
+func loadComments(tx *gorm.DB, c *Comment) ([]Comment, error) {
+	// gets c's child comments as an array
+	var err error
+	childArray := []Comment{} // array of child comments
+	if err = tx.Model(&Comment{}).Where("parent_id = ?", c.ID).Find(&childArray).Error; err != nil {
+		return nil, err
+	}
+	// array of child comments with their nested comments to allow for memory re-alloc (so that nesting is preserved)
+	nestedChildArray := []Comment{}
+	for _, child := range childArray {
+		if child.Comments, err = loadComments(tx, &child); err != nil {
+			return nil, err
+		} else {
+			nestedChildArray = append(nestedChildArray, child)
 		}
 	}
-	return nil
+	return nestedChildArray, nil
 }
 
 // Get base64 encoded file content from filesystem.
@@ -270,7 +278,7 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 }
 
 // Unzip a file to some temporary folder. Returns folder path.
-// 
+//
 // Params:
 // 	base64value (string) : the base64 encoded value of the entire zip file
 // Returns:
@@ -300,4 +308,34 @@ func TmpStoreZip(base64value string) (string, error) {
 ROLLBACK:
 	os.Remove(path)
 	return "", err
+}
+
+func storeZip(base64value string, id uint) error {
+	zipBytes, err := base64.StdEncoding.DecodeString(base64value)
+	if err != nil {
+		log.Printf("[ERROR] Base 64 value given is invalid/corrupt.")
+		return err
+	}
+	var s Submission
+	if err := gormDb.Find(&s, id).Error; err != nil {
+		return err
+	}
+
+	path := filepath.Join(getSubmissionDirectoryPath(s), "project.zip")
+	fmt.Println(path)
+	f, err := os.Create(path)
+	if err != nil {
+		log.Printf("[ERROR] Could not create zip file - %v", err)
+	}
+	defer f.Close()
+	if err := os.WriteFile(path, zipBytes, 0666); err != nil {
+		log.Printf("[ERROR] ZIP file creation failed: %v", err)
+		goto ROLLBACK
+	}
+	log.Printf("[INFO] Created ZIP file at path %s", path)
+	return nil
+
+ROLLBACK:
+	os.Remove(path)
+	return err
 }

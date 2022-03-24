@@ -26,11 +26,6 @@ const (
 	TEST_FILES_DIR = "../filesystem_test/" // environment variable set to this value
 )
 
-var testFiles []File = []File{
-	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
-	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
-}
-
 // -----------
 // Router Function Tests
 // -----------
@@ -89,6 +84,49 @@ func TestGetFile(t *testing.T) {
 		case !assert.Equal(t, testFile.Path, respData.File.Path, "file paths do not match"),
 			!assert.Equal(t, submissionID, respData.File.SubmissionID, "Submission IDs do not match"),
 			!assert.Equal(t, testFile.Base64Value, respData.File.Base64Value, "File Content does not match"):
+			return
+		}
+	})
+
+	// tests getting a single valid file without comments
+	t.Run("Get One File nested comments", func(t *testing.T) {
+		// adds comments to the test file
+		commentID1, _ := addComment(&Comment{FileID:fileID, 
+			AuthorID:reviewerID, LineNumber: 0, Base64Value:"testComment1"})
+		commentID2, _ := addComment(&Comment{ParentID:&commentID1, FileID:fileID,
+			AuthorID:reviewerID, Base64Value:"testComment1"})
+		commentID3, _ := addComment(&Comment{ParentID:&commentID2, FileID:fileID,
+			AuthorID:reviewerID, Base64Value:"testComment1"})
+		commentID4, _ := addComment(&Comment{ParentID:&commentID3, FileID:fileID,
+			AuthorID:reviewerID, Base64Value:"testComment1"})
+	
+		// builds the request url inserting query parameters
+		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
+		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+		if !assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode) {
+			return
+		}
+		// marshals the json response into a file struct
+		respData := &GetFileResponse{}
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&respData), "Error decoding JSON in server response") {
+			return
+		}
+
+		// tests that the file was retrieved with the correct information
+		switch {
+		case !assert.Equal(t, testFile.Path, respData.File.Path, "file paths do not match"),
+			!assert.Equal(t, submissionID, respData.File.SubmissionID, "Submission IDs do not match"),
+			!assert.Equal(t, testFile.Base64Value, respData.File.Base64Value, "File Content does not match"),
+			!assert.Equal(t, commentID1, respData.File.Comments[0].ID, "top level comment does not match"),
+			!assert.Equal(t, commentID2, respData.File.Comments[0].
+				Comments[0].ID, "second level comment does not match"),
+			!assert.Equal(t, commentID3, respData.File.Comments[0].
+				Comments[0].Comments[0].ID, "third level comment does not match"),
+			!assert.Equal(t, commentID4, respData.File.Comments[0].
+				Comments[0].Comments[0].Comments[0].ID,"fourth level comment does not match"):
 			return
 		}
 	})
