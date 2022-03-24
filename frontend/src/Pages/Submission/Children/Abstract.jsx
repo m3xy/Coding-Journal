@@ -5,29 +5,25 @@ import { Card, Collapse, Button } from "react-bootstrap"
 export default ({ markdown, show, setShow, inversed }) => {
 	let showAbstract = inversed ? !show : show
 	return (
-		<Card style={{ marginBottom: "15px" }}>
+		<Card style={{ marginBottom: "15px" }} body>
 			<Collapse in={showAbstract}>
 				<div id="collapse-abstract">
-					<Card.Body>
-						<h4>Abstract</h4>
-						{markdown !== "" ? (
-							<ReactMarkdown children={markdown} />
-						) : (
-							<p className="text-muted">No abstract...</p>
-						)}
-					</Card.Body>
+					<h4>Abstract</h4>
+					{markdown !== "" ? (
+						<ReactMarkdown children={markdown} />
+					) : (
+						<p className="text-muted">No abstract...</p>
+					)}
 				</div>
 			</Collapse>
-			<Card.Body>
-				<div style={{ display: "flex" }}>
-					<Button
-						style={{ flex: 6 }}
-						variant="outline-secondary"
-						onClick={() => setShow((show) => !show)}>
-						{!showAbstract ? "Show abstract" : "Show files"}
-					</Button>
-				</div>
-			</Card.Body>
+			<div style={{ display: "flex" }}>
+				<Button
+					style={{ flex: 6 }}
+					variant="outline-secondary"
+					onClick={() => setShow((show) => !show)}>
+					{!showAbstract ? "Show abstract" : "Show files"}
+				</Button>
+			</div>
 		</Card>
 	)
 }
