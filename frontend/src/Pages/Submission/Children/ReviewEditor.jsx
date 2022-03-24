@@ -21,6 +21,7 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 	}, [editorState])
 
 	const uploadReview = () => {
+		console.log(markdown)
 		axiosInstance
 			.post("/submission/" + id + "/review", {
 				approved: approve,
@@ -79,7 +80,7 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 			</Modal.Body>
 			{showErr && (
 				<Modal.Body>
-					<Alert variant="alert">{errMsg}</Alert>
+					<Alert variant="danger">{errMsg}</Alert>
 				</Modal.Body>
 			)}
 		</Modal>
