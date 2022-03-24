@@ -73,7 +73,7 @@ func GetFile(w http.ResponseWriter, r *http.Request) {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - file ID unable to be parsed", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// calls helper function to get the file struct for the given ID
+		// calls helper function to get the file struct for the given ID
 	} else if resp.File, err = getFileData(uint(fileID64)); err != nil {
 		switch err.(type) {
 		case *FileNotFoundError:
@@ -195,9 +195,8 @@ func getFileData(fileID uint) (*File, error) {
 	return file, nil
 }
 
-
 // Recursive functions for loading comment replies.
-// 
+//
 // Params:
 // 	tx (*gorm.DB) - A gorm.DB instance to be query on (as this is used in transactions only)
 // 	c (Comment) - the comment to get the children of
@@ -279,7 +278,7 @@ func getFileArrayFromZipBase64(base64value string) ([]File, error) {
 }
 
 // Unzip a file to some temporary folder. Returns folder path.
-// 
+//
 // Params:
 // 	base64value (string) : the base64 encoded value of the entire zip file
 // Returns:
@@ -309,4 +308,34 @@ func TmpStoreZip(base64value string) (string, error) {
 ROLLBACK:
 	os.Remove(path)
 	return "", err
+}
+
+func storeZip(base64value string, id uint) error {
+	zipBytes, err := base64.StdEncoding.DecodeString(base64value)
+	if err != nil {
+		log.Printf("[ERROR] Base 64 value given is invalid/corrupt.")
+		return err
+	}
+	var s Submission
+	if err := gormDb.Find(&s, id).Error; err != nil {
+		return err
+	}
+
+	path := filepath.Join(getSubmissionDirectoryPath(s), "project.zip")
+	fmt.Println(path)
+	f, err := os.Create(path)
+	if err != nil {
+		log.Printf("[ERROR] Could not create zip file - %v", err)
+	}
+	defer f.Close()
+	if err := os.WriteFile(path, zipBytes, 0666); err != nil {
+		log.Printf("[ERROR] ZIP file creation failed: %v", err)
+		goto ROLLBACK
+	}
+	log.Printf("[INFO] Created ZIP file at path %s", path)
+	return nil
+
+ROLLBACK:
+	os.Remove(path)
+	return err
 }
