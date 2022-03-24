@@ -10,7 +10,6 @@
 package main
 
 import (
-	"archive/zip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -426,7 +425,12 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 		Abstract: r.Abstract, Tags: r.Tags,
 		Files: files, Runnable: r.Runnable,
 	})
-	if submissionID, err := addSubmission(submission); err != nil {
+	submissionID, err := addSubmission(submission)
+	if err != nil {
+		return 0, err
+	}
+	err = storeZip(r.ZipBase64Value, submissionID)
+	if err != nil {
 		return 0, err
 	} else {
 		return submissionID, nil
@@ -536,45 +540,16 @@ func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
 // 	(string) : a string of the zip file's contents
 // 	(error) : an error if one occurs
 func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
-	submission, err := getSubmission(submissionID)
-	if err != nil {
-		return nil, err
+	var submission Submission
+	res := gormDb.Limit(1).Find(&submission, submissionID)
+	if res.Error != nil {
+		return nil, res.Error
+	} else if res.RowsAffected == 0 {
+		return nil, &NoSubmissionError{ID: submissionID}
 	}
 
 	// creates the zip archive if it doesn't exist, retrieves it otherwise
-	zipPath := filepath.Join(getSubmissionDirectoryPath(*submission), submission.Name+".zip")
-	if _, err := os.Stat(zipPath); errors.Is(err, os.ErrNotExist) {
-		zipArchive, err := os.Create(zipPath)
-		if err != nil {
-			return nil, err
-		}
-		defer zipArchive.Close()
-		writer := zip.NewWriter(zipArchive)
-		for _, file := range submission.Files {
-			// gets the file content from the filesystem
-			file.Base64Value, err = getFileContent(filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID)))
-			if err != nil {
-				return nil, err
-			}
-			// decodes file content into a byte array to be made into a zip
-			fileBytes, err := base64.StdEncoding.DecodeString(file.Base64Value)
-			if err != nil {
-				return nil, err
-			}
-			// creates a new zip entry for the given file
-			zipEntryWriter, err := writer.Create(fmt.Sprintf("%s/%s", submission.Name, file.Path))
-			if err != nil {
-				return nil, err
-			} else if _, err := zipEntryWriter.Write(fileBytes); err != nil {
-				return nil, err
-			}
-		}
-		writer.Close() // flushes the contents of the buffer into the file
-
-		// any other error occurred
-	} else if err != nil {
-		return nil, err
-	}
+	zipPath := filepath.Join(getSubmissionDirectoryPath(submission), "project.zip")
 
 	// read byte-array from the zip file, encode it to base64 and return
 	zipContent, err := os.ReadFile(zipPath)
@@ -608,7 +583,7 @@ func addSubmission(submission *Submission) (uint, error) {
 	if submission.Runnable {
 		seenRunFile := false
 		for _, file := range submission.Files {
-			if match, err := regexp.MatchString("^run\\.sh", file.Path); err != nil{
+			if match, err := regexp.MatchString("^run\\.sh", file.Path); err != nil {
 				return 0, err
 			} else if match {
 				seenRunFile = true
