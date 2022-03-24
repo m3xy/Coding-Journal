@@ -137,7 +137,6 @@ func TestGetUsers(t *testing.T) {
 
 // tests ability of another journal to get all global users from this journal
 func TestGetUser(t *testing.T) {
-	// Set up test
 	testInit()
 	defer testEnd()
 
