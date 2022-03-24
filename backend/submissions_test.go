@@ -884,6 +884,14 @@ func TestAddSubmission(t *testing.T) {
 	t.Run("Add Full Submission", func(t *testing.T) {
 		testAddSubmission(&FULL_SUBMISSION)
 	})
+	// tests that a valid runnable submission can be added
+	t.Run("Add Runnable Submission", func(t *testing.T) {
+		runnableSub := FULL_SUBMISSION.getCopy()
+		runnableSub.Runnable = true
+		runnableSub.Files = append(runnableSub.Files,
+			File{Path:"run.sh", Base64Value:"testrunfile"})
+		testAddSubmission(runnableSub)
+	})
 
 	// tests that trying to add a nil submission to the db and filesystem will result in an error
 	t.Run("Invalid cases do not change the database and filesystem's state", func(t *testing.T) {
@@ -912,6 +920,12 @@ func TestAddSubmission(t *testing.T) {
 				},
 			}
 			verifyRollback(&BadFilesSubmission)
+		})
+		t.Run("Invalid Runnable Submission", func(t *testing.T) {
+			notRunnable := FULL_SUBMISSION.getCopy()
+			notRunnable.Runnable = true
+			_, err := addSubmission(notRunnable)
+			assert.Error(t, err, "no error for invalid runnable submission")
 		})
 	})
 }

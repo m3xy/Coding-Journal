@@ -115,3 +115,7 @@ type DuplicateFileError struct {
 func (e *DuplicateFileError) Error() string {
 	return fmt.Sprintf("Path %s appears more than once!", e.Path)
 }
+
+type SubmissionNotRunnableError struct {}
+
+func (e *SubmissionNotRunnableError) Error() string { return "Given submission is missing a run file" }

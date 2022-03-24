@@ -94,6 +94,7 @@ type UploadSubmissionBody struct {
 	Authors   []string `json:"authors" validate:"required"`
 	Reviewers []string `json:"reviewers"`
 	Files     []File   `json:"files"`
+	Runnable  bool     `json:"runnable"`
 }
 
 // POST /submissions/{id}/assignreviewers
@@ -121,6 +122,7 @@ type UploadSubmissionByZipBody struct {
 	Authors        []string `json:"authors" validate:"required"`
 	Reviewers      []string `json:"reviewers"`
 	ZipBase64Value string   `json:"base64" validate:"base64,required"`
+	Runnable       bool     `json:"runnable"`
 }
 
 // --- JWT Claim types --- //

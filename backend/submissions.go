@@ -355,6 +355,7 @@ func adaptBodyToSubmission(b *UploadSubmissionBody) *Submission {
 		MetaData: &SubmissionData{
 			Abstract: b.Abstract,
 		},
+		Runnable: b.Runnable,
 	}
 }
 
@@ -387,6 +388,9 @@ func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
 		case *BadUserError:
 			resp.Message = fmt.Sprintf("User %s does not exist in the system.", err.(*BadUserError).userID)
 			w.WriteHeader(http.StatusUnauthorized)
+		case *SubmissionNotRunnableError:
+			resp.Message = err.Error()
+			w.WriteHeader(http.StatusBadRequest)
 		default:
 			resp.Message = "Internal server error - Undisclosed."
 			w.WriteHeader(http.StatusInternalServerError)
@@ -416,12 +420,11 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 	if err != nil {
 		return 0, err
 	}
-
 	submission := adaptBodyToSubmission(&UploadSubmissionBody{
 		Name: r.Name, License: r.License,
 		Authors: r.Authors, Reviewers: r.Reviewers,
 		Abstract: r.Abstract, Tags: r.Tags,
-		Files: files,
+		Files: files, Runnable: r.Runnable,
 	})
 	if submissionID, err := addSubmission(submission); err != nil {
 		return 0, err
@@ -600,6 +603,21 @@ func addSubmission(submission *Submission) (uint, error) {
 	// adds the submission to the db, automatically setting submission.ID
 	if submission == nil {
 		return 0, errors.New("Submission is empty.")
+	}
+	// checks for run file if the submission is marked runnable
+	if submission.Runnable {
+		seenRunFile := false
+		for _, file := range submission.Files {
+			if match, err := regexp.MatchString("^run\\.sh", file.Path); err != nil{
+				return 0, err
+			} else if match {
+				seenRunFile = true
+				break
+			}
+		}
+		if !seenRunFile {
+			return 0, &SubmissionNotRunnableError{}
+		}
 	}
 	err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Database operations
