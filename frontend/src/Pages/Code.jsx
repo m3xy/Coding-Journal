@@ -16,9 +16,9 @@ const fileEndpoint = '/file'
 function Code({id}) {
 
     const [file, setFile] = useState({ID:null, submissionId:null, path:"", CreatedAt:"", UpdatedAt:""});
-    const [code, setCode] = useState("// type your code...");
+    const [code, setCode] = useState("");
 
-    const monacoRef = useRef();
+    const monacoRef = useRef(null);
     const [theme, setTheme] = useState('vs');
     const [language, setLanguage] = useState('javascript');
     const [lineNumber, setLineNumber] = useState(1);
@@ -38,25 +38,28 @@ function Code({id}) {
     }, [id])
 
     const getFile = () => {
-        console.log(id);
-        if(id == null || id == -1) return;
-        axiosInstance.get(fileEndpoint + "/" + id)
+        if(id && id != -1){
+            axiosInstance.get(fileEndpoint + "/" + id)
             .then((response) => {
-                console.log(response.data.file);
 
                 //Set file, code and comments
                 setFile(response.data.file);
-                setCode(atob(response.data.file.base64Value));
+                setCode(atob(response.data.file.base64Value)); 
+                // monacoRef.current.editor.setValue(atob(response.data.file.base64Value)); //Fixes problem with selecting
                 setComments(response.data.file.comments);
 
             }).catch((error) => {
                 console.log(error);
             })
+        }else{
+            setFile({ID:null, submissionId:null, path:"", CreatedAt:"", UpdatedAt:""});
+            setComments([]);
+            setCode("");
+        }
+
     }
 
     const editorDidMount = (editor, monaco) => {
-        console.log('editorDidMount', editor);
-
         // monaco.languages.registerHoverProvider(language, {
         //     provideHover: function(model, position) {
         //         // console.log(model.getWordAtPosition(position).word); //Able to retrieve word
@@ -76,17 +79,18 @@ function Code({id}) {
 
             id: 'Comment',                                                  // An unique identifier of the contributed action.
             label: 'Comment',                                               // A label of the action that will be presented to the user. (Right-click)
-            keybindings: [ monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyM ],   // An optional array of keybindings for the action.
+            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyM],     // An optional array of keybindings for the action.
             precondition: null,                                             // A precondition for this action.
             keybindingContext: null,                                        // A rule to evaluate on top of the precondition in order to dispatch the keybindings.
             contextMenuGroupId: 'navigation',
             contextMenuOrder: 1.5,
         
             // Method that will be executed when the action is triggered.
-            // @param editor The editor instance is passed in as a convenience
+            // @param editor The editor instance is passed in
             run: function (ed) {
-                // let comment = prompt("Comment on line " + ed.getPosition().lineNumber, "Type Here");
-                setLineNumber(ed.getPosition().lineNumber);
+                // console.log(ed.getSelection().startLineNumber)
+                // console.log(ed.getSelection().endLineNumber)
+                setLineNumber(ed.getSelection().startLineNumber);
                 setShowComments(true);
             }
         });
@@ -108,11 +112,6 @@ function Code({id}) {
         editor.focus();
     };
 
-    const onChange = (newValue, e) => {
-        console.log('onChange', newValue, e);
-        setCode(newValue)
-    };
-
     const options = {
         selectOnLineNumbers: true,
         glyphMargin: true,
@@ -122,6 +121,7 @@ function Code({id}) {
     return(
         <Card border="light" className='row no-gutters'>
             <Card.Header><b>Code</b></Card.Header>
+            {(id && id != -1) ? 
             <Card.Body>
             <Card.Title>{file.path}</Card.Title>
             <Card.Text>Created: {file.CreatedAt}</Card.Text>
@@ -161,7 +161,6 @@ function Code({id}) {
                                     theme={theme}
                                     value={code}
                                     options={options}
-                                    onChange={onChange}
                                     editorDidMount={editorDidMount}
                                 />
                             </Col>
@@ -171,7 +170,7 @@ function Code({id}) {
                 <embed height="1000" width="100%" src={"data:application/pdf;base64," + file.base64Value} />
             }
             <br/>
-            <Button variant="dark" onClick={() => setShowComments(!showComments)}>Show comments</Button>
+            <Button variant="dark" onClick={monacoRef.current ? (monacoRef.current.editor._actions.Comment._run) : (() => {setShowComments(true); setLineNumber(1)})}>Show comments</Button>
             <Comments 
                 id={id}
                 comments={comments}
@@ -181,6 +180,7 @@ function Code({id}) {
                 refresh={getFile}>
             </Comments>
             </Card.Body>
+            : <>No file selected</>}
             <Card.Footer className="text-muted">Last updated: {file.UpdatedAt}</Card.Footer>
         </Card>
     )

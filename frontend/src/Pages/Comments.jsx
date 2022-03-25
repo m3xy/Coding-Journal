@@ -23,13 +23,13 @@ function Comments({id, comments, line, show, setShow, refresh}) {
 	const postComment = (e, parentID, content, line) => {
 		e.preventDefault();
 
-		if (content == null || content == "") {
+		if (!content || content == "") {
 			console.log("No comment written");
 			return;
 		}
 		
 		let userId = JwtService.getUserID();        //Preparing to get userId from session cookie
-		if(userId === null){                        //If user has not logged in, disallow submit
+		if(!userId){                        		//If user has not logged in, disallow submit
 			console.log("Not logged in");
 			return;
 		}
@@ -43,7 +43,6 @@ function Comments({id, comments, line, show, setShow, refresh}) {
 		console.log(comment);
 		axiosInstance.post(fileEndpoint + "/" + id + commentEndpoint, comment)
 					.then((response) => {
-						console.log(response);
 						refresh();
 					})
 					.catch((error) => {
@@ -61,14 +60,7 @@ function Comments({id, comments, line, show, setShow, refresh}) {
 	const commentsHTML = comments !== undefined ? 
 		comments.map((comment) => {
 			return (<Comment 
-						ID={comment.ID} 
-						author={comment.author} 
-						line={comment.lineNumber} 
-						b64={comment.base64Value} 
-						replies={comment.comments} 
-						created={comment.CreatedAt}
-						updated={comment.UpdatedAt}
-						deleted={comment.DeletedAt}
+						comment={comment}
 						show={showComment}
 						postReply={(e, parentID, content) => {postComment(e, parentID, content, comment.lineNumber)}}/>)
 		})

@@ -5,27 +5,45 @@
  * React component for displaying a comment
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Button, Collapse, FormControl, InputGroup, Toast } from 'react-bootstrap'
 import JwtService from "../Web/jwt.service";
+import axiosInstance from "../Web/axiosInstance"
 
-function Comment({ID, author, line, b64, replies, created, updated, deleted, show, postReply}) {
+const userEndpoint = "/user"
 
-    const [text, setText] = useState("");
+function Comment({comment, show, postReply}) {
+
+    const [reply, setReply] = useState("");
     const [showReplies, setShowReplies] = useState(false);
     const [openReplies, setOpenReplies] = useState(false);
+    const [name, setName] = useState("");
+    const [edit, setEdit] = useState("");
+    const [openEdits, setOpenEdits] = useState(false);
 
-    const repliesHTML = (replies !== undefined ? replies.map((reply) => {
-        console.log(reply);
+
+    useEffect(() => {
+        getName();
+    }, [name])
+
+    const getName = () => {
+        axiosInstance.get(userEndpoint + "/" + comment.author)
+        .then((response)=>{
+            setName(response.data.profile.firstName + " " + response.data.profile.lastName)
+        }).catch((error) => {
+            console.log(error);
+        })
+    }
+
+    const postEdit = () => {
+        if(text == atob(comment.base64Value)){
+            console.log("Comment unchanged")
+        }
+    }
+
+    const repliesHTML = (comment.comments? comment.comments.map((reply) => {
         return (<Comment 
-            ID={reply.ID} 
-            author={reply.author}
-            line={reply.lineNumber} 
-            b64={reply.base64Value} 
-            replies={reply.comments} 
-            created={reply.CreatedAt}
-            updated={reply.UpdatedAt}
-            deleted={reply.DeletedAt}
+            comment={reply}
             show={showReplies} 
             postReply={postReply}/>)
     })
@@ -36,28 +54,34 @@ function Comment({ID, author, line, b64, replies, created, updated, deleted, sho
             <Toast style={{verticalAlign:"top"}} className="d-inline-block m-1">
                 <Toast.Header closeButton={false}>
                     {/* <img src="holder.js/20x20?text=%20" className="rounded me-2" alt="" /> */}
-                    <strong className="me-auto">{author}</strong>
-                    <small>{"Line: " + line}</small>
+                    <strong className="me-auto">{name}</strong>
+                    <small>{"Line: " + comment.lineNumber}</small>
                 </Toast.Header>
                 <Toast.Body>
-                    {atob(b64)}<p />
-                    <small className="text-muted">{deleted ? "(deleted)" : (created == updated ? created : updated + " (edited)")}</small>
+                    {openEdits ?
+                        <InputGroup className="mb-3" size="sm">
+                            <FormControl placeholder={"Edit comment"} onChange={(e) => setEdit(e.target.value)} value={edit}/>
+                            <Button variant="outline-secondary" onClick={(e) => {postEdit(); setEdit("")}}>Save</Button>
+                        </InputGroup>
+                    :
+                    atob(comment.base64Value)}<p />
+                    <small className="text-muted">{comment.DeletedAt ? "(deleted)" : (comment.CreatedAt == comment.UpdatedAt ? comment.CreatedAt : comment.UpdatedAt + " (edited)")}</small>
                     <br />
 
                     <Button variant='light' onClick={() => setOpenReplies(!openReplies)}>↩</Button>
-                    { JwtService.getUserID() == author ? 
-                      <><Button variant='light'>✎</Button>
+                    { JwtService.getUserID() == comment.author ? 
+                      <><Button variant='light' onClick={() => {setEdit(atob(comment.base64Value)); setOpenEdits(!openEdits)}}>✎</Button>
                         <Button variant='light'>🗑</Button></>
                     : <></>}
 
-                    {replies ? 
+                    {comment.comments ? 
                         <Button variant='light' onClick={() => setShowReplies(!showReplies)}>💬</Button>
                     : <></>}
 
                     <Collapse in={openReplies}>
                         <InputGroup className="mb-3" size="sm">
-                            <FormControl placeholder={"Enter a reply"} onChange={(e) => setText(e.target.value)} value={text}/>
-                            <Button variant="outline-secondary" onClick={(e) => {setText(""); postReply(e, ID, text)}}>Reply</Button>
+                            <FormControl placeholder={"Enter a reply"} onChange={(e) => setReply(e.target.value)} value={reply}/>
+                            <Button variant="outline-secondary" onClick={(e) => {postReply(e, comment.ID, reply); setReply("")}}>Reply</Button>
                         </InputGroup>
                     </Collapse>
                 </Toast.Body> 
