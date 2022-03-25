@@ -116,22 +116,22 @@ func TestGetUserQuery(t *testing.T) {
 			return respData
 		}
 
-		// // confirms that the query requests return a full user profile
-		// t.Run("confirm data", func(t *testing.T) {
-		// 	queryRoute := fmt.Sprintf("%s%s", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
-		// 	respData := handleValidQuery(queryRoute)
-		// 	user := respData.Users[0]
-		// 	switch {
-		// 	case !assert.NotEmpty(t, user.User, "user profile is nil"),
-		// 		!assert.NotEmpty(t, user.User.Email, "email is nil"),
-		// 		!assert.Empty(t, user.User.Password, "password returned!"),
-		// 		!assert.NotEmpty(t, user.User.FirstName, "first name is nil"),
-		// 		!assert.NotEmpty(t, user.User.LastName, "last name is nil"),
-		// 		!assert.NotEmpty(t, user.User.PhoneNumber, "phone number is nil"),
-		// 		!assert.NotEmpty(t, user.User.Organization, "organization is nil"):
-		// 		return
-		// 	}
-		// })
+		// confirms that the query requests return a full user profile
+		t.Run("confirm data", func(t *testing.T) {
+			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+			respData := handleValidQuery(queryRoute)
+			user := respData.Users[0]
+			switch {
+			case !assert.NotEmpty(t, user.User, "user profile is nil"),
+				!assert.NotEmpty(t, user.User.Email, "email is nil"),
+				!assert.Empty(t, user.User.Password, "password returned!"),
+				!assert.NotEmpty(t, user.User.FirstName, "first name is nil"),
+				!assert.NotEmpty(t, user.User.LastName, "last name is nil"),
+				!assert.NotEmpty(t, user.User.PhoneNumber, "phone number is nil"),
+				!assert.NotEmpty(t, user.User.Organization, "organization is nil"):
+				return
+			}
+		})
 
 		t.Run("order by name", func(t *testing.T) {
 			t.Run("first name", func(t *testing.T) {

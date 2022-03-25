@@ -154,6 +154,10 @@ func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]Global
 	}); err != nil {
 		return nil, err
 	}
+	// removes passwords from the users
+	for _, user := range users {
+		user.User.Password = ""
+	}
 	return users, nil
 }
 
