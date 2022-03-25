@@ -23,11 +23,15 @@ const (
 
 func getUserSubroutes(r *mux.Router) {
 	user := r.PathPrefix(SUBROUTE_USER).Subrouter()
+	users := r.PathPrefix(SUBROUTE_USERS).Subrouter()
 
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
-	user.HandleFunc(ENDPOINT_QUERY_USER, GetQueryUsers).Methods(http.MethodGet)
+
+	// Users routes:
+	// + GET /users/query
+	users.HandleFunc(ENDPOINT_QUERY_USER, GetQueryUsers).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
@@ -73,7 +77,7 @@ func GetQueryUsers(w http.ResponseWriter, r *http.Request) {
 	var resp *QueryUsersResponse
 	var users []GlobalUser
 
-	// gets the request context if there is a user logged in
+	// gets the request context if there is a user logged in (login not required, but if logged in, context must be valid)
 	if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
 		stdResp = StandardResponse{Message: "Bad Request Context", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
