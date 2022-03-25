@@ -27,6 +27,7 @@ func getUserSubroutes(r *mux.Router) {
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
+	user.HandleFunc(ENDPOINT_QUERY_USER, GetQueryUsers).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
