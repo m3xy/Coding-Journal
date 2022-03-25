@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useRef } from "react"
+import React, { useEffect, useState } from "react"
 import { Editor } from "react-draft-wysiwyg"
-import { stateToMarkdown } from "draft-js-export-markdown"
-import { EditorState } from "draft-js"
+import { draftToMarkdown } from "markdown-draft-js"
+import { EditorState, convertToRaw } from "draft-js"
 import editorStyles from "./Submission.module.css"
 import "react-draft-wysiwyg/dist/react-draft-wysiwyg.css"
-import { Modal, Form, Alert, Button } from "react-bootstrap"
+import { Modal, Form, Alert, Button, Tabs, Tab } from "react-bootstrap"
+import ReactMarkdown from "react-markdown"
 import axiosInstance from "../../../Web/axiosInstance"
 
 export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
@@ -17,7 +18,9 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 	const [errMsg, setErrMsg] = useState("")
 
 	useEffect(() => {
-		setMarkdown(stateToMarkdown(editorState.getCurrentContent()))
+		setMarkdown(
+			draftToMarkdown(convertToRaw(editorState.getCurrentContent()))
+		)
 	}, [editorState])
 
 	const uploadReview = () => {
@@ -36,15 +39,15 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 				console.log(error)
 				setErrMsg(
 					"Review upload failed - " +
-					error.response.data.message +
-					" - " +
-					error.response.status
+						error.response.data.message +
+						" - " +
+						error.response.status
 				)
 				setShowErr(true)
 			})
 	}
 
-	useEffect(() => { }, [editorState])
+	useEffect(() => {}, [editorState])
 
 	return (
 		<Modal size="lg" show={show} onHide={() => setShow(false)}>
@@ -54,29 +57,46 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 				</h3>
 			</Modal.Header>
 			<Modal.Body>
-				<Form.Switch
-					label="Approve"
-					size="lg"
-					onChange={(e) =>
-						setApproval(e.target.value === "on" ? true : false)
-					}
-				/>
-				<div className={editorStyles.editor}>
-					<Editor
-						editorState={editorState}
-						toolbarClassName="toolbarClassName"
-						wrapperClassname="wrapperClassName"
-						editorClassName="editorClassName"
-						onEditorStateChange={setEditorState}
-					/>
+				<Tabs defaultActiveKey="edit">
+					<Tab eventKey="edit" title="Edit">
+						<div className={editorStyles.editor}>
+							<Editor
+								editorState={editorState}
+								toolbarClassName="toolbarClassName"
+								wrapperClassname="wrapperClassName"
+								editorClassName="editorClassName"
+								onEditorStateChange={setEditorState}
+							/>
+						</div>
+					</Tab>
+					<Tab eventKey="preview" title="Preview">
+						<div className={editorStyles.editor}>
+							<ReactMarkdown children={markdown} />
+						</div>
+					</Tab>
+				</Tabs>
+				<div style={{ display: "flex" }}>
+					<Button
+						size="lg"
+						onClick={() => {
+							uploadReview()
+						}}>
+						{" "}
+						Upload{" "}
+					</Button>
+					<h5>
+						<Form.Switch
+							style={{ marginTop: "8px", marginLeft: "15px" }}
+							label="Approve"
+							size="lg"
+							onChange={(e) =>
+								setApproval(
+									e.target.value === "on" ? true : false
+								)
+							}
+						/>
+					</h5>
 				</div>
-				<Button
-					onClick={() => {
-						uploadReview()
-					}}>
-					{" "}
-					Upload{" "}
-				</Button>
 			</Modal.Body>
 			{showErr && (
 				<Modal.Body>
