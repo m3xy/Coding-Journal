@@ -28,7 +28,7 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 		axiosInstance
 			.post("/submission/" + id + "/review", {
 				approved: approve,
-				base64Value: window.btoa(markdown)
+				base64Value: window.btoa(unescape(encodeURIComponent(markdown)))
 			})
 			.then(() => {
 				setValidationMsg("Review successfully posted!")
@@ -75,6 +75,13 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 						</div>
 					</Tab>
 				</Tabs>
+			</Modal.Body>
+			{showErr && (
+				<Modal.Body>
+					<Alert variant="danger">{errMsg}</Alert>
+				</Modal.Body>
+			)}
+			<Modal.Footer>
 				<div style={{ display: "flex" }}>
 					<Button
 						size="lg"
@@ -89,20 +96,13 @@ export default ({ id, show, setShow, setValidation, setValidationMsg }) => {
 							style={{ marginTop: "8px", marginLeft: "15px" }}
 							label="Approve"
 							size="lg"
-							onChange={(e) =>
-								setApproval(
-									e.target.value === "on" ? true : false
-								)
+							onChange={() =>
+								setApproval((approval) => !approval)
 							}
 						/>
 					</h5>
 				</div>
-			</Modal.Body>
-			{showErr && (
-				<Modal.Body>
-					<Alert variant="danger">{errMsg}</Alert>
-				</Modal.Body>
-			)}
+			</Modal.Footer>
 		</Modal>
 	)
 }
