@@ -107,10 +107,10 @@ func TestGetUserQuery(t *testing.T) {
 
 	t.Run("valid queries", func(t *testing.T) {
 		defer clearUsers()
-		userID1 := registerTestUser("test1@test.com", "Joe", "Shmo", USERTYPE_NIL, "org1")
-		userID2 := registerTestUser("test2@test.com", "Bob", "Tao", USERTYPE_PUBLISHER, "org2")
+		userID1 := registerTestUser("test1@test.com", "Joe", "Shmo", USERTYPE_NIL, "org one")
+		userID2 := registerTestUser("test2@test.com", "Bob", "Tao", USERTYPE_PUBLISHER, "org one two")
 		userID3 := registerTestUser("test3@test.com", "Billy", "Tai", USERTYPE_REVIEWER, "org3")
-		userID4 := registerTestUser("test4@test.com", "Will", "Zimmer", USERTYPE_EDITOR, "org4")
+		userID4 := registerTestUser("test4@test.com", "Will", "Zimmer", USERTYPE_EDITOR, "testtest")
 
 		t.Run("order by name", func(t *testing.T) {
 			t.Run("first name", func(t *testing.T) {
@@ -178,6 +178,28 @@ func TestGetUserQuery(t *testing.T) {
 				assert.Equal(t, 2, len(respData.Users), "incorrect number of users returned")
 				assert.Contains(t, []string{userID2, userID3}, respData.Users[0].ID, "incorrect user")
 				assert.Contains(t, []string{userID2, userID3}, respData.Users[1].ID, "incorrect user")
+			})
+		})
+
+		t.Run("filter by organization", func(t *testing.T) {
+			t.Run("full org", func(t *testing.T) {
+				queryRoute := fmt.Sprintf("%s%s?organization=testtest", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				respData := handleQuery(queryRoute)
+				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
+				assert.Equal(t, userID4, respData.Users[0].ID, "incorrect user")
+			})
+
+			t.Run("partial org", func(t *testing.T) {
+				queryRoute := fmt.Sprintf("%s%s?organization=org", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				respData := handleQuery(queryRoute)
+				expectedUsers := []string{userID1, userID2, userID3}
+				switch {
+				case !assert.Equal(t, 3, len(respData.Users), "incorrect number of users returned"),
+					!assert.Contains(t, expectedUsers, respData.Users[0].ID, "incorrect user"),
+					!assert.Contains(t, expectedUsers, respData.Users[1].ID, "incorrect user"),
+					!assert.Contains(t, expectedUsers, respData.Users[2].ID, "incorrect user"):
+					return
+				}
 			})
 		})
 

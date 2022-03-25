@@ -323,7 +323,6 @@ func storeZip(base64value string, id uint) error {
 	}
 
 	path := filepath.Join(getSubmissionDirectoryPath(s), "project.zip")
-	fmt.Println(path)
 	f, err := os.Create(path)
 	if err != nil {
 		log.Printf("[ERROR] Could not create zip file - %v", err)

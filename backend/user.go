@@ -119,11 +119,15 @@ func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]Global
 			}
 			tx = tx.Where("user_type = ?", userType)
 		}
+		// filter by organization
+		if len(queryParams["organization"]) > 0 {
+			tx = filterByOrganization(tx, regexp.QuoteMeta(queryParams["organization"][0]))
+		}
 		// RegEx filtering for user name
 		if len(queryParams["name"]) > 0 {
 			tx = filterByUserName(tx, regexp.QuoteMeta(queryParams["name"][0]))
 		}
-		// orders result set
+		// order users alphabetically
 		if len(queryParams["orderBy"]) > 0 {
 			orderBy := queryParams["orderBy"][0]
 			if orderBy != "firstName" && orderBy != "lastName" {
@@ -153,6 +157,20 @@ func filterByUserName(tx *gorm.DB, userName string) *gorm.DB {
 	if wordList := strings.Fields(userName); len(wordList) > 1 {
 		for index, field := range wordList {
 			whereString = whereString + fmt.Sprintf(" OR User.first_name REGEXP @%d OR User.last_name REGEXP @%d ", index, index)
+			params[fmt.Sprint(index)] = field
+		}
+	}
+	return tx.Where(whereString, params)
+}
+
+// uses SQL REGEX to filter the users returned based on their organization
+func filterByOrganization(tx *gorm.DB, organization string) *gorm.DB {
+	params := map[string]interface{}{"full": organization}
+	whereString := " User.organization REGEXP @full"
+	// only adds multiple regex conditions if the name given is multiple words
+	if wordList := strings.Fields(organization); len(wordList) > 1 {
+		for index, field := range wordList {
+			whereString = whereString + fmt.Sprintf(" OR User.organization REGEXP @%d", index)
 			params[fmt.Sprint(index)] = field
 		}
 	}
