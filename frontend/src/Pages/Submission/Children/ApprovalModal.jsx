@@ -1,7 +1,30 @@
-import React from "react"
-import { Modal, Button, Table, ButtonGroup } from "react-bootstrap"
+import React, { useState } from "react"
+import { Modal, Button, Table, ButtonGroup, Alert } from "react-bootstrap"
+import { CSSTransition } from "react-transition-group"
+import FadeInStyles from "../../../Components/Transitions/FadeIn.module.css"
+import axiosInstance from "../../../Web/axiosInstance"
 
-export default ({ submission, show, setShow }) => {
+export default ({ submission, show, setShow, setAlertMsg, showAlertMsg }) => {
+	const [showAlert, setShowAlert] = useState(false)
+	const [msg, setMsg] = useState("")
+
+	const submitApproval = (approval) => {
+		axiosInstance
+			.post("/submission/" + submission.ID + "/approve", {
+				status: approval
+			})
+			.then((response) => {
+				setAlertMsg(response.message)
+				showAlertMsg(true)
+				setShow(false)
+			})
+			.catch((err) => {
+				console.log(err)
+				setMsg("Error - " + err.response?.data.message)
+				setShowAlert(false)
+			})
+	}
+
 	return (
 		<Modal show={show} onHide={() => setShow(false)} size="lg">
 			<Modal.Header closeButton>
@@ -11,32 +34,66 @@ export default ({ submission, show, setShow }) => {
 				<div className="text-muted">
 					{submission.reviewers.length === 0
 						? "No reviewers yet, please assign reviewers..."
-						: (submission.metaData.hasOwnProperty('reviews') ? submission.metaData.reviews?.length : '0') +
-						" reviewers have assigned a review, out of " + submission.reviewers?.length + " reviewers."}
+						: (submission.metaData.hasOwnProperty("reviews")
+							? submission.metaData.reviews?.length
+							: "0") +
+						" reviewers have assigned a review, out of " +
+						submission.reviewers?.length +
+						" reviewers."}
 				</div>
 			</Modal.Body>
 			<Modal.Body>
 				<Table striped bordered hover>
 					<thead>
-						<th>#</th>
-						<th>ID</th>
-						<th>Approval</th>
+						<tr>
+							<th>#</th>
+							<th>ID</th>
+							<th>Approval</th>
+						</tr>
 					</thead>
 					<tbody>
 						{submission.metaData.reviews?.map((review, i) => (
 							<tr key={i}>
 								<td>{i}</td>
 								<td>{review.reviewerId}</td>
-								<td>{review.approved ? "Approved" : "Disapproved"}</td>
+								<td>
+									{review.approved
+										? "Approved"
+										: "Disapproved"}
+								</td>
 							</tr>
 						))}
 					</tbody>
 				</Table>
 			</Modal.Body>
+			<CSSTransition
+				in={showAlert}
+				timeout={100}
+				unmountOnExit
+				classNames={{ ...FadeInStyles }}>
+				<Modal.Body>
+					<Alert
+						variant="danger"
+						onClose={() => setShowAlert(false)}
+						dismissible>
+						{msg}
+					</Alert>
+				</Modal.Body>
+			</CSSTransition>
 			<Modal.Footer>
 				<ButtonGroup className="mb-2">
-					<Button disabled={!submission.metaData.hasOwnProperty('reviews')}>Approve</Button>
-					<Button variant="danger">Reject</Button>
+					<Button
+						onClick={() => submitApproval(true)}
+						disabled={
+							!submission.metaData.hasOwnProperty("reviews")
+						}>
+						Approve
+					</Button>
+					<Button
+						variant="danger"
+						onClick={() => submitApproval(false)}>
+						Reject
+					</Button>
 				</ButtonGroup>
 				<Button className="mb-2">Migrate</Button>
 			</Modal.Footer>
