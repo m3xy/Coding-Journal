@@ -30,7 +30,11 @@ export default ({ review, reviewer, show, setShow }) => {
 					</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
-					<ReactMarkdown children={window.atob(review.base64Value)} />
+					<ReactMarkdown
+						children={decodeURIComponent(
+							escape(window.atob(review.base64Value))
+						)}
+					/>
 				</Modal.Body>
 			</Modal>
 		)
