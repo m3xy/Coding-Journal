@@ -113,6 +113,7 @@ func GetQueryUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Controller function to query the database for a list of users
 func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]GlobalUser, error) {
 	var users []GlobalUser
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
@@ -121,7 +122,7 @@ func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]Global
 		// filter results based on user type
 		if len(queryParams["userType"]) > 0 {
 			userType, err := strconv.Atoi(queryParams["userType"][0])
-			if err != nil {
+			if err != nil || userType < 0 || userType > 4 {
 				return &BadQueryParameterError{ParamName:"userType", Value:queryParams["userType"][0]}
 			}
 			tx = tx.Where("user_type = ?", userType)
