@@ -20,7 +20,7 @@ export default ({ review, reviewer, show, setShow }) => {
 				<Modal.Header closeButton>
 					<Modal.Title>
 						<div style={{ display: "flex" }}>
-							{getBadge(review.approves)}
+							{getBadge(review.approved)}
 							<div
 								id="review-title"
 								style={{ marginLeft: "15px" }}>
