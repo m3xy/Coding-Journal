@@ -10,7 +10,8 @@ import {
 	FileViewer,
 	FileExplorer,
 	TagsList,
-	Reviews
+	Reviews,
+	ReviewEditor
 } from "./Children"
 import { Badge, Collapse, Button } from "react-bootstrap"
 
@@ -34,14 +35,15 @@ function Submission() {
 	})
 	const [authors, setAuthors] = useState([])
 	const [reviewers, setReviewers] = useState([])
+	const [review, showReview] = useState(false)
 
 	// Setters for file mode and file ID.
 	const [showFile, setShowFile] = useState(false)
 	const [fileId, setFileId] = useState(-1)
 
 	// Error handling states
-	const [showError, setShowError] = useState(false)
-	const [errMsg, setErrMsg] = useState("")
+	const [showAlert, setAlert] = useState(false)
+	const [alertMsg, setAlertMsg] = useState("")
 
 	// Editor and reviewer variant controllers
 	// 0 - user, 1 - author, 2 - reviewer, 3 - editor.
@@ -59,7 +61,7 @@ function Submission() {
 		setPermissions(() => {
 			switch (JwtService.getUserType()) {
 				case 3:
-					return 1
+					return 2
 				case 4:
 					return 3
 				default:
@@ -158,7 +160,7 @@ function Submission() {
 							<h1 style={{ flex: "1", marginLeft: "15px" }}>
 								{submission.name}
 							</h1>
-							{permissionLevel[perm] === "editor" && (
+							{permissionLevel[perm] === "editor" ? (
 								<Button
 									style={{
 										flex: "0.15",
@@ -166,6 +168,17 @@ function Submission() {
 									}}>
 									Set Approval
 								</Button>
+							) : (
+								permissionLevel[perm] === "reviewer" && (
+									<Button
+										style={{
+											flex: "0.15",
+											justifyContent: "right"
+										}}
+										onClick={() => showReview(true)}>
+										Review
+									</Button>
+								)
 							)}
 						</div>
 					)}
@@ -222,6 +235,13 @@ function Submission() {
 					)}
 				</div>
 			</div>
+			<ReviewEditor
+				id={params.id}
+				show={review}
+				setShow={showReview}
+				setValidation={setAlert}
+				setValidationMsg={setAlertMsg}
+			/>
 		</div>
 	)
 }
