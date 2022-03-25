@@ -11,7 +11,8 @@ import {
 	FileExplorer,
 	TagsList,
 	Reviews,
-	ReviewEditor as EditorModal
+	ReviewEditor as EditorModal,
+	ApprovalModal
 } from "./Children"
 import { Badge, Collapse, Button } from "react-bootstrap"
 
@@ -36,6 +37,7 @@ function Submission() {
 	const [authors, setAuthors] = useState([])
 	const [reviewers, setReviewers] = useState([])
 	const [review, showReview] = useState(false)
+	const [approval, showApproval] = useState(false)
 
 	// Setters for file mode and file ID.
 	const [showFile, setShowFile] = useState(false)
@@ -120,8 +122,8 @@ function Submission() {
 		let [bg, status] = submission.approved
 			? ["primary", "Approved"]
 			: submission.approved === null
-				? ["secondary", "In review"]
-				: ["danger", "Rejected"]
+			? ["secondary", "In review"]
+			: ["danger", "Rejected"]
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
@@ -132,9 +134,9 @@ function Submission() {
 				{users.length > 1 ? "s: " : ": "}
 				{users.length > 0
 					? users.map(
-						(user, i) =>
-							(i === 0 ? " " : ", ") + getUserFullName(user)
-					)
+							(user, i) =>
+								(i === 0 ? " " : ", ") + getUserFullName(user)
+					  )
 					: "No " + role + "s..."}
 			</h5>
 		)
@@ -144,6 +146,7 @@ function Submission() {
 		if (permissionLevel[perm] === "editor")
 			return (
 				<Button
+					onClick={() => showApproval(true)}
 					style={{
 						flex: "0.15",
 						justifyContent: "right"
@@ -280,6 +283,11 @@ function Submission() {
 				setShow={showReview}
 				setValidation={setAlert}
 				setValidationMsg={setAlertMsg}
+			/>
+			<ApprovalModal
+				submission={submission}
+				show={approval}
+				setShow={showApproval}
 			/>
 		</div>
 	)
