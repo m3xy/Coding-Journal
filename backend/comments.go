@@ -36,7 +36,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 
 		// gets context struct and validates it
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - No user logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
