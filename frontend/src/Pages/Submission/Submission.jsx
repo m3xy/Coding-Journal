@@ -151,17 +151,39 @@ function Submission() {
 					Set Approval
 				</Button>
 			)
-		else if (permissionLevel[perm] === "reviewer")
-			return (
-				<Button
-					style={{
-						flex: "0.15",
-						justifyContent: "right"
-					}}
-					onClick={() => showReview(true)}>
-					Review
-				</Button>
-			)
+		else if (
+			permissionLevel[perm] === "reviewer" &&
+			submission.reviewers
+				.map((reviewer) => {
+					return reviewer.userId
+				})
+				.includes(JwtService.getUserID())
+		) {
+			const disabled = submission.metaData.reviews
+				?.map((review) => {
+					return review.reviewerId
+				})
+				.includes(JwtService.getUserID())
+			if (!disabled)
+				return (
+					<Button
+						style={{
+							flex: "0.15",
+							justifyContent: "right"
+						}}
+						onClick={
+							!disabled ? () => showReview(true) : () => null
+						}>
+						Review
+					</Button>
+				)
+			else
+				return (
+					<h5 className={`text-muted ${styles.DisabledReviewButton}`}>
+						You've already reviewed this submission...
+					</h5>
+				)
+		}
 	}
 
 	const leftContainer = () => {
@@ -238,10 +260,10 @@ function Submission() {
 							</Button>
 						)}
 						<div
-							style={
+							className={
 								permissionLevel[perm] === "editor"
-									? { marginTop: "5px" }
-									: {}
+									? styles.ButtonTextCenter
+									: ""
 							}>
 							{getUsersString(reviewers, "Reviewer")}
 						</div>
