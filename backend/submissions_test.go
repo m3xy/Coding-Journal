@@ -819,22 +819,15 @@ func TestGetSubmission(t *testing.T) {
 
 	testSubmission := *testSubmissions[0].getCopy()
 	testFile := testFiles[0]
-	testAuthor := testAuthors[0]
-	testReviewer := testReviewers[0]
 
 	// sets up test environment, and adds a submission with one file to the db and filesystem
-
-	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	// Get authors and reviewers
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	testSubmission.Files = []File{testFile}
 	submissionID, err := addSubmission(&testSubmission)
@@ -914,14 +907,13 @@ func TestGetSubmissionMetaData(t *testing.T) {
 	testInit()
 	defer testEnd()
 
+	// Get authors and reviewers
 	testSubmission := *testSubmissions[0].getCopy()
-	testAuthor := testAuthors[0]
-
-	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, _, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
+	testSubmission.Authors = globalAuthors[:1]
 
 	submissionID, err := addSubmission(&testSubmission)
 	if !assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err) {

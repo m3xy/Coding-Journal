@@ -302,23 +302,19 @@ func TestAddComment(t *testing.T) {
 
 	testSubmission := testSubmissions[0] // test submission to add testFile to
 	testFile := testFiles[0]             // test file to add comments to
-	testAuthor := testAuthors[1]         // test author of comment
 	testComment := testComments[0]
 	testReply := testComments[1]
 
 	// adds a submission for the test file to be added to
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if !assert.NoError(t, err, "error registering mock users") {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
+	testSubmission.Authors = globalAuthors[:1]
+	authorID := globalAuthors[0].ID
+	testSubmission.Reviewers = globalReviewers[:1]
+	testComment.AuthorID = globalReviewers[0].ID
 
-	// Add reviewer to a submission.
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
 
 	// Add submission, and test file linked to submission.
 	testSubmission.Files = []File{testFile}
@@ -327,13 +323,6 @@ func TestAddComment(t *testing.T) {
 	// gets the file ID from the files table
 	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
 	fileID := testFile.ID
-
-	// adds a test user to author a comment
-	commentAuthorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "failed to add user to the database: %v", err) {
-		return
-	}
-	testComment.AuthorID = commentAuthorID
 
 	// tests adding one valid comment. Uses the testAddComment() utility method
 	t.Run("Add One Comment", func(t *testing.T) {

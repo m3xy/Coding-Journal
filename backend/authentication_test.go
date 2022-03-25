@@ -81,7 +81,7 @@ func TestRegisterUser(t *testing.T) {
 	t.Run("Valid registrations", func(t *testing.T) {
 		for i := range testUsers {
 			trialUser := testUsers[i].getCopy()
-			_, err := registerUser(*trialUser, USERTYPE_NIL)
+			_, err := registerUser(*trialUser, "fake", "name", USERTYPE_NIL)
 			if err != nil {
 				t.Errorf("User registration error: %v\n", err.Error())
 				return
@@ -93,7 +93,7 @@ func TestRegisterUser(t *testing.T) {
 	t.Run("Repeat registrations", func(t *testing.T) {
 		for i := range testUsers {
 			trialUser := testUsers[i].getCopy()
-			_, err := registerUser(*trialUser, USERTYPE_NIL)
+			_, err := registerUser(*trialUser, "fake", "name", USERTYPE_NIL)
 			if err == nil {
 				t.Error("Already registered account cannot be reregistered.")
 				return
@@ -110,14 +110,13 @@ func TestSignUp(t *testing.T) {
 	defer testEnd()
 
 	router := mux.NewRouter()
-	router.HandleFunc(ENDPOINT_SIGNUP, signUp)
+	router.HandleFunc(ENDPOINT_SIGNUP, PostSignUp)
 
 	// Test not yet registered users.
 	t.Run("Valid signup requests", func(t *testing.T) {
-		for i := range testUsers {
+		for _, u := range testSignUpBodies {
 			// Create JSON body for sign up request based on test user.
-			trialUser := testUsers[i].getCopy()
-			reqBody, _ := json.Marshal(trialUser)
+			reqBody, _ := json.Marshal(u)
 			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			resp := w.Result()
@@ -126,23 +125,22 @@ func TestSignUp(t *testing.T) {
 			// Check if response OK and user registered.
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "Expected %d but got %d status code!", http.StatusOK, resp.StatusCode)
 
+			// check if user is in global users and local users tables
+			var queriedUser *GlobalUser
 			assert.NotEqualf(t, true,
-				isUnique(gormDb, &User{}, "email", testUsers[i].Email), "User should be in database!")
-
-			var exists bool
-			if err := gormDb.Model(&GlobalUser{}).Select("count(*) > 0").
-				Where(&GlobalUser{User: &testUsers[i]}).Find(&exists).Error; err != nil {
-				t.Errorf("Global ID test query error: %v", err)
+				isUnique(gormDb, &User{}, "email", u.Email), "User should be in database!")	
+			if res := gormDb.Model(&GlobalUser{}).Joins("User").Select("count(*) > 0").Where("User.email = ?", u.Email).Find(&queriedUser); res.Error != nil {
+				t.Errorf("Global ID test query error: %v", res.Error)
+			} else if !assert.Equal(t, int64(1), res.RowsAffected, "user not created properly") {
+				return
 			}
-			assert.NotEqual(t, false, exists, "ID should be in database!")
 		}
 	})
 
 	// Test bad request response for an already registered user.
 	t.Run("Repeat user signups", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			trialUser := testUsers[i].getCopy()
-			reqBody, _ := json.Marshal(trialUser)
+		for _, u := range testSignUpBodies {
+			reqBody, _ := json.Marshal(u)
 			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			resp := w.Result()
@@ -155,17 +153,16 @@ func TestSignUp(t *testing.T) {
 
 	// Test bad request response for invalid credentials.
 	t.Run("Invalid signups", func(t *testing.T) {
-		for _, user := range wrongCredsUsers {
-			trialUser := user.getCopy()
-			reqBody, _ := json.Marshal(trialUser)
+		for _, user := range wrongCredsSignups {
+			reqBody, _ := json.Marshal(user)
 			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			resp := w.Result()
 			defer resp.Body.Close()
 
 			// Check if response is indeed unsuccessful.
-			if resp.StatusCode != http.StatusBadRequest {
-				t.Errorf("Status incorrect, should be %d, got %d\n", http.StatusBadRequest, resp.StatusCode)
+			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, 
+				"Status incorrect, should be %d, got %d\n", http.StatusBadRequest, resp.StatusCode) {
 				return
 			}
 		}
@@ -182,8 +179,8 @@ func TestAuthLogIn(t *testing.T) {
 	router.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn)
 
 	// Populate database.
-	for _, u := range testUsers {
-		registerUser(u, USERTYPE_NIL)
+	for i, u := range testUsers {
+		registerUser(u, fmt.Sprint(i), fmt.Sprint(i), USERTYPE_NIL)
 	}
 
 	// Set JWT Secret.

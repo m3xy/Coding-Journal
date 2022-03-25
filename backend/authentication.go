@@ -55,7 +55,7 @@ func getAuthSubRoutes(r *mux.Router) {
 	// + POST /auth/register - Register.
 	// + GET /auth/token  - Get new access token from a refresh token.
 	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
-	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_SIGNUP, PostSignUp).Methods(http.MethodPost, http.MethodOptions)
 	auth.HandleFunc(ENDPOINT_TOKEN, GetToken).Methods(http.MethodGet)
 
 	// Set up jwt secret
@@ -316,11 +316,11 @@ func createToken(ID string, userType int, scope string) (string, error) {
   Success: 200, OK
   Failure: 400, bad request
 */
-func signUp(w http.ResponseWriter, r *http.Request) {
+func PostSignUp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
-	user := &User{}
+	user := &SignUpPostBody{}
 	var resp FormResponse
 	if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
@@ -329,12 +329,13 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 			Error:   true,
 		}}
 	} else if validate.Struct(*user) != nil {
+		log.Println("A")
 		w.WriteHeader(http.StatusBadRequest)
 		resp = FormResponse{StandardResponse: StandardResponse{
 			Message: "Registration failed",
 			Error:   true,
 		}}
-	} else if _, err := registerUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
+	} else if _, err := ControllerRegisterUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		switch err.(type) {
 		case *RepeatEmailError:
@@ -369,12 +370,49 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// Register a user to the database. Returns user global ID.
-func registerUser(user User, UserType int) (string, error) {
+// controller function to register a user
+func ControllerRegisterUser(user SignUpPostBody, UserType int) (string, error) {
 	// Hash password and store new credentials to database.
 	user.Password = string(hashPw(user.Password))
 
 	registeredUser := GlobalUser{
+		FirstName: user.FirstName,
+		LastName: user.LastName,
+		UserType: UserType,
+		User:     &User{
+			Email: user.Email,
+			Password: user.Password,
+			PhoneNumber: user.PhoneNumber,
+			Organization: user.Organization,
+		},
+	}
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// Check constraints on user
+		if !isUnique(tx, User{}, "Email", user.Email) {
+			return &RepeatEmailError{email: user.Email}
+		}
+
+		// Make credentials insert transaction.
+		if err := gormDb.Create(&registeredUser).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return "", err
+	}
+
+	// Return user's primary key (the UUID)
+	return registeredUser.ID, nil
+}
+
+// Register a user to the database. Returns user global ID.
+func registerUser(user User, firstName string, lastName string, UserType int) (string, error) {
+	// Hash password and store new credentials to database.
+	user.Password = string(hashPw(user.Password))
+
+	registeredUser := GlobalUser{
+		FirstName: firstName,
+		LastName: lastName,
 		UserType: UserType,
 		User:     &user,
 	}

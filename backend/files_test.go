@@ -41,19 +41,14 @@ func TestGetFile(t *testing.T) {
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_FILE+"/{id}", GetFile)
 
-	// adds a submission to the database and filesystem
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
+	reviewerID := globalReviewers[0].ID
 
 	testSubmission.Files = []File{testFile}
 	submissionID, err := addSubmission(&testSubmission)
@@ -156,17 +151,12 @@ func TestAddFile(t *testing.T) {
 	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
 
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	submissionID, err := addSubmission(&testSubmission) // adds a submission for the file to be uploaded to
 	if !assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err) {
@@ -236,23 +226,16 @@ func TestGetFileData(t *testing.T) {
 
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem.
 	testSubmission := testSubmissions[0] // test submission to be added to db and filesystem.
-	testAuthor := testAuthors[0]
-	testReviewer := testReviewers[0]
 
 	// configures the test submission fields
 	testSubmission.Files = []File{testFile}
 
-	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	// adds a submission to the database and filesystem
 	submissionID, err := addSubmission(&testSubmission)

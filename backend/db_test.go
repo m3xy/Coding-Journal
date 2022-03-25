@@ -25,28 +25,51 @@ const (
 // -------------
 
 var testUsers []User = []User{
-	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", FirstName: "test",
-		LastName: "test", PhoneNumber: "0574349206"},
-	{Email: "john.doe@hello.com", Password: "dlbjDs2!", FirstName: "John",
+	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", PhoneNumber: "0574349206"},
+	{Email: "john.doe@hello.com", Password: "dlbjDs2!", Organization: "TestOrg"},
+	{Email: "jane.doe@test.net", Password: "dlbjDs2!"},
+}
+
+var testSignUpBodies = []SignUpPostBody{
+	{Email: "paul@test.com", Password: "123456aB$", PhoneNumber: "0574349206",
+		FirstName: "paul", LastName: "test"},
+	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
 		LastName: "Doe", Organization: "TestOrg"},
-	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
+	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
+		LastName: "Doe"},
+	{Email: "author3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
 		LastName: "Doe"},
 }
 
+var wrongCredsSignups = []SignUpPostBody{
+	{Email: "test.nospec@hello.com", Password: "badN0Special",
+		FirstName:"test", LastName: "nospec"},
+	{Email: "test.nonum@hello.com", Password: "testNoNum!",
+		FirstName:"test", LastName: "nospec"},
+	{Email: "test.toosmall@hello.com", Password: "g0.Ku",
+		FirstName:"test", LastName: "nospec"},
+	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal",
+		FirstName:"test", LastName: "nospec"},
+	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!",
+		FirstName:"test", LastName: "nospec"},
+	{Email: "test.nouppercase@hello.com", Password: "nocap5!!",
+		FirstName:"test", LastName: "nospec"},
+}
+
 var testObjects []GlobalUser = []GlobalUser{
-	{ID: "1", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "2", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "3", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "4", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "1", FirstName:"Paul", LastName:"Doe", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "2", FirstName:"Joe", LastName:"Shmo", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "3", FirstName:"Vincent", LastName:"Adultman", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{ID: "4", FirstName:"Mike", LastName:"Potts", UserType: USERTYPE_REVIEWER_PUBLISHER},
 }
 
 var wrongCredsUsers []User = []User{
-	{Email: "test.nospec@hello.com", Password: "badN0Special", FirstName: "test", LastName: "nospec"},
-	{Email: "test.nonum@hello.com", Password: "testNoNum!", FirstName: "test", LastName: "nonum"},
-	{Email: "test.toosmall@hello.com", Password: "g0.Ku", FirstName: "test", LastName: "toosmall"},
-	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal", FirstName: "test", LastName: "wrongchars"},
-	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!", FirstName: "test", LastName: "nolower"},
-	{Email: "test.nouppercase@hello.com", Password: "nocap5!!", FirstName: "test", LastName: "noupper"},
+	{Email: "test.nospec@hello.com", Password: "badN0Special"},
+	{Email: "test.nonum@hello.com", Password: "testNoNum!"},
+	{Email: "test.toosmall@hello.com", Password: "g0.Ku"},
+	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal"},
+	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!"},
+	{Email: "test.nouppercase@hello.com", Password: "nocap5!!"},
 }
 
 var testSubmissions []Submission = []Submission{
@@ -86,25 +109,17 @@ var testSubmissionMetaData = []*SubmissionData{
 }
 
 var testAuthors []User = []User{
-	{Email: "paul@test.com", Password: "123456aB$", FirstName: "paul",
-		LastName: "test", PhoneNumber: "0574349206"},
-	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg"},
-	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-	{Email: "author3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe"},
+	{Email: "paul@test.com", Password: "123456aB$", PhoneNumber: "0574349206"},
+	{Email: "john.doe@test.com", Password: "dlbjDs2!", Organization: "TestOrg"},
+	{Email: "author2@test.net", Password: "dlbjDs2!"},
+	{Email: "author3@test.net", Password: "dlbjDs2!"},
 }
 
 var testReviewers []User = []User{
-	{Email: "dave@test.com", Password: "123456aB$", FirstName: "dave",
-		LastName: "smith", PhoneNumber: "0574349206"},
-	{Email: "Geoff@test.com", Password: "dlbjDs2!", FirstName: "Geoff",
-		LastName: "Williams", Organization: "TestOrg"},
-	{Email: "reviewer2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-	{Email: "reviewer3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe"},
+	{Email: "dave@test.com", Password: "123456aB$", PhoneNumber: "0574349206"},
+	{Email: "Geoff@test.com", Password: "dlbjDs2!", Organization: "TestOrg"},
+	{Email: "reviewer2@test.net", Password: "dlbjDs2!"},
+	{Email: "reviewer3@test.net", Password: "dlbjDs2!"},
 }
 
 var testComments []*Comment = []*Comment{
@@ -153,7 +168,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 	var err error
 	globalAuthors := make([]GlobalUser, len(testAuthors))
 	for i, user := range testAuthors {
-		if globalAuthors[i].ID, err = registerUser(user, USERTYPE_PUBLISHER); err != nil {
+		if globalAuthors[i].ID, err = registerUser(user, fmt.Sprint(i), fmt.Sprint(i), USERTYPE_PUBLISHER); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
@@ -161,7 +176,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 	}
 	globalReviewers := make([]GlobalUser, len(testReviewers))
 	for i, user := range testReviewers {
-		if globalReviewers[i].ID, err = registerUser(user, USERTYPE_REVIEWER); err != nil {
+		if globalReviewers[i].ID, err = registerUser(user, fmt.Sprint(i), fmt.Sprint(i), USERTYPE_REVIEWER); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
@@ -193,8 +208,8 @@ func testAuth(t *testing.T) {
 // Get a copy of a user object.
 func (u *User) getCopy() *User {
 	if u != nil {
-		return &User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
-			LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+		return &User{Email: u.Email, Password: u.Password, 
+			PhoneNumber: u.PhoneNumber, Organization: u.Organization}
 	} else {
 		return nil
 	}

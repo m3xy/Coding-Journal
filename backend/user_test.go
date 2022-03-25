@@ -24,7 +24,7 @@ func TestGetUserProfile(t *testing.T) {
 	// Populate database for testing and test valid user.
 	globalUsers := make([]GlobalUser, len(testUsers))
 	for i := range testUsers {
-		globalUsers[i].ID, _ = registerUser(testUsers[i], USERTYPE_NIL)
+		globalUsers[i].ID, _ = registerUser(testUsers[i], fmt.Sprint(i), fmt.Sprint(i), USERTYPE_NIL)
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
@@ -42,8 +42,8 @@ func TestGetUserProfile(t *testing.T) {
 
 			// Check equality for all user info.
 			equal := (testUsers[i].Email == resCreds.User.Email) &&
-				(testUsers[i].FirstName == resCreds.User.FirstName) &&
-				(testUsers[i].LastName == resCreds.User.LastName) &&
+				(fmt.Sprint(i) == resCreds.FirstName) &&
+				(fmt.Sprint(i) == resCreds.LastName) &&
 				(testUsers[i].PhoneNumber == resCreds.User.PhoneNumber) &&
 				(testUsers[i].Organization == resCreds.User.Organization)
 			assert.Equal(t, true, equal, "Users should be equal.")
@@ -73,12 +73,10 @@ func TestGetUserQuery(t *testing.T) {
 		user := User{
 			Email: email,
 			Password: VALID_PW, // in authentication_test.go
-			FirstName: fname,
-			LastName: lname,
 			PhoneNumber: "07375942117",
 			Organization: organization,
 		}
-		id, err := registerUser(user, userType)
+		id, err := registerUser(user, fname, lname, userType)
 		assert.NoError(t, err, "Error occurred while registering test user")
 		return id
 	}
@@ -125,8 +123,8 @@ func TestGetUserQuery(t *testing.T) {
 			case !assert.NotEmpty(t, user.User, "user profile is nil"),
 				!assert.NotEmpty(t, user.User.Email, "email is nil"),
 				!assert.Empty(t, user.User.Password, "password returned!"),
-				!assert.NotEmpty(t, user.User.FirstName, "first name is nil"),
-				!assert.NotEmpty(t, user.User.LastName, "last name is nil"),
+				!assert.NotEmpty(t, user.FirstName, "first name is nil"),
+				!assert.NotEmpty(t, user.LastName, "last name is nil"),
 				!assert.NotEmpty(t, user.User.PhoneNumber, "phone number is nil"),
 				!assert.NotEmpty(t, user.User.Organization, "organization is nil"):
 				return

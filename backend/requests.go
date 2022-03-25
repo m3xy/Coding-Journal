@@ -4,6 +4,16 @@ package main
 // Authentication/User Endpoints
 // ----------
 
+// POST /auth/register
+type SignUpPostBody struct {
+	Email        string `json:"email" validate:"email,required"`
+	Password     string `json:"password,omitempty" validate:"min=8,max=64,ispw,required"`
+	FirstName    string `json:"firstName" validate:"required,max=32"`
+	LastName     string `json:"lastName" validate:"required,max=32"`
+	PhoneNumber  string `json:"phoneNumber,omitempty"`
+	Organization string `json:"organization,omitempty"`
+}
+
 // POST /auth/login body.
 type AuthLoginPostBody struct {
 	Email       string `json:"email"`

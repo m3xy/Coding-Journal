@@ -44,8 +44,6 @@ type User struct {
 	GlobalUserID string `json:"-"`
 	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"email,required"`
 	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw,required"`
-	FirstName    string `json:"firstName" validate:"required,max=32"`
-	LastName     string `json:"lastName" validate:"required,max=32"`
 	PhoneNumber  string `json:"phoneNumber,omitempty"`
 	Organization string `json:"organization,omitempty"`
 
@@ -58,6 +56,8 @@ type User struct {
 type GlobalUser struct {
 	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
 	UserType int    `gorm:"default:0" json:"userType"`
+	FirstName    string `json:"firstName" validate:"required,max=32"`
+	LastName     string `json:"lastName" validate:"required,max=32"`
 	User     *User  `json:"profile,omitempty"`
 
 	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"authoredSubmissions" validate:"dive"`
