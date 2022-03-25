@@ -41,8 +41,16 @@ func TestPostAssignReviewers(t *testing.T) {
 	}
 
 	// adds a test editor
-	editorID, err := registerUser(User{Email: "editor@test.net",
-		Password: "dlbjDs2!"}, "Paul", "Editman", USERTYPE_EDITOR)
+	globEditor := GlobalUser{
+		FirstName: "Paul",
+		LastName: "EditMan",
+		UserType: USERTYPE_EDITOR,
+		User: &User{
+			Email: "editor@test.net",
+			Password: "dlbjDs2",
+		},
+	}
+	editorID, err := registerTestUser(globEditor)
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}
@@ -370,8 +378,16 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 		return
 	}
 	// adds a test editor
-	editorID, err := registerUser(User{Email: "editor@test.net",
-		Password: "dlbjDs2!"}, "Paul", "Editman", USERTYPE_EDITOR)
+	globEditor := GlobalUser{
+		FirstName: "Paul",
+		LastName: "EditMan",
+		UserType: USERTYPE_EDITOR,
+		User: &User{
+			Email: "editor@test.net",
+			Password: "dlbjDs2",
+		},
+	}
+	editorID, err := registerTestUser(globEditor)
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}

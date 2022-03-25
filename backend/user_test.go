@@ -22,9 +22,10 @@ func TestGetUserProfile(t *testing.T) {
 	router.HandleFunc(SUBROUTE_USER+"/{id}", getUserProfile)
 
 	// Populate database for testing and test valid user.
-	globalUsers := make([]GlobalUser, len(testUsers))
-	for i := range testUsers {
-		globalUsers[i].ID, _ = registerUser(testUsers[i], fmt.Sprint(i), fmt.Sprint(i), USERTYPE_NIL)
+	globalUsers := make([]GlobalUser, len(testGlobUsers))
+	for i, u := range testGlobUsers {
+		globalUsers[i] = u
+		globalUsers[i].ID, _ = registerTestUser(u)
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
@@ -40,13 +41,15 @@ func TestGetUserProfile(t *testing.T) {
 				return
 			}
 
-			// Check equality for all user info.
-			equal := (testUsers[i].Email == resCreds.User.Email) &&
-				(fmt.Sprint(i) == resCreds.FirstName) &&
-				(fmt.Sprint(i) == resCreds.LastName) &&
-				(testUsers[i].PhoneNumber == resCreds.User.PhoneNumber) &&
-				(testUsers[i].Organization == resCreds.User.Organization)
-			assert.Equal(t, true, equal, "Users should be equal.")
+			// tests for user equality
+			switch {
+			case !assert.Equal(t, globalUsers[i].FirstName, resCreds.FirstName, "first names not equal"),
+				!assert.Equal(t, globalUsers[i].LastName, resCreds.LastName, "last names not equal"),
+				!assert.Equal(t, globalUsers[i].User.Email, resCreds.User.Email, "emails not equal"),
+				!assert.Equal(t, globalUsers[i].User.Organization, resCreds.User.Organization, "organizations not equal"),
+				!assert.Equal(t, globalUsers[i].User.PhoneNumber, resCreds.User.PhoneNumber, "phone numbers not equal"):
+				return
+			}
 		}
 	})
 
@@ -70,13 +73,9 @@ func TestGetUserQuery(t *testing.T) {
 
 	// registers a test user with the given fields and returns their global ID
 	registerTestUser := func(email string, fname string, lname string, userType int, organization string) string {
-		user := User{
-			Email: email,
-			Password: VALID_PW, // in authentication_test.go
-			PhoneNumber: "07375942117",
-			Organization: organization,
-		}
-		id, err := registerUser(user, fname, lname, userType)
+		user := User{Email: email, Password: VALID_PW, PhoneNumber: "07375942117", Organization: organization}
+		globUser := GlobalUser{FirstName: fname, LastName: lname, UserType: userType, User: &user}
+		id, err := registerTestUser(globUser)
 		assert.NoError(t, err, "Error occurred while registering test user")
 		return id
 	}

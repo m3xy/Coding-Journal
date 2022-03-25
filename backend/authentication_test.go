@@ -74,35 +74,6 @@ func TestPw(t *testing.T) {
 	})
 }
 
-// test user registration.
-func TestRegisterUser(t *testing.T) {
-	testInit()
-	// Test registering new users with default credentials.
-	t.Run("Valid registrations", func(t *testing.T) {
-		for i := range testUsers {
-			trialUser := testUsers[i].getCopy()
-			_, err := registerUser(*trialUser, "fake", "name", USERTYPE_NIL)
-			if err != nil {
-				t.Errorf("User registration error: %v\n", err.Error())
-				return
-			}
-		}
-	})
-
-	// Test reregistering those users
-	t.Run("Repeat registrations", func(t *testing.T) {
-		for i := range testUsers {
-			trialUser := testUsers[i].getCopy()
-			_, err := registerUser(*trialUser, "fake", "name", USERTYPE_NIL)
-			if err == nil {
-				t.Error("Already registered account cannot be reregistered.")
-				return
-			}
-		}
-	})
-	testEnd()
-}
-
 // Test user sign-up using test database.
 func TestSignUp(t *testing.T) {
 	// Set up test
@@ -179,8 +150,15 @@ func TestAuthLogIn(t *testing.T) {
 	router.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn)
 
 	// Populate database.
+	var globUser GlobalUser
 	for i, u := range testUsers {
-		registerUser(u, fmt.Sprint(i), fmt.Sprint(i), USERTYPE_NIL)
+		globUser = GlobalUser{
+			FirstName: fmt.Sprint(i),
+			LastName: fmt.Sprint(i),
+			UserType: USERTYPE_NIL,
+			User: u.getCopy(),
+		}
+		registerTestUser(globUser)
 	}
 
 	// Set JWT Secret.

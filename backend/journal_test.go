@@ -26,10 +26,10 @@ func TestJournalLogIn(t *testing.T) {
 	defer testEnd()
 
 	// Populate database with valid users.
-	trialUsers := make([]GlobalUser, len(testUsers))
-	for i, u := range testUsers {
-		trialUsers[i] = GlobalUser{User: u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
-		trialUsers[i].ID, _ = registerUser(*trialUsers[i].User,  fmt.Sprint(i), fmt.Sprint(i), USERTYPE_REVIEWER_PUBLISHER)
+	trialUsers := make([]GlobalUser, len(testGlobUsers))
+	for i, u := range testGlobUsers {
+		trialUsers[i] = u
+		trialUsers[i].ID, _ = registerTestUser(trialUsers[i])
 	}
 
 	router := mux.NewRouter()
@@ -93,11 +93,11 @@ func TestGetUsers(t *testing.T) {
 	defer testEnd()
 
 	// Populate database with valid users.
-	trialUsers := map[string]GlobalUser{}
 	var id string // temp loop variable
-	for i, u := range testUsers {
-		id, _ = registerUser(u, fmt.Sprint(i), fmt.Sprint(i), USERTYPE_REVIEWER_PUBLISHER)
-		trialUsers[id] = GlobalUser{User: u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
+	trialUsers := map[string]GlobalUser{}
+	for _, u := range testGlobUsers {
+		id, _ = registerTestUser(u)
+		trialUsers[id] = u
 	}
 
 	router := mux.NewRouter()
@@ -122,7 +122,7 @@ func TestGetUsers(t *testing.T) {
 		// tests that the users match
 		var testUser GlobalUser
 		for _, user := range users {
-			testUser = trialUsers[user.GlobalUserID]
+			testUser = trialUsers[user.ID]
 			switch {
 			case !assert.Equal(t, testUser.FirstName, user.FirstName, "user names do not match"),
 				!assert.Equal(t, testUser.LastName, user.LastName, "user names do not match"),
@@ -143,8 +143,13 @@ func TestGetUser(t *testing.T) {
 	// Populate database with valid users.
 	trialUsers := make([]GlobalUser, len(testUsers))
 	for i, u := range testUsers {
-		trialUsers[i] = GlobalUser{User: u.getCopy(), UserType: USERTYPE_REVIEWER_PUBLISHER}
-		trialUsers[i].ID, _ = registerUser(*trialUsers[i].User,  fmt.Sprint(i), fmt.Sprint(i), USERTYPE_REVIEWER_PUBLISHER)
+		trialUsers[i] = GlobalUser{
+			FirstName: fmt.Sprint(i),
+			LastName: fmt.Sprint(i),
+			UserType: USERTYPE_REVIEWER_PUBLISHER,
+			User: u.getCopy(),
+		}
+		trialUsers[i].ID, _ = registerTestUser(trialUsers[i])
 	}
 
 	router := mux.NewRouter()
@@ -168,7 +173,7 @@ func TestGetUser(t *testing.T) {
 
 		// test that the retrieved user matches that which was expected
 		switch {
-		case !assert.Equal(t, trialUsers[0].ID, queriedUser.GlobalUserID, "user IDs do not match"),
+		case !assert.Equal(t, trialUsers[0].ID, queriedUser.ID, "user IDs do not match"),
 			!assert.Equal(t, trialUsers[0].User.Email, queriedUser.Email, "user names do not match"),
 			!assert.Equal(t, trialUsers[0].FirstName, queriedUser.FirstName, "user names do not match"),
 			!assert.Equal(t, trialUsers[0].LastName, queriedUser.LastName, "user names do not match"),
@@ -219,8 +224,7 @@ func TestExportSubmission(t *testing.T) {
 	}
 
 	// adds a test editor
-	editorID, err := registerUser(User{Email: "editor@test.net",
-		Password: "dlbjDs2!"}, "Paul", "Editman", USERTYPE_EDITOR)
+	editorID, err := registerTestUser(testEditors[0])
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}

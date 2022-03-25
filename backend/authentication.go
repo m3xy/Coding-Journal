@@ -405,36 +405,6 @@ func ControllerRegisterUser(user SignUpPostBody, UserType int) (string, error) {
 	return registeredUser.ID, nil
 }
 
-// Register a user to the database. Returns user global ID.
-func registerUser(user User, firstName string, lastName string, UserType int) (string, error) {
-	// Hash password and store new credentials to database.
-	user.Password = string(hashPw(user.Password))
-
-	registeredUser := GlobalUser{
-		FirstName: firstName,
-		LastName: lastName,
-		UserType: UserType,
-		User:     &user,
-	}
-	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		// Check constraints on user
-		if !isUnique(tx, User{}, "Email", user.Email) {
-			return &RepeatEmailError{email: user.Email}
-		}
-
-		// Make credentials insert transaction.
-		if err := gormDb.Create(&registeredUser).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return "", err
-	}
-
-	// Return user's primary key (the UUID)
-	return registeredUser.ID, nil
-}
-
 // -- Password control --
 
 // Hash a password
