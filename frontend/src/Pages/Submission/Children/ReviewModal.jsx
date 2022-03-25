@@ -3,8 +3,8 @@ import { Modal, Badge } from "react-bootstrap"
 import ReactMarkdown from "react-markdown"
 
 export default ({ review, reviewer, show, setShow }) => {
-	const getFullName = (reviewer) => {
-		return reviewer.profile.firstName + " " + reviewer.profile.lastName
+	const getFullName = (target) => {
+		return target.profile.firstName + " " + target.profile.lastName
 	}
 
 	const getBadge = (approval) => {
@@ -14,28 +14,25 @@ export default ({ review, reviewer, show, setShow }) => {
 		return <Badge bg={bg}>{text}</Badge>
 	}
 
-	return (
-		<Modal show={show} onHide={() => setShow(false)}>
-			<Modal.Header closeButton>
-				<Modal.Title>
-					<div style={{ display: "flex" }}>
-						<div id="review-title" style={{ flex: "0.2" }}>
-							Review by {getFullName(reviewer)}
-						</div>
-						<div style={{ flex: "1", textAlign: "right" }}>
+	if (reviewer !== undefined && review !== undefined)
+		return (
+			<Modal show={show} size="lg" onHide={() => setShow(false)}>
+				<Modal.Header closeButton>
+					<Modal.Title>
+						<div style={{ display: "flex" }}>
 							{getBadge(review.approves)}
+							<div
+								id="review-title"
+								style={{ marginLeft: "15px" }}>
+								Review by {getFullName(reviewer)}
+							</div>
 						</div>
-					</div>
-				</Modal.Title>
-			</Modal.Header>
-			<Modal.Body>
-				<ReactMarkdown
-					children={Buffer.from(
-						review.base64Value,
-						"bsae64"
-					).toString("utf-8")}
-				/>
-			</Modal.Body>
-		</Modal>
-	)
+					</Modal.Title>
+				</Modal.Header>
+				<Modal.Body>
+					<ReactMarkdown children={window.atob(review.base64Value)} />
+				</Modal.Body>
+			</Modal>
+		)
+	else return <div></div>
 }
