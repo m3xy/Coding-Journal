@@ -25,6 +25,8 @@ func getUserSubroutes(r *mux.Router) {
 	user := r.PathPrefix(SUBROUTE_USER).Subrouter()
 	users := r.PathPrefix(SUBROUTE_USERS).Subrouter()
 
+	users.Use(jwtMiddleware)
+
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
