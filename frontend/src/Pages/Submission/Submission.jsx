@@ -11,7 +11,7 @@ import {
 	FileExplorer,
 	TagsList,
 	Reviews,
-	ReviewEditor
+	ReviewEditor as EditorModal
 } from "./Children"
 import { Badge, Collapse, Button } from "react-bootstrap"
 
@@ -120,8 +120,8 @@ function Submission() {
 		let [bg, status] = submission.approved
 			? ["primary", "Approved"]
 			: submission.approved === null
-			? ["secondary", "In review"]
-			: ["danger", "Rejected"]
+				? ["secondary", "In review"]
+				: ["danger", "Rejected"]
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
@@ -132,11 +132,74 @@ function Submission() {
 				{users.length > 1 ? "s: " : ": "}
 				{users.length > 0
 					? users.map(
-							(user, i) =>
-								(i === 0 ? " " : ", ") + getUserFullName(user)
-					  )
+						(user, i) =>
+							(i === 0 ? " " : ", ") + getUserFullName(user)
+					)
 					: "No " + role + "s..."}
 			</h5>
+		)
+	}
+
+	const permissionButtons = () => {
+		if (permissionLevel[perm] === "editor")
+			return (
+				<Button
+					style={{
+						flex: "0.15",
+						justifyContent: "right"
+					}}>
+					Set Approval
+				</Button>
+			)
+		else if (permissionLevel[perm] === "reviewer")
+			return (
+				<Button
+					style={{
+						flex: "0.15",
+						justifyContent: "right"
+					}}
+					onClick={() => showReview(true)}>
+					Review
+				</Button>
+			)
+	}
+
+	const leftContainer = () => {
+		return (
+			<div className={styles.LeftContainer}>
+				<Abstract
+					markdown={submission.metaData.abstract}
+					show={showFile}
+					setShow={(e) => setShowFile(e)}
+					inversed
+				/>
+				<FileViewer id={fileId} show={showFile} />
+			</div>
+		)
+	}
+
+	const rightContainer = () => {
+		return (
+			<div className={styles.RightContainer}>
+				<FileExplorer
+					files={submission.files}
+					onClick={(id) => {
+						setFileId(id)
+						setShowFile(true)
+					}}
+				/>
+				<TagsList tags={submission.categories} />
+				{submission.metaData.hasOwnProperty("reviews") && (
+					<Reviews
+						reviews={submission.metaData.reviews}
+						noProfileReviewers={
+							submission.hasOwnProperty("reviewers")
+								? submission.reviewers
+								: []
+						}
+					/>
+				)}
+			</div>
 		)
 	}
 
@@ -160,26 +223,7 @@ function Submission() {
 							<h1 style={{ flex: "1", marginLeft: "15px" }}>
 								{submission.name}
 							</h1>
-							{permissionLevel[perm] === "editor" ? (
-								<Button
-									style={{
-										flex: "0.15",
-										justifyContent: "right"
-									}}>
-									Set Approval
-								</Button>
-							) : (
-								permissionLevel[perm] === "reviewer" && (
-									<Button
-										style={{
-											flex: "0.15",
-											justifyContent: "right"
-										}}
-										onClick={() => showReview(true)}>
-										Review
-									</Button>
-								)
-							)}
+							{permissionButtons()}
 						</div>
 					)}
 				</CSSTransition>
@@ -205,37 +249,10 @@ function Submission() {
 				</div>
 			</Collapse>
 			<div style={{ display: "flex" }}>
-				<div className={styles.LeftContainer}>
-					<Abstract
-						markdown={submission.metaData.abstract}
-						show={showFile}
-						setShow={(e) => setShowFile(e)}
-						inversed
-					/>
-					<FileViewer id={fileId} show={showFile} />
-				</div>
-				<div className={styles.RightContainer}>
-					<FileExplorer
-						files={submission.files}
-						onClick={(id) => {
-							setFileId(id)
-							setShowFile(true)
-						}}
-					/>
-					<TagsList tags={submission.categories} />
-					{submission.metaData.hasOwnProperty("reviews") && (
-						<Reviews
-							reviews={submission.metaData.reviews}
-							noProfileReviewers={
-								submission.hasOwnProperty("reviewers")
-									? submission.reviewers
-									: []
-							}
-						/>
-					)}
-				</div>
+				{leftContainer()}
+				{rightContainer()}
 			</div>
-			<ReviewEditor
+			<EditorModal
 				id={params.id}
 				show={review}
 				setShow={showReview}

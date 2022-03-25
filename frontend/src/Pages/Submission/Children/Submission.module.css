@@ -8,3 +8,7 @@
 	box-shadow: inset 0px 1px 8px -3px #ababab;
 	background: #fefefe;
 }
+
+.fileBrowser {
+	font-size: 80% !important;
+}
