@@ -90,17 +90,24 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 // GET /user
 func GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// gets an array of users
-	users := []SupergroupUser{}
-	if err := gormDb.Model(&User{}).Find(&users).Error; err != nil {
+	// gets an array of users using GORM smart select fields
+	users := []GlobalUser{}
+	if err := gormDb.Model(&GlobalUser{}).Preload("User").Find(&users).Error; err != nil {
 		log.Printf("[ERROR] SQL Query Error: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
+	// parses users into global format
+	globUsers := make([]SupergroupUser, len(users))
+	for i, u := range users {
+		globUsers[i] = SupergroupUser{
+			ID: u.ID, FirstName: u.FirstName, LastName: u.LastName,
+			Email: u.User.Email, PhoneNumber: u.User.PhoneNumber,
+			Organization: u.User.Organization,
+		}
+	}
 	// sends response
-	if err := json.NewEncoder(w).Encode(users); err != nil {
+	if err := json.NewEncoder(w).Encode(globUsers); err != nil {
 		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -113,9 +120,9 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 
 	// queries user using URL parameters
 	vars := mux.Vars(r)
-	user := SupergroupUser{}
-	if res := gormDb.Model(&User{}).Where("users.global_user_id = ?", vars["id"]).
-		Limit(1).Find(&user); res.Error != nil {
+	user := GlobalUser{}
+	if res := gormDb.Model(&GlobalUser{}).Preload("User").
+		Where("id = ?", vars["id"]).Limit(1).Find(&user); res.Error != nil {
 		log.Printf("[ERROR] SQL query error: %v", res.Error)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -125,8 +132,15 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// adapts local user to supergroup-compliant format
+	globUser := SupergroupUser{
+		ID: user.ID, FirstName: user.FirstName, LastName: user.LastName,
+		Email: user.User.Email, PhoneNumber: user.User.PhoneNumber,
+		Organization: user.User.Organization,
+	}
+
 	// sends response
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+	if err := json.NewEncoder(w).Encode(globUser); err != nil {
 		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}

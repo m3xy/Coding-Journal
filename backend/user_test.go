@@ -2,14 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"fmt"
 
-	"gorm.io/gorm"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
 
 // Test user info getter.
@@ -22,9 +22,14 @@ func TestGetUserProfile(t *testing.T) {
 	router.HandleFunc(SUBROUTE_USER+"/{id}", getUserProfile)
 
 	// Populate database for testing and test valid user.
-	globalUsers := make([]GlobalUser, len(testUsers))
-	for i := range testUsers {
-		globalUsers[i].ID, _ = registerUser(testUsers[i], USERTYPE_NIL)
+	var err error
+	globalUsers := make([]GlobalUser, len(testGlobUsers))
+	for i, u := range testGlobUsers {
+		globalUsers[i] = *u.getCopy()
+		globalUsers[i].ID, err = registerUser(globalUsers[i])
+		if !assert.NoError(t, err, "error registering test users") {
+			return
+		}
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
@@ -40,13 +45,15 @@ func TestGetUserProfile(t *testing.T) {
 				return
 			}
 
-			// Check equality for all user info.
-			equal := (testUsers[i].Email == resCreds.User.Email) &&
-				(testUsers[i].FirstName == resCreds.User.FirstName) &&
-				(testUsers[i].LastName == resCreds.User.LastName) &&
-				(testUsers[i].PhoneNumber == resCreds.User.PhoneNumber) &&
-				(testUsers[i].Organization == resCreds.User.Organization)
-			assert.Equal(t, true, equal, "Users should be equal.")
+			// tests for user equality
+			switch {
+			case !assert.Equal(t, globalUsers[i].FirstName, resCreds.FirstName, "first names not equal"),
+				!assert.Equal(t, globalUsers[i].LastName, resCreds.LastName, "last names not equal"),
+				!assert.Equal(t, globalUsers[i].User.Email, resCreds.User.Email, "emails not equal"),
+				!assert.Equal(t, globalUsers[i].User.Organization, resCreds.User.Organization, "organizations not equal"),
+				!assert.Equal(t, globalUsers[i].User.PhoneNumber, resCreds.User.PhoneNumber, "phone numbers not equal"):
+				return
+			}
 		}
 	})
 
@@ -68,17 +75,16 @@ func TestGetUserQuery(t *testing.T) {
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_USERS+ENDPOINT_QUERY_USER, GetQueryUsers)
 
-	// registers a test user with the given fields and returns their global ID
-	registerTestUser := func(email string, fname string, lname string, userType int, organization string) string {
+	// registers a test user with the given fields and returns their global ID (just makes calling registerUser more compact)
+	registerUser := func(email string, fname string, lname string, userType int, organization string) string {
 		user := User{
-			Email: email,
-			Password: VALID_PW, // in authentication_test.go
-			FirstName: fname,
-			LastName: lname,
-			PhoneNumber: "07375942117",
+			Email:        email,
+			Password:     VALID_PW,
+			PhoneNumber:  "07375942117",
 			Organization: organization,
 		}
-		id, err := registerUser(user, userType)
+		globUser := GlobalUser{FirstName: fname, LastName: lname, UserType: userType, User: &user}
+		id, err := registerUser(globUser)
 		assert.NoError(t, err, "Error occurred while registering test user")
 		return id
 	}
@@ -98,10 +104,10 @@ func TestGetUserQuery(t *testing.T) {
 
 	t.Run("valid queries", func(t *testing.T) {
 		defer clearUsers()
-		userID1 := registerTestUser("test1@test.com", "Joe", "Shmo", USERTYPE_NIL, "org one")
-		userID2 := registerTestUser("test2@test.com", "Bob", "Tao", USERTYPE_PUBLISHER, "org one two")
-		userID3 := registerTestUser("test3@test.com", "Billy", "Tai", USERTYPE_REVIEWER, "org3")
-		userID4 := registerTestUser("test4@test.com", "Will", "Zimmer", USERTYPE_EDITOR, "testtest")
+		userID1 := registerUser("test1@test.com", "Joe", "Shmo", USERTYPE_NIL, "org one")
+		userID2 := registerUser("test2@test.com", "Bob", "Tao", USERTYPE_PUBLISHER, "org one two")
+		userID3 := registerUser("test3@test.com", "Billy", "Tai", USERTYPE_REVIEWER, "org3")
+		userID4 := registerUser("test4@test.com", "Will", "Zimmer", USERTYPE_EDITOR, "testtest")
 
 		// handles sending the request and parsing the response for valid queries (i.e. status 200)
 		handleValidQuery := func(queryRoute string) *QueryUsersResponse {
@@ -116,7 +122,7 @@ func TestGetUserQuery(t *testing.T) {
 			return respData
 		}
 
-		// confirms that the query requests return a full user profile
+		// confirms that the query requests return a full user profile not just ID
 		t.Run("confirm data", func(t *testing.T) {
 			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
 			respData := handleValidQuery(queryRoute)
@@ -125,8 +131,8 @@ func TestGetUserQuery(t *testing.T) {
 			case !assert.NotEmpty(t, user.User, "user profile is nil"),
 				!assert.NotEmpty(t, user.User.Email, "email is nil"),
 				!assert.Empty(t, user.User.Password, "password returned!"),
-				!assert.NotEmpty(t, user.User.FirstName, "first name is nil"),
-				!assert.NotEmpty(t, user.User.LastName, "last name is nil"),
+				!assert.NotEmpty(t, user.FirstName, "first name is nil"),
+				!assert.NotEmpty(t, user.LastName, "last name is nil"),
 				!assert.NotEmpty(t, user.User.PhoneNumber, "phone number is nil"),
 				!assert.NotEmpty(t, user.User.Organization, "organization is nil"):
 				return

@@ -31,8 +31,8 @@ const (
 	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories
 	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
-	SUBROUTE_FILE       = "/file"
-	ENDPOINT_NEWFILE    = "/upload"
+	SUBROUTE_FILE    = "/file"
+	ENDPOINT_NEWFILE = "/upload"
 
 	DIR_PERMISSIONS  = 0755 // permissions for filesystem directories
 	FILE_PERMISSIONS = 0644 // permissions for submission files

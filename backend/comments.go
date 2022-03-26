@@ -21,7 +21,7 @@ import (
 
 const (
 	ENDPOINT_COMMENT = "/comment"
-	ENDPOINT_EDIT = "/edit"
+	ENDPOINT_EDIT    = "/edit"
 )
 
 // -----------
@@ -41,7 +41,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - Given File ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// gets context struct and validates it
+		// gets context struct and validates it
 	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - No user logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
@@ -50,7 +50,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 		resp.StandardResponse = StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// creates the comment using the given helper method
+		// creates the comment using the given helper method
 	} else if commentID, err := addComment(&Comment{AuthorID: ctx.ID, FileID: uint(fileID64),
 		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber}); err != nil {
 		log.Printf("[ERROR] Comment creation failed: %v", err)
@@ -83,7 +83,7 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// edits the comment using the given controller method
+		// edits the comment using the given controller method
 	} else if err := ControllerEditComment(req, ctx.ID); err != nil {
 		switch err.(type) {
 		case *CommentNotFoundError:
@@ -112,7 +112,7 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 func ControllerEditComment(r *EditCommentPostBody, authorID string) error {
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// gets the comment from the db if it exists
-		comment := &Comment{Model: gorm.Model{ID:r.ID}}
+		comment := &Comment{Model: gorm.Model{ID: r.ID}}
 		if res := tx.Model(comment).Find(comment); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected == 0 {

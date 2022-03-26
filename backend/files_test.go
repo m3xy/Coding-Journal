@@ -35,32 +35,28 @@ const (
 func TestGetFile(t *testing.T) {
 	testInit()
 	defer testEnd()
-	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
-	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0]                        // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+	testSubmission := *testSubmissions[0].getCopy() // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_FILE+"/{id}", GetFile)
 
-	// adds a submission to the database and filesystem
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
+	reviewerID := globalReviewers[0].ID
 
 	testSubmission.Files = []File{testFile}
 	submissionID, err := addSubmission(&testSubmission)
 	if !assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err) {
 		return
 	}
-	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") {
+		return
+	}
 	fileID := testFile.ID
 
 	// tests getting a single valid file without comments
@@ -91,15 +87,15 @@ func TestGetFile(t *testing.T) {
 	// tests getting a single valid file without comments
 	t.Run("Get One File nested comments", func(t *testing.T) {
 		// adds comments to the test file
-		commentID1, _ := addComment(&Comment{FileID:fileID, 
-			AuthorID:reviewerID, LineNumber: 0, Base64Value:"testComment1"})
-		commentID2, _ := addComment(&Comment{ParentID:&commentID1, FileID:fileID,
-			AuthorID:reviewerID, Base64Value:"testComment1"})
-		commentID3, _ := addComment(&Comment{ParentID:&commentID2, FileID:fileID,
-			AuthorID:reviewerID, Base64Value:"testComment1"})
-		commentID4, _ := addComment(&Comment{ParentID:&commentID3, FileID:fileID,
-			AuthorID:reviewerID, Base64Value:"testComment1"})
-	
+		commentID1, _ := addComment(&Comment{FileID: fileID,
+			AuthorID: reviewerID, LineNumber: 0, Base64Value: "testComment1"})
+		commentID2, _ := addComment(&Comment{ParentID: &commentID1, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+		commentID3, _ := addComment(&Comment{ParentID: &commentID2, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+		commentID4, _ := addComment(&Comment{ParentID: &commentID3, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+
 		// builds the request url inserting query parameters
 		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
 		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
@@ -126,7 +122,7 @@ func TestGetFile(t *testing.T) {
 			!assert.Equal(t, commentID3, respData.File.Comments[0].
 				Comments[0].Comments[0].ID, "third level comment does not match"),
 			!assert.Equal(t, commentID4, respData.File.Comments[0].
-				Comments[0].Comments[0].Comments[0].ID,"fourth level comment does not match"):
+				Comments[0].Comments[0].Comments[0].ID, "fourth level comment does not match"):
 			return
 		}
 	})
@@ -156,17 +152,12 @@ func TestAddFile(t *testing.T) {
 	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
 
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	submissionID, err := addSubmission(&testSubmission) // adds a submission for the file to be uploaded to
 	if !assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err) {
@@ -236,23 +227,16 @@ func TestGetFileData(t *testing.T) {
 
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem.
 	testSubmission := testSubmissions[0] // test submission to be added to db and filesystem.
-	testAuthor := testAuthors[0]
-	testReviewer := testReviewers[0]
 
 	// configures the test submission fields
 	testSubmission.Files = []File{testFile}
 
-	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	// adds a submission to the database and filesystem
 	submissionID, err := addSubmission(&testSubmission)
