@@ -124,7 +124,7 @@ func TestSignUp(t *testing.T) {
 
 	// Test bad request response for invalid credentials.
 	t.Run("Invalid signups", func(t *testing.T) {
-		for _, user := range wrongCredsSignups {
+		for _, user := range wrongCredsSignupBodies {
 			reqBody, _ := json.Marshal(user)
 			req, w := httptest.NewRequest(http.MethodPost, ENDPOINT_SIGNUP, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
