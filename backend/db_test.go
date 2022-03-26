@@ -117,8 +117,8 @@ var testFiles []File = []File{
 }
 
 var testComments []*Comment = []*Comment{
-	{AuthorID: "", Base64Value: "Hello World", Comments: []Comment{}, LineNumber: 0},
-	{AuthorID: "", Base64Value: "Goodbye World", Comments: []Comment{}, LineNumber: 0},
+	{AuthorID: "", Base64Value: "Hello World", Comments: []Comment{}, StartLine: 0, EndLine: 0},
+	{AuthorID: "", Base64Value: "Goodbye World", Comments: []Comment{}, StartLine: 0, EndLine: 1},
 }
 
 var testLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
@@ -301,6 +301,21 @@ func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
 		}
 	} else {
 		return nil
+	}
+}
+func (c *Comment) getCopy() (*Comment) {
+	commentArray := make([]Comment, len(c.Comments))
+	for i, comment := range c.Comments {
+		commentArray[i] = *comment.getCopy()
+	}
+	return &Comment{
+		AuthorID: c.AuthorID,
+		FileID: c.FileID,
+		Base64Value: c.Base64Value,
+		StartLine: c.StartLine,
+		EndLine: c.EndLine,
+		ParentID: c.ParentID,
+		Comments: c.Comments,
 	}
 }
 

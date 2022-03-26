@@ -32,7 +32,7 @@ export default ({ submission, show, setShow, setAlertMsg, showAlertMsg }) => {
 			</Modal.Header>
 			<Modal.Body>
 				<div className="text-muted">
-					{submission.reviewers.length === 0
+					{submission.reviewers?.length === 0
 						? "No reviewers yet, please assign reviewers..."
 						: (submission.metaData.hasOwnProperty("reviews")
 							? submission.metaData.reviews?.length

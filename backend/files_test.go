@@ -88,7 +88,7 @@ func TestGetFile(t *testing.T) {
 	t.Run("Get One File nested comments", func(t *testing.T) {
 		// adds comments to the test file
 		commentID1, _ := addComment(&Comment{FileID: fileID,
-			AuthorID: reviewerID, LineNumber: 0, Base64Value: "testComment1"})
+			AuthorID: reviewerID, StartLine: 0, EndLine: 0, Base64Value: "testComment1"})
 		commentID2, _ := addComment(&Comment{ParentID: &commentID1, FileID: fileID,
 			AuthorID: reviewerID, Base64Value: "testComment1"})
 		commentID3, _ := addComment(&Comment{ParentID: &commentID2, FileID: fileID,

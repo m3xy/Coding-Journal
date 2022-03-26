@@ -54,7 +54,7 @@ export default ({ noProfileReviewers, reviews }) => {
 				<h4>Reviews</h4>
 			</Card.Body>
 			<ListGroup className="list-group-flush">
-				{reviews.map((review, i) => {
+				{reviews?.map((review, i) => {
 					return (
 						<ListGroupItem key={i}>
 							<h5 style={{ display: "flex" }}>

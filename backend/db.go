@@ -130,7 +130,8 @@ type Comment struct {
 	AuthorID    string `json:"author"`
 	FileID      uint   `json:"fileId"` // foreign key linking comments to files table
 	Base64Value string `gorm:"type:mediumtext" json:"base64Value"`
-	LineNumber  int    `json:"lineNumber"`
+	StartLine   int    `json:"startLine"`
+	EndLine     int    `json:"endLine"`
 
 	// self association for replies to user comments
 	ParentID *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
