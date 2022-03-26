@@ -31,7 +31,7 @@ function Submission() {
 			abstract: "",
 			reviews: []
 		},
-		files: [],
+		files: [{ID:null, path:""}],
 		approved: null
 	})
 	const [authors, setAuthors] = useState([])
