@@ -20,14 +20,7 @@ function getUserID() {
 
 function Profile() {
 	const navigate = useNavigate()
-	const [firstname, setFirstname] = useState("")
-	const [lastname, setLastname] = useState("")
-	const [usertype, setUsertype] = useState(0)
-	const [email, setEmail] = useState("")
-	const [phonenumber, setPhoneNumber] = useState("000000")
-	const [organization, setOrganization] = useState("None")
-	const [authoredSubs, setAuthoredSubs] = useState([])
-	const [reviewedSubs, setReviewedSubs] = useState([])
+	const [user, setUser] = useState({})
 
 	if (getUserID() === null) {
 		navigate("/login")
@@ -37,23 +30,7 @@ function Profile() {
 		axiosInstance
 			.get(profileEndpoint + "/" + getUserID())
 			.then((response) => {
-				console.log(response.data)
-				setFirstname(response.data.profile.firstName)
-				setLastname(response.data.profile.lastName)
-				setUsertype(response.data.userType)
-				setEmail(response.data.profile.email)
-				setPhoneNumber(response.data.profile.phoneNumber)
-				setOrganization(response.data.profile.organization)
-				setAuthoredSubs(
-					response.data.authoredSubmissions
-						? response.data.authoredSubmissions
-						: []
-				)
-				setReviewedSubs(
-					response.data.reviewedSubmissions
-						? response.data.reviewedSubmissions
-						: []
-				)
+				setUser(response.data)
 			})
 			.catch(() => {
 				return <div></div>
@@ -73,7 +50,7 @@ function Profile() {
 	const getSubmissionsList = (submissions) => {
 		return (
 			<ListGroup>
-				{submissions.map((submission) => {
+				{user.authoredSubmissions?.map((submission) => {
 					return (
 						<ListGroup.Item
 							as="li"
@@ -124,8 +101,8 @@ function Profile() {
 	return (
 		<div className="col-md-6 offset-md-3" style={{ textAlign: "center" }}>
 			<br />
-			<h2>{firstname + " " + lastname}</h2>
-			<label>({userTypes[usertype]})</label>
+			<h2>{user.firstName + " " + user.lastName}</h2>
+			<label>({userTypes[user.userType]})</label>
 			<br />
 			<br />
 			<Tabs
@@ -134,8 +111,8 @@ function Profile() {
 				id="profileTabs"
 				className="mb-3">
 				<Tab eventKey="authored" title="Authored Submissions">
-					{authoredSubs.length > 0 ? (
-						getSubmissionsList(authoredSubs)
+					{user.authoredSubmissions?.length > 0 ? (
+						getSubmissionsList(user.authoredSubmissions)
 					) : (
 						<div className="text-center" style={{ color: "grey" }}>
 							<i>No authored submissions</i>
@@ -143,8 +120,8 @@ function Profile() {
 					)}
 				</Tab>
 				<Tab eventKey="reviewed" title="Reviewer Submissions">
-					{reviewedSubs.length > 0 ? (
-						getSubmissionsList(reviewedSubs)
+					{user.reviewedSubmissions?.length > 0 ? (
+						getSubmissionsList(user.reviewedSubmissions)
 					) : (
 						<div className="text-center" style={{ color: "grey" }}>
 							<i>No reviewed submissions</i>
@@ -152,12 +129,12 @@ function Profile() {
 					)}
 				</Tab>
 				<Tab eventKey="comments" title="Comments">
-					{comments}
+					{}
 				</Tab>
 				<Tab eventKey="contact" title="Contact">
-					Email: {email} <br />
-					Phone Number: {phonenumber} <br />
-					Organization: {organization} <br />
+					Email: {user.profile?.email} <br />
+					Phone Number: {user.profile?.phoneNumber} <br />
+					Organization: {user.profile?.organization} <br />
 				</Tab>
 			</Tabs>
 		</div>

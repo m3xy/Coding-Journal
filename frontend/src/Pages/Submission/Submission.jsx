@@ -34,8 +34,6 @@ function Submission() {
 		files: [],
 		approved: null
 	})
-	const [authors, setAuthors] = useState([])
-	const [reviewers, setReviewers] = useState([])
 	const [review, showReview] = useState(false)
 	const [approval, showApproval] = useState(false)
 
@@ -78,13 +76,6 @@ function Submission() {
 			.get("/submission/" + id)
 			.then((response) => {
 				setSubmission(response.data)
-				response.data.authors.map((author) =>
-					getUser(author.userId, setAuthors)
-				)
-				if (response.data.hasOwnProperty("reviewers"))
-					response.data.reviewers.map((reviewer) =>
-						getUser(reviewer.userId, setReviewers)
-					)
 			})
 			.catch((err) => {
 				console.log(err)
@@ -96,25 +87,9 @@ function Submission() {
 			})
 	}
 
-	// Get an author's full profile from it's ID and add it to the authors array.
-	const getUser = async (id, setUsers) => {
-		try {
-			let res = await axiosInstance.get("/user/" + id)
-			setUsers((users) => {
-				return [...users, res.data]
-			})
-		} catch (err) {
-			console.log(err)
-		}
-	}
-
 	// Get an author's full name.
 	const getUserFullName = (author) => {
-		if (author.hasOwnProperty("profile")) {
-			return author.profile.firstName + " " + author.profile.lastName
-		} else {
-			return author.userId
-		}
+		return author.firstName + " " + author.lastName
 	}
 
 	// Get status badge from submission status
@@ -131,9 +106,9 @@ function Submission() {
 		return (
 			<h5>
 				{role}
-				{users.length > 1 ? "s: " : ": "}
-				{users.length > 0
-					? users.map(
+				{users?.length > 1 ? "s: " : ": "}
+				{users?.length > 0
+					? users?.map(
 						(user, i) =>
 							(i === 0 ? " " : ", ") + getUserFullName(user)
 					)
@@ -156,8 +131,7 @@ function Submission() {
 			)
 		else if (
 			permissionLevel[perm] === "reviewer" &&
-			submission.reviewers
-				.map((reviewer) => {
+			submission.reviewers?.map((reviewer) => {
 					return reviewer.userId
 				})
 				.includes(JwtService.getUserID())
@@ -255,7 +229,7 @@ function Submission() {
 			</SwitchTransition>
 			<Collapse in={!showFile}>
 				<div className="text-muted">
-					{getUsersString(authors, "Author")}
+					{getUsersString(submission.authors, "Author")}
 					<div style={{ display: "flex" }}>
 						{permissionLevel[perm] === "editor" && (
 							<Button style={{ marginRight: "5px" }} size="sm">
@@ -268,7 +242,7 @@ function Submission() {
 									? styles.ButtonTextCenter
 									: ""
 							}>
-							{getUsersString(reviewers, "Reviewer")}
+							{getUsersString(submission.reviewers, "Reviewer")}
 						</div>
 					</div>
 				</div>

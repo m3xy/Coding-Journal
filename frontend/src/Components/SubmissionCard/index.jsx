@@ -1,38 +1,15 @@
-import React, { useEffect, useState } from "react"
-import axiosInstance from "../../Web/axiosInstance"
+import React, { useEffect } from "react"
 import { Card, Button, Badge } from "react-bootstrap"
 import styles from "./SubmissionCard.module.css"
 import JwtService from "../../Web/axiosInstance"
 import { useNavigate } from "react-router-dom"
 
 export default ({ submission }) => {
-	const [authors, setAuthors] = useState([])
 	const navigate = useNavigate()
 
 	useEffect(() => {
 		setAuthorsNotFetched(submission.authors)
 	})
-
-	// Get authors from their IDs.
-	const setAuthorsNotFetched = (authors) => {
-		authors.map((author) => {
-			if (!authors.hasOwnProperty(author.userId)) {
-				axiosInstance
-					.get("/user/" + author.userId)
-					.then((response) => {
-						setAuthors((authors) => {
-							return {
-								...authors,
-								[author.userId]: response.data
-							}
-						})
-					})
-					.catch((err) => {
-						console.log(err)
-					})
-			}
-		})
-	}
 
 	const getBadge = (submission) => {
 		const [bg, text] = submission.approved
@@ -49,11 +26,7 @@ export default ({ submission }) => {
 
 	const getAuthorFullName = (author) => {
 		if (authors.hasOwnProperty(author.userId)) {
-			return (
-				authors[author.userId].profile.firstName +
-				" " +
-				authors[author.userId].profile.lastName
-			)
+			return author.firstName + " " + author.lastName
 		} else {
 			return author.userId
 		}
