@@ -72,7 +72,8 @@ func TestUploadUserComment(t *testing.T) {
 		case !assert.Equal(t, c1.FileID, c2.FileID, "file IDs do not match"),
 			!assert.Equal(t, c1.AuthorID, c2.AuthorID, "Comment author ID mismatch"),
 			!assert.Equal(t, c1.Base64Value, c2.Base64Value, "Comment content does not match"),
-			!assert.Equal(t, c1.LineNumber, c2.LineNumber, "line numbers do not match"):
+			!assert.Equal(t, c1.StartLine, c2.StartLine, "line numbers do not match"),
+			!assert.Equal(t, c1.EndLine, c2.EndLine, "line numbers do not match"):
 			return
 		}
 	}
@@ -108,7 +109,8 @@ func TestUploadUserComment(t *testing.T) {
 			reqBody := &NewCommentPostBody{
 				ParentID:    nil,
 				Base64Value: testComment.Base64Value,
-				LineNumber:  testComment.LineNumber,
+				StartLine: testComment.StartLine,
+				EndLine: testComment.EndLine,
 			}
 			resp := handleRequest(ctx, reqBody)
 			defer resp.Body.Close()
@@ -131,7 +133,8 @@ func TestUploadUserComment(t *testing.T) {
 			reqBody := &NewCommentPostBody{
 				ParentID:    &testComment.ID,
 				Base64Value: testReply.Base64Value,
-				LineNumber:  testReply.LineNumber,
+				StartLine:  testReply.StartLine,
+				EndLine: testReply.EndLine,
 			}
 			resp := handleRequest(ctx, reqBody)
 			defer resp.Body.Close()
@@ -153,7 +156,8 @@ func TestUploadUserComment(t *testing.T) {
 			reqBody := &NewCommentPostBody{
 				ParentID:    nil,
 				Base64Value: testComments[0].Base64Value,
-				LineNumber:  0,
+				StartLine: 0,
+				EndLine: 0,
 			}
 			resp := handleRequest(nil, reqBody)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
@@ -162,7 +166,8 @@ func TestUploadUserComment(t *testing.T) {
 		t.Run("Empty comment", func(t *testing.T) {
 			reqBody := &NewCommentPostBody{
 				ParentID:   nil,
-				LineNumber: 0,
+				StartLine: 0, 
+				EndLine: 0,
 			}
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
 			resp := handleRequest(ctx, reqBody)
@@ -238,7 +243,7 @@ func TestEditUserComment(t *testing.T) {
 
 		// adds a test comment
 		comment := &Comment{AuthorID: globalReviewers[0].ID, FileID: fileID,
-			LineNumber: 0, Base64Value: "test"}
+			StartLine: 0, EndLine: 0, Base64Value: "test"}
 		addComment(comment, fileID)
 
 		// upload a single user comment to a valid file in a valid submission
@@ -277,7 +282,7 @@ func TestEditUserComment(t *testing.T) {
 	t.Run("Request Validation", func(t *testing.T) {
 		// adds a test comment
 		comment := &Comment{AuthorID: globalReviewers[0].ID, FileID: fileID,
-			LineNumber: 0, Base64Value: "test"}
+			StartLine: 0, EndLine: 0, Base64Value: "test"}
 		addComment(comment, fileID)
 		defer clearComments()
 

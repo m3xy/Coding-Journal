@@ -52,7 +52,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 
 		// creates the comment using the given helper method
 	} else if commentID, err := addComment(&Comment{AuthorID: ctx.ID, FileID: uint(fileID64),
-		ParentID: req.ParentID, Base64Value: req.Base64Value, LineNumber: req.LineNumber}); err != nil {
+		ParentID: req.ParentID, Base64Value: req.Base64Value, StartLine: req.StartLine, EndLine: req.EndLine}); err != nil {
 		log.Printf("[ERROR] Comment creation failed: %v", err)
 		resp.StandardResponse = StandardResponse{Message: "Internal Server Error - Comment creation failed.", Error: true}
 		w.WriteHeader(http.StatusInternalServerError)
