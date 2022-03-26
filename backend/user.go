@@ -2,22 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"fmt"
-	"strings"
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
 const (
-	SUBROUTE_USERS = "/users"
-	SUBROUTE_USER  = "/user"
-	ENDPOINT_GET   = "/get"
+	SUBROUTE_USERS      = "/users"
+	SUBROUTE_USER       = "/user"
+	ENDPOINT_GET        = "/get"
 	ENDPOINT_QUERY_USER = "/query"
 )
 
@@ -37,7 +37,7 @@ func getUserSubroutes(r *mux.Router) {
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
-	return tx.Select("GlobalUserID", "Email", "FirstName", "LastName", "PhoneNumber", "Organization", "CreatedAt")
+	return tx.Select("GlobalUserID", "Email", "PhoneNumber", "Organization", "CreatedAt")
 }
 
 // -----------
@@ -123,7 +123,7 @@ func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]Global
 		if len(queryParams["userType"]) > 0 {
 			userType, err := strconv.Atoi(queryParams["userType"][0])
 			if err != nil || userType < 0 || userType > 4 {
-				return &BadQueryParameterError{ParamName:"userType", Value:queryParams["userType"][0]}
+				return &BadQueryParameterError{ParamName: "userType", Value: queryParams["userType"][0]}
 			}
 			tx = tx.Where("user_type = ?", userType)
 		}
@@ -164,11 +164,12 @@ func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]Global
 // uses SQL REGEX to filter the users returned based on their names
 func filterByUserName(tx *gorm.DB, userName string) *gorm.DB {
 	params := map[string]interface{}{"full": userName}
-	whereString := " User.first_name REGEXP @full OR User.last_name REGEXP @full"
+	whereString := " global_users.first_name REGEXP @full OR global_users.last_name REGEXP @full"
 	// only adds multiple regex conditions if the name given is multiple words
 	if wordList := strings.Fields(userName); len(wordList) > 1 {
 		for index, field := range wordList {
-			whereString = whereString + fmt.Sprintf(" OR User.first_name REGEXP @%d OR User.last_name REGEXP @%d ", index, index)
+			whereString = whereString + fmt.Sprintf(
+				" OR global_users.first_name REGEXP @%d OR global_users.last_name REGEXP @%d ", index, index)
 			params[fmt.Sprint(index)] = field
 		}
 	}
@@ -193,9 +194,9 @@ func filterByOrganization(tx *gorm.DB, organization string) *gorm.DB {
 func orderUserQuery(tx *gorm.DB, orderBy string) *gorm.DB {
 	// order of submissions
 	if orderBy == "lastName" {
-		tx = tx.Order("User__last_name")
+		tx = tx.Order("global_users.last_name")
 	} else if orderBy == "firstName" {
-		tx = tx.Order("User__first_name")
+		tx = tx.Order("global_users.first_name")
 	}
 	return tx
 }

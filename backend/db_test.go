@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"gorm.io/gorm/logger"
-
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -25,69 +24,70 @@ const (
 // -------------
 
 var testUsers []User = []User{
-	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", FirstName: "test",
-		LastName: "test", PhoneNumber: "0574349206"},
-	{Email: "john.doe@hello.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg"},
-	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-}
-
-var testObjects []GlobalUser = []GlobalUser{
-	{ID: "1", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "2", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "3", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "4", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", PhoneNumber: "0574349206"},
+	{Email: "john.doe@hello.com", Password: "dlbjDs2!", Organization: "TestOrg"},
+	{Email: "jane.doe@test.net", Password: "dlbjDs2!"},
 }
 
 var wrongCredsUsers []User = []User{
-	{Email: "test.nospec@hello.com", Password: "badN0Special", FirstName: "test", LastName: "nospec"},
-	{Email: "test.nonum@hello.com", Password: "testNoNum!", FirstName: "test", LastName: "nonum"},
-	{Email: "test.toosmall@hello.com", Password: "g0.Ku", FirstName: "test", LastName: "toosmall"},
-	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal", FirstName: "test", LastName: "wrongchars"},
-	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!", FirstName: "test", LastName: "nolower"},
-	{Email: "test.nouppercase@hello.com", Password: "nocap5!!", FirstName: "test", LastName: "noupper"},
+	{Email: "test.nospec@hello.com", Password: "badN0Special"},
+	{Email: "test.nonum@hello.com", Password: "testNoNum!"},
+	{Email: "test.toosmall@hello.com", Password: "g0.Ku"},
+	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal"},
+	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!"},
+	{Email: "test.nouppercase@hello.com", Password: "nocap5!!"},
+}
+
+var testEditors = []GlobalUser{
+	{FirstName: "Paul", LastName: "EditMan", UserType: USERTYPE_EDITOR,
+		User: &User{Email: "editor@test.net", Password: "dlbjDs2"}},
+}
+
+var testAuthors = []GlobalUser{
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "paula@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
+	{FirstName: "Joe", LastName: "Foe", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "john.doea@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
+	{FirstName: "Saul", LastName: "Moe", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "saula@test.net", Password: "dlbjDs2!"}},
+	{FirstName: "Pat", LastName: "Dill", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "pata@test.net", Password: "dlbjDs2!"}},
+}
+
+var testReviewers = []GlobalUser{
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "daver@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "Geoffr@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "paulr@test.net", Password: "dlbjDs2!"}},
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "paulrr@test.net", Password: "dlbjDs2!"}},
+}
+
+var testGlobUsers = []GlobalUser{
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_NIL,
+		User: &User{Email: "paulu@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
+	{FirstName: "Joe", LastName: "Foe", UserType: USERTYPE_NIL,
+		User: &User{Email: "john.doeu@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
+	{FirstName: "Saul", LastName: "Moe", UserType: USERTYPE_NIL,
+		User: &User{Email: "saulu@test.net", Password: "dlbjDs2!"}},
+	{FirstName: "Pat", LastName: "Dill", UserType: USERTYPE_NIL,
+		User: &User{Email: "patu@test.net", Password: "dlbjDs2!"}},
 }
 
 var testSubmissions []Submission = []Submission{
-	{
-		Name:       "TestSubmission1",
-		License:    "MIT",
-		Authors:    []GlobalUser{},
-		Reviewers:  []GlobalUser{},
-		Files:      []File{},
-		Categories: []Category{{Tag: "testtag"}},
-		MetaData: &SubmissionData{
-			Abstract: "test abstract",
-			Reviews:  []*Review{},
-		},
-	},
-	{
-		Name:       "TestSubmission2",
-		License:    "MIT",
-		Authors:    []GlobalUser{},
-		Reviewers:  []GlobalUser{},
-		Files:      []File{},
-		Categories: []Category{{Tag: "testtag"}},
-		MetaData: &SubmissionData{
-			Abstract: "test abstract",
-			Reviews:  []*Review{},
-		},
-	},
+	{Name: "TestSubmission1", License: "MIT", Authors: []GlobalUser{}, Reviewers: []GlobalUser{},
+		Files: []File{}, Categories: []Category{{Tag: "testtag"}}, MetaData: &SubmissionData{
+			Abstract: "test abstract", Reviews: []*Review{}}},
+	{Name: "TestSubmission2", License: "MIT", Authors: []GlobalUser{}, Reviewers: []GlobalUser{},
+		Files: []File{}, Categories: []Category{{Tag: "testtag"}}, MetaData: &SubmissionData{
+			Abstract: "test abstract", Reviews: []*Review{}}},
 }
 
-var testFiles []File = []File{
-	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
-	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
-}
-
-var testSubmissionMetaData = []*SubmissionData{
-	{Abstract: "test abstract, this means nothing", Reviews: nil},
-}
-
-var testAuthors []User = []User{
-	{Email: "paul@test.com", Password: "123456aB$", FirstName: "paul",
-		LastName: "test", PhoneNumber: "0574349206"},
+var testSignUpBodies = []SignUpPostBody{
+	{Email: "paul@test.com", Password: "123456aB$", PhoneNumber: "0574349206",
+		FirstName: "paul", LastName: "test"},
 	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
 		LastName: "Doe", Organization: "TestOrg"},
 	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
@@ -96,15 +96,24 @@ var testAuthors []User = []User{
 		LastName: "Doe"},
 }
 
-var testReviewers []User = []User{
-	{Email: "dave@test.com", Password: "123456aB$", FirstName: "dave",
-		LastName: "smith", PhoneNumber: "0574349206"},
-	{Email: "Geoff@test.com", Password: "dlbjDs2!", FirstName: "Geoff",
-		LastName: "Williams", Organization: "TestOrg"},
-	{Email: "reviewer2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-	{Email: "reviewer3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
-		LastName: "Doe"},
+var wrongCredsSignupBodies = []SignUpPostBody{
+	{Email: "test.nospec@hello.com", Password: "badN0Special",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.nonum@hello.com", Password: "testNoNum!",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.toosmall@hello.com", Password: "g0.Ku",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.nouppercase@hello.com", Password: "nocap5!!",
+		FirstName: "test", LastName: "nospec"},
+}
+
+var testFiles []File = []File{
+	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
+	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
 }
 
 var testComments []*Comment = []*Comment{
@@ -153,7 +162,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 	var err error
 	globalAuthors := make([]GlobalUser, len(testAuthors))
 	for i, user := range testAuthors {
-		if globalAuthors[i].ID, err = registerUser(user, USERTYPE_PUBLISHER); err != nil {
+		if globalAuthors[i].ID, err = registerUser(user); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
@@ -161,7 +170,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 	}
 	globalReviewers := make([]GlobalUser, len(testReviewers))
 	for i, user := range testReviewers {
-		if globalReviewers[i].ID, err = registerUser(user, USERTYPE_REVIEWER); err != nil {
+		if globalReviewers[i].ID, err = registerUser(user); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
@@ -193,17 +202,16 @@ func testAuth(t *testing.T) {
 // Get a copy of a user object.
 func (u *User) getCopy() *User {
 	if u != nil {
-		return &User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
-			LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+		return &User{Email: u.Email, Password: u.Password,
+			PhoneNumber: u.PhoneNumber, Organization: u.Organization}
 	} else {
 		return nil
 	}
 }
 func (g *GlobalUser) getCopy() *GlobalUser {
 	if g != nil {
-		return &GlobalUser{
-			ID: g.ID, User: g.User.getCopy(), UserType: g.UserType,
-		}
+		return &GlobalUser{ID: g.ID, FirstName: g.FirstName,
+			LastName: g.LastName, User: g.User.getCopy(), UserType: g.UserType}
 	} else {
 		return nil
 	}
@@ -313,6 +321,13 @@ func TestDbInit(t *testing.T) {
 // Test credential uniqueness with test database.
 func TestIsUnique(t *testing.T) {
 	testInit()
+
+	// copies testGlobUsers array and assigns unique IDs
+	testObjects := make([]GlobalUser, len(testGlobUsers))
+	for i, u := range testGlobUsers {
+		testObjects[i] = *u.getCopy()
+		testObjects[i].ID = fmt.Sprint(i)
+	}
 
 	// Test uniqueness in empty table
 	t.Run("Unique elements", func(t *testing.T) {

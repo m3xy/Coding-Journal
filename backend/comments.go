@@ -21,7 +21,7 @@ import (
 
 const (
 	ENDPOINT_COMMENT = "/comment"
-	ENDPOINT_EDIT = "/edit"
+	ENDPOINT_EDIT    = "/edit"
 )
 
 // -----------
@@ -83,7 +83,7 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
-	// edits the comment using the given controller method
+		// edits the comment using the given controller method
 	} else if err := ControllerEditComment(req, ctx.ID); err != nil {
 		switch err.(type) {
 		case *CommentNotFoundError:
@@ -112,7 +112,7 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 func ControllerEditComment(r *EditCommentPostBody, authorID string) error {
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// gets the comment from the db if it exists
-		comment := &Comment{Model: gorm.Model{ID:r.ID}}
+		comment := &Comment{Model: gorm.Model{ID: r.ID}}
 		if res := tx.Model(comment).Find(comment); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected == 0 {
