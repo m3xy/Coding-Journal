@@ -40,7 +40,6 @@ type UploadSubmissionResponse struct {
 	SubmissionID uint `json:"ID"`
 }
 
-
 // ----------
 // Files Endpoints
 // ----------

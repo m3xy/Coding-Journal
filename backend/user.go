@@ -2,22 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"fmt"
-	"strings"
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
 const (
-	SUBROUTE_USERS = "/users"
-	SUBROUTE_USER  = "/user"
-	ENDPOINT_GET   = "/get"
+	SUBROUTE_USERS      = "/users"
+	SUBROUTE_USER       = "/user"
+	ENDPOINT_GET        = "/get"
 	ENDPOINT_QUERY_USER = "/query"
 )
 
@@ -123,7 +123,7 @@ func ControllerQueryUsers(queryParams url.Values, ctx *RequestContext) ([]Global
 		if len(queryParams["userType"]) > 0 {
 			userType, err := strconv.Atoi(queryParams["userType"][0])
 			if err != nil || userType < 0 || userType > 4 {
-				return &BadQueryParameterError{ParamName:"userType", Value:queryParams["userType"][0]}
+				return &BadQueryParameterError{ParamName: "userType", Value: queryParams["userType"][0]}
 			}
 			tx = tx.Where("user_type = ?", userType)
 		}

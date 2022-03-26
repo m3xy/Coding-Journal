@@ -42,7 +42,7 @@ func TestPostAssignReviewers(t *testing.T) {
 
 	// adds a test editor
 	globEditor := *testEditors[0].getCopy()
-	editorID, err := registerTestUser(globEditor)
+	editorID, err := registerUser(globEditor)
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}
@@ -373,7 +373,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 	}
 	// adds a test editor
 	globEditor := *testEditors[0].getCopy()
-	editorID, err := registerTestUser(globEditor)
+	editorID, err := registerUser(globEditor)
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}
@@ -416,8 +416,8 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 	t.Run("Change Status", func(t *testing.T) {
 		t.Run("Review not added", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusUnauthorized, 
-				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), 
+			assert.Equal(t, http.StatusUnauthorized,
+				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct),
 				"Wrong error code, was expecting 409 Conflict")
 		})
 
@@ -433,8 +433,8 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 
 		t.Run("Valid approval", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusOK, 
-				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), 
+			assert.Equal(t, http.StatusOK,
+				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct),
 				"Wrong error code, was expecting 200")
 			submission := &Submission{}
 			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").
@@ -467,7 +467,7 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 
 		t.Run("Non-editor user type", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID, 
+			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID,
 				globalReviewers[0].ID, USERTYPE_REVIEWER, reqStruct), "Wrong error code, was expecting 401")
 		})
 
@@ -480,19 +480,18 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 		})
 	})
 
-
 	t.Run("approve no reviewers assigned", func(t *testing.T) {
 		// adds a new submission without reviewers
 		submission := Submission{
-			Name:      "Test",
-			Authors:   []GlobalUser{globalAuthors[0]},
+			Name:     "Test",
+			Authors:  []GlobalUser{globalAuthors[0]},
 			MetaData: &SubmissionData{Abstract: "Test"},
 		}
 		subID, err := addSubmission(&submission)
 		if !assert.NoError(t, err, "Submission creation shouldn't error!") {
 			return
 		}
-		reqStruct := &UpdateSubmissionStatusBody{Status:true}
+		reqStruct := &UpdateSubmissionStatusBody{Status: true}
 		respCode := changeStatus(subID, editorID, USERTYPE_EDITOR, reqStruct)
 		assert.Equal(t, http.StatusUnauthorized, respCode, "incorrect status code returned")
 	})

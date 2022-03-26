@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"gorm.io/gorm/logger"
-	"gorm.io/gorm"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -41,49 +40,49 @@ var wrongCredsUsers []User = []User{
 
 var testEditors = []GlobalUser{
 	{FirstName: "Paul", LastName: "EditMan", UserType: USERTYPE_EDITOR,
-		User: &User{Email: "editor@test.net", Password: "dlbjDs2",}},
+		User: &User{Email: "editor@test.net", Password: "dlbjDs2"}},
 }
 
 var testAuthors = []GlobalUser{
-	{FirstName: "Paul", LastName:"Doe", UserType: USERTYPE_PUBLISHER, 
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_PUBLISHER,
 		User: &User{Email: "paula@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
-	{FirstName: "Joe", LastName:"Foe", UserType: USERTYPE_PUBLISHER, 
+	{FirstName: "Joe", LastName: "Foe", UserType: USERTYPE_PUBLISHER,
 		User: &User{Email: "john.doea@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
-	{FirstName: "Saul", LastName:"Moe", UserType: USERTYPE_PUBLISHER,
+	{FirstName: "Saul", LastName: "Moe", UserType: USERTYPE_PUBLISHER,
 		User: &User{Email: "saula@test.net", Password: "dlbjDs2!"}},
-	{FirstName: "Pat", LastName:"Dill", UserType: USERTYPE_PUBLISHER,
+	{FirstName: "Pat", LastName: "Dill", UserType: USERTYPE_PUBLISHER,
 		User: &User{Email: "pata@test.net", Password: "dlbjDs2!"}},
 }
 
 var testReviewers = []GlobalUser{
-	{FirstName: "Paul", LastName:"Doe", UserType: USERTYPE_REVIEWER,
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
 		User: &User{Email: "daver@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
-	{FirstName: "Paul", LastName:"Doe", UserType: USERTYPE_REVIEWER,
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
 		User: &User{Email: "Geoffr@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
-	{FirstName: "Paul", LastName:"Doe", UserType: USERTYPE_REVIEWER,
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
 		User: &User{Email: "paulr@test.net", Password: "dlbjDs2!"}},
-	{FirstName: "Paul", LastName:"Doe", UserType: USERTYPE_REVIEWER,
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
 		User: &User{Email: "paulrr@test.net", Password: "dlbjDs2!"}},
 }
 
 var testGlobUsers = []GlobalUser{
-	{FirstName: "Paul", LastName:"Doe", UserType: USERTYPE_NIL, 
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_NIL,
 		User: &User{Email: "paulu@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
-	{FirstName: "Joe", LastName:"Foe", UserType: USERTYPE_NIL, 
+	{FirstName: "Joe", LastName: "Foe", UserType: USERTYPE_NIL,
 		User: &User{Email: "john.doeu@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
-	{FirstName: "Saul", LastName:"Moe", UserType: USERTYPE_NIL,
+	{FirstName: "Saul", LastName: "Moe", UserType: USERTYPE_NIL,
 		User: &User{Email: "saulu@test.net", Password: "dlbjDs2!"}},
-	{FirstName: "Pat", LastName:"Dill", UserType: USERTYPE_NIL,
+	{FirstName: "Pat", LastName: "Dill", UserType: USERTYPE_NIL,
 		User: &User{Email: "patu@test.net", Password: "dlbjDs2!"}},
 }
 
 var testSubmissions []Submission = []Submission{
 	{Name: "TestSubmission1", License: "MIT", Authors: []GlobalUser{}, Reviewers: []GlobalUser{},
 		Files: []File{}, Categories: []Category{{Tag: "testtag"}}, MetaData: &SubmissionData{
-			Abstract: "test abstract", Reviews:  []*Review{}}},
+			Abstract: "test abstract", Reviews: []*Review{}}},
 	{Name: "TestSubmission2", License: "MIT", Authors: []GlobalUser{}, Reviewers: []GlobalUser{},
 		Files: []File{}, Categories: []Category{{Tag: "testtag"}}, MetaData: &SubmissionData{
-			Abstract: "test abstract", Reviews:  []*Review{}}},
+			Abstract: "test abstract", Reviews: []*Review{}}},
 }
 
 var testSignUpBodies = []SignUpPostBody{
@@ -99,19 +98,18 @@ var testSignUpBodies = []SignUpPostBody{
 
 var wrongCredsSignupBodies = []SignUpPostBody{
 	{Email: "test.nospec@hello.com", Password: "badN0Special",
-		FirstName:"test", LastName: "nospec"},
+		FirstName: "test", LastName: "nospec"},
 	{Email: "test.nonum@hello.com", Password: "testNoNum!",
-		FirstName:"test", LastName: "nospec"},
+		FirstName: "test", LastName: "nospec"},
 	{Email: "test.toosmall@hello.com", Password: "g0.Ku",
-		FirstName:"test", LastName: "nospec"},
+		FirstName: "test", LastName: "nospec"},
 	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal",
-		FirstName:"test", LastName: "nospec"},
+		FirstName: "test", LastName: "nospec"},
 	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!",
-		FirstName:"test", LastName: "nospec"},
+		FirstName: "test", LastName: "nospec"},
 	{Email: "test.nouppercase@hello.com", Password: "nocap5!!",
-		FirstName:"test", LastName: "nospec"},
+		FirstName: "test", LastName: "nospec"},
 }
-
 
 var testFiles []File = []File{
 	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
@@ -159,35 +157,12 @@ func testEnd() {
 	getDB.Close()
 }
 
-// Test function to register a user to the database. Returns user global ID.
-func registerTestUser(user GlobalUser) (string, error) {
-	// Hash password and store new credentials to database.
-	user.User.Password = string(hashPw(user.User.Password))
-	if err := gormDb.Transaction(func(tx *gorm.DB) error {
-		// Check constraints on user
-		if !isUnique(tx, User{}, "Email", user.User.Email) {
-			return &RepeatEmailError{email: user.User.Email}
-		}
-
-		// Make credentials insert transaction.
-		if err := gormDb.Create(&user).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return "", err
-	}
-	// Return user's primary key (the UUID)
-	return user.ID, nil
-}
-
-
 // Initialise mock data in the database for use later on in the testing.
 func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 	var err error
 	globalAuthors := make([]GlobalUser, len(testAuthors))
 	for i, user := range testAuthors {
-		if globalAuthors[i].ID, err = registerTestUser(user); err != nil {
+		if globalAuthors[i].ID, err = registerUser(user); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
@@ -195,7 +170,7 @@ func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
 	}
 	globalReviewers := make([]GlobalUser, len(testReviewers))
 	for i, user := range testReviewers {
-		if globalReviewers[i].ID, err = registerTestUser(user); err != nil {
+		if globalReviewers[i].ID, err = registerUser(user); err != nil {
 			t.Errorf("User registration failed: %v", err)
 			return nil, nil, err
 		}
@@ -227,7 +202,7 @@ func testAuth(t *testing.T) {
 // Get a copy of a user object.
 func (u *User) getCopy() *User {
 	if u != nil {
-		return &User{Email: u.Email, Password: u.Password, 
+		return &User{Email: u.Email, Password: u.Password,
 			PhoneNumber: u.PhoneNumber, Organization: u.Organization}
 	} else {
 		return nil

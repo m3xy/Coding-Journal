@@ -99,7 +99,7 @@ func TestSignUp(t *testing.T) {
 			// check if user is in global users and local users tables
 			var queriedUser *GlobalUser
 			assert.NotEqualf(t, true,
-				isUnique(gormDb, &User{}, "email", u.Email), "User should be in database!")	
+				isUnique(gormDb, &User{}, "email", u.Email), "User should be in database!")
 			if res := gormDb.Model(&GlobalUser{}).Joins("User").Select("count(*) > 0").Where("User.email = ?", u.Email).Find(&queriedUser); res.Error != nil {
 				t.Errorf("Global ID test query error: %v", res.Error)
 			} else if !assert.Equal(t, int64(1), res.RowsAffected, "user not created properly") {
@@ -132,7 +132,7 @@ func TestSignUp(t *testing.T) {
 			defer resp.Body.Close()
 
 			// Check if response is indeed unsuccessful.
-			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, 
+			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode,
 				"Status incorrect, should be %d, got %d\n", http.StatusBadRequest, resp.StatusCode) {
 				return
 			}
@@ -151,7 +151,7 @@ func TestAuthLogIn(t *testing.T) {
 
 	// Populate database.
 	for _, u := range testGlobUsers {
-		registerTestUser(*u.getCopy())
+		registerUser(*u.getCopy())
 	}
 
 	// Set JWT Secret.

@@ -30,7 +30,7 @@ func TestJournalLogIn(t *testing.T) {
 	trialUsers := make([]GlobalUser, len(testGlobUsers))
 	for i, u := range testGlobUsers {
 		trialUsers[i] = *u.getCopy()
-		trialUsers[i].ID, err = registerTestUser(trialUsers[i])
+		trialUsers[i].ID, err = registerUser(trialUsers[i])
 		if !assert.NoError(t, err, "error while registering test users") {
 			return
 		}
@@ -45,7 +45,9 @@ func TestJournalLogIn(t *testing.T) {
 			// Create a request for user login. NOTE: must use testGlobUsers for password because trialUsers[i].User.Password is encrypted
 			loginBody := JournalLoginPostBody{Email: trialUsers[i].User.Email, Password: testGlobUsers[i].User.Password}
 			reqBody, err := json.Marshal(loginBody)
-			if !assert.NoError(t, err, "error marshaling request") { return }
+			if !assert.NoError(t, err, "error marshaling request") {
+				return
+			}
 			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			resp := w.Result()
@@ -79,7 +81,7 @@ func TestJournalLogIn(t *testing.T) {
 	// Test invalid email login.
 	t.Run("Invalid email logins", func(t *testing.T) {
 		for i := 1; i < len(trialUsers); i++ {
-			loginMap := JournalLoginPostBody{Email: "a"+trialUsers[0].User.Email, Password: testGlobUsers[i].User.Password}
+			loginMap := JournalLoginPostBody{Email: "a" + trialUsers[0].User.Email, Password: testGlobUsers[i].User.Password}
 
 			reqBody, _ := json.Marshal(loginMap)
 			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
@@ -101,7 +103,7 @@ func TestGetUsers(t *testing.T) {
 	var id string // temp loop variable
 	trialUsers := map[string]GlobalUser{}
 	for _, u := range testGlobUsers {
-		id, _ = registerTestUser(u)
+		id, _ = registerUser(u)
 		trialUsers[id] = u
 	}
 
@@ -150,11 +152,11 @@ func TestGetUser(t *testing.T) {
 	for i, u := range testUsers {
 		trialUsers[i] = GlobalUser{
 			FirstName: fmt.Sprint(i),
-			LastName: fmt.Sprint(i),
-			UserType: USERTYPE_REVIEWER_PUBLISHER,
-			User: u.getCopy(),
+			LastName:  fmt.Sprint(i),
+			UserType:  USERTYPE_REVIEWER_PUBLISHER,
+			User:      u.getCopy(),
 		}
-		trialUsers[i].ID, _ = registerTestUser(trialUsers[i])
+		trialUsers[i].ID, _ = registerUser(trialUsers[i])
 	}
 
 	router := mux.NewRouter()
@@ -229,7 +231,7 @@ func TestExportSubmission(t *testing.T) {
 	}
 
 	// adds a test editor
-	editorID, err := registerTestUser(testEditors[0])
+	editorID, err := registerUser(testEditors[0])
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}
@@ -321,7 +323,7 @@ func TestImportSubmission(t *testing.T) {
 
 	globalAuthors, globalReviewers, err := initMockUsers(t)
 	if !assert.NoError(t, err, "error registering test users") {
-		return 
+		return
 	}
 	authorID := globalAuthors[0].ID
 

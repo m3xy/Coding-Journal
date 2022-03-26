@@ -4,9 +4,9 @@ import "time"
 
 // Supergroup compliant user type
 type SupergroupUser struct {
-	ID           string `json:"id" gorm:"global_users.id"`
-	FirstName    string `json:"firstName"`
-	LastName     string `json:"lastName"`
+	ID        string `json:"id" gorm:"global_users.id"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 
 	Email        string `json:"email" gorm:"users.email"`
 	PhoneNumber  string `json:"phoneNumber"`

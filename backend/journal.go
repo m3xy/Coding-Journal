@@ -102,7 +102,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	for i, u := range users {
 		globUsers[i] = SupergroupUser{
 			ID: u.ID, FirstName: u.FirstName, LastName: u.LastName,
-			Email:u.User.Email, PhoneNumber: u.User.PhoneNumber, 
+			Email: u.User.Email, PhoneNumber: u.User.PhoneNumber,
 			Organization: u.User.Organization,
 		}
 	}
@@ -135,7 +135,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	// adapts local user to supergroup-compliant format
 	globUser := SupergroupUser{
 		ID: user.ID, FirstName: user.FirstName, LastName: user.LastName,
-		Email:user.User.Email, PhoneNumber: user.User.PhoneNumber, 
+		Email: user.User.Email, PhoneNumber: user.User.PhoneNumber,
 		Organization: user.User.Organization,
 	}
 

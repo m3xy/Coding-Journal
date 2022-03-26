@@ -370,39 +370,41 @@ func PostSignUp(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// controller function to register a user
+// controller function to register a user, returns uuid of user and an error if one occurs
 func ControllerRegisterUser(user SignUpPostBody, UserType int) (string, error) {
-	// Hash password and store new credentials to database.
-	user.Password = string(hashPw(user.Password))
-
 	registeredUser := GlobalUser{
 		FirstName: user.FirstName,
-		LastName: user.LastName,
-		UserType: UserType,
-		User:     &User{
-			Email: user.Email,
-			Password: user.Password,
-			PhoneNumber: user.PhoneNumber,
+		LastName:  user.LastName,
+		UserType:  UserType,
+		User: &User{
+			Email:        user.Email,
+			Password:     user.Password,
+			PhoneNumber:  user.PhoneNumber,
 			Organization: user.Organization,
 		},
 	}
+	// registers user returning uuid of the user and an error if one occurs
+	return registerUser(registeredUser)
+}
+
+// executes transaction to register a user in the database
+func registerUser(user GlobalUser) (string, error) {
+	// Hash password and store new credentials to database.
+	user.User.Password = string(hashPw(user.User.Password))
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user
-		if !isUnique(tx, User{}, "Email", user.Email) {
-			return &RepeatEmailError{email: user.Email}
+		if !isUnique(tx, User{}, "Email", user.User.Email) {
+			return &RepeatEmailError{email: user.User.Email}
 		}
-
 		// Make credentials insert transaction.
-		if err := gormDb.Create(&registeredUser).Error; err != nil {
+		if err := gormDb.Create(&user).Error; err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
 		return "", err
 	}
-
-	// Return user's primary key (the UUID)
-	return registeredUser.ID, nil
+	return user.ID, nil
 }
 
 // -- Password control --

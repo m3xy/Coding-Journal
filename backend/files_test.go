@@ -35,13 +35,12 @@ const (
 func TestGetFile(t *testing.T) {
 	testInit()
 	defer testEnd()
-	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0]                        // the test file to be added to the db and filesystem (saved here so it can be easily changed)
 	testSubmission := *testSubmissions[0].getCopy() // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_FILE+"/{id}", GetFile)
 
-	
 	globalAuthors, globalReviewers, err := initMockUsers(t)
 	if err != nil {
 		return
@@ -55,7 +54,9 @@ func TestGetFile(t *testing.T) {
 	if !assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err) {
 		return
 	}
-	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") { return }
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") {
+		return
+	}
 	fileID := testFile.ID
 
 	// tests getting a single valid file without comments
@@ -86,15 +87,15 @@ func TestGetFile(t *testing.T) {
 	// tests getting a single valid file without comments
 	t.Run("Get One File nested comments", func(t *testing.T) {
 		// adds comments to the test file
-		commentID1, _ := addComment(&Comment{FileID:fileID, 
-			AuthorID:reviewerID, LineNumber: 0, Base64Value:"testComment1"})
-		commentID2, _ := addComment(&Comment{ParentID:&commentID1, FileID:fileID,
-			AuthorID:reviewerID, Base64Value:"testComment1"})
-		commentID3, _ := addComment(&Comment{ParentID:&commentID2, FileID:fileID,
-			AuthorID:reviewerID, Base64Value:"testComment1"})
-		commentID4, _ := addComment(&Comment{ParentID:&commentID3, FileID:fileID,
-			AuthorID:reviewerID, Base64Value:"testComment1"})
-	
+		commentID1, _ := addComment(&Comment{FileID: fileID,
+			AuthorID: reviewerID, LineNumber: 0, Base64Value: "testComment1"})
+		commentID2, _ := addComment(&Comment{ParentID: &commentID1, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+		commentID3, _ := addComment(&Comment{ParentID: &commentID2, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+		commentID4, _ := addComment(&Comment{ParentID: &commentID3, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+
 		// builds the request url inserting query parameters
 		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
 		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
@@ -121,7 +122,7 @@ func TestGetFile(t *testing.T) {
 			!assert.Equal(t, commentID3, respData.File.Comments[0].
 				Comments[0].Comments[0].ID, "third level comment does not match"),
 			!assert.Equal(t, commentID4, respData.File.Comments[0].
-				Comments[0].Comments[0].Comments[0].ID,"fourth level comment does not match"):
+				Comments[0].Comments[0].Comments[0].ID, "fourth level comment does not match"):
 			return
 		}
 	})

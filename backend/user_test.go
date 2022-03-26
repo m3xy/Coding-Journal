@@ -2,14 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"fmt"
 
-	"gorm.io/gorm"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
 
 // Test user info getter.
@@ -26,8 +26,10 @@ func TestGetUserProfile(t *testing.T) {
 	globalUsers := make([]GlobalUser, len(testGlobUsers))
 	for i, u := range testGlobUsers {
 		globalUsers[i] = *u.getCopy()
-		globalUsers[i].ID, err = registerTestUser(u)
-		if !assert.NoError(t, err, "error registering test users") { return }
+		globalUsers[i].ID, err = registerUser(globalUsers[i])
+		if !assert.NoError(t, err, "error registering test users") {
+			return
+		}
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
@@ -73,11 +75,16 @@ func TestGetUserQuery(t *testing.T) {
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_USERS+ENDPOINT_QUERY_USER, GetQueryUsers)
 
-	// registers a test user with the given fields and returns their global ID (just makes calling registerTestUser more compact)
-	registerTestUser := func(email string, fname string, lname string, userType int, organization string) string {
-		user := User{Email: email, Password: VALID_PW, PhoneNumber: "07375942117", Organization: organization}
+	// registers a test user with the given fields and returns their global ID (just makes calling registerUser more compact)
+	registerUser := func(email string, fname string, lname string, userType int, organization string) string {
+		user := User{
+			Email:        email,
+			Password:     VALID_PW,
+			PhoneNumber:  "07375942117",
+			Organization: organization,
+		}
 		globUser := GlobalUser{FirstName: fname, LastName: lname, UserType: userType, User: &user}
-		id, err := registerTestUser(globUser)
+		id, err := registerUser(globUser)
 		assert.NoError(t, err, "Error occurred while registering test user")
 		return id
 	}
@@ -97,10 +104,10 @@ func TestGetUserQuery(t *testing.T) {
 
 	t.Run("valid queries", func(t *testing.T) {
 		defer clearUsers()
-		userID1 := registerTestUser("test1@test.com", "Joe", "Shmo", USERTYPE_NIL, "org one")
-		userID2 := registerTestUser("test2@test.com", "Bob", "Tao", USERTYPE_PUBLISHER, "org one two")
-		userID3 := registerTestUser("test3@test.com", "Billy", "Tai", USERTYPE_REVIEWER, "org3")
-		userID4 := registerTestUser("test4@test.com", "Will", "Zimmer", USERTYPE_EDITOR, "testtest")
+		userID1 := registerUser("test1@test.com", "Joe", "Shmo", USERTYPE_NIL, "org one")
+		userID2 := registerUser("test2@test.com", "Bob", "Tao", USERTYPE_PUBLISHER, "org one two")
+		userID3 := registerUser("test3@test.com", "Billy", "Tai", USERTYPE_REVIEWER, "org3")
+		userID4 := registerUser("test4@test.com", "Will", "Zimmer", USERTYPE_EDITOR, "testtest")
 
 		// handles sending the request and parsing the response for valid queries (i.e. status 200)
 		handleValidQuery := func(queryRoute string) *QueryUsersResponse {

@@ -36,6 +36,7 @@ type UploadSubmissionByZipBody struct {
 	ZipBase64Value string   `json:"base64" validate:"base64,required"`
 	Runnable       bool     `json:"runnable"`
 }
+
 // POST /submissions/create body
 type UploadSubmissionBody struct {
 	Name      string   `json:"name" validate:"required"`
@@ -81,7 +82,7 @@ type NewCommentPostBody struct {
 
 // POST /file/{id}/editcomment body
 type EditCommentPostBody struct {
-	ID uint `json:"id" validate:"required"`
+	ID          uint   `json:"id" validate:"required"`
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
