@@ -36,7 +36,7 @@ func TestGetFile(t *testing.T) {
 	testInit()
 	defer testEnd()
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
-	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
+	testSubmission := *testSubmissions[0].getCopy() // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_FILE+"/{id}", GetFile)

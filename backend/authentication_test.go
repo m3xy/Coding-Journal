@@ -150,15 +150,8 @@ func TestAuthLogIn(t *testing.T) {
 	router.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn)
 
 	// Populate database.
-	var globUser GlobalUser
-	for i, u := range testUsers {
-		globUser = GlobalUser{
-			FirstName: fmt.Sprint(i),
-			LastName: fmt.Sprint(i),
-			UserType: USERTYPE_NIL,
-			User: u.getCopy(),
-		}
-		registerTestUser(globUser)
+	for _, u := range testGlobUsers {
+		registerTestUser(*u.getCopy())
 	}
 
 	// Set JWT Secret.
@@ -170,8 +163,8 @@ func TestAuthLogIn(t *testing.T) {
 	}
 
 	t.Run("Valid logins", func(t *testing.T) {
-		for _, user := range testUsers {
-			body := AuthLoginPostBody{Email: user.Email, Password: user.Password, GroupNumber: TEAM_ID}
+		for _, user := range testGlobUsers {
+			body := AuthLoginPostBody{Email: user.User.Email, Password: user.User.Password, GroupNumber: TEAM_ID}
 			bodyBuf, _ := json.Marshal(body)
 
 			// Send request
@@ -191,7 +184,7 @@ func TestAuthLogIn(t *testing.T) {
 				return
 			}
 			var actualUser User
-			if err := gormDb.Where("Email = ?", user.Email).Find(&actualUser).Error; err != nil {
+			if err := gormDb.Where("Email = ?", user.User.Email).Find(&actualUser).Error; err != nil {
 				t.Errorf("SQL query error: %v\n", err)
 				return
 			}
@@ -220,7 +213,7 @@ func TestAuthLogIn(t *testing.T) {
 			router.ServeHTTP(w, req)
 			resp := w.Result()
 			defer resp.Body.Close()
-			if !assert.Equal(t, 401, resp.StatusCode, "Status code should be 401 - unauthorized") {
+			if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "Status code should be 401 - unauthorized") {
 				return
 			}
 

@@ -155,7 +155,7 @@ func TestUploadUserComment(t *testing.T) {
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 
-		t.Run("Bad Request Body", func(t *testing.T) {
+		t.Run("Empty comment", func(t *testing.T) {
 			reqBody := &NewCommentPostBody{
 				ParentID: nil,
 				LineNumber: 0,
@@ -225,7 +225,7 @@ func TestEditUserComment(t *testing.T) {
 		return w.Result()
 	}
 
-	t.Run("valid upload", func(t *testing.T) {
+	t.Run("valid edit", func(t *testing.T) {
 		defer clearComments()
 
 		// adds a test comment
@@ -234,23 +234,23 @@ func TestEditUserComment(t *testing.T) {
 		addComment(comment, fileID)
 
 		// upload a single user comment to a valid file in a valid submission
-		t.Run("Edit Single User Comment", func(t *testing.T) {
-			newContent := "new content"
+		t.Run("first edit", func(t *testing.T) {
 			// formats the request body to send to the server to add a comment
+			newContent := "new content"
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
 			req := &EditCommentPostBody{ID: comment.ID, Base64Value: newContent}
 			resp := handleRequest(ctx, req)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
-			// gets the comment from the db
+			// gets the comment from the db to test for equality
 			addedComment := &Comment{}
 			assert.NoError(t, gormDb.Model(&Comment{}).Find(addedComment, comment.ID).Error, "Could not query added comment")
 			assert.Equal(t, newContent, addedComment.Base64Value, "comment content not updated")
 		})
 
 		// upload a single user comment to a valid file in a valid submission
-		t.Run("Edit Again", func(t *testing.T) {
+		t.Run("edit again", func(t *testing.T) {
 			newContent := "new new content"
 			// formats the request body to send to the server to add a comment
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
@@ -300,8 +300,8 @@ func TestAddComment(t *testing.T) {
 	testInit()
 	defer testEnd()
 
-	testSubmission := testSubmissions[0] // test submission to add testFile to
-	testFile := testFiles[0]             // test file to add comments to
+	testSubmission := *testSubmissions[0].getCopy() // test submission to add testFile to
+	testFile := testFiles[0]                        // test file to add comments to
 	testComment := testComments[0]
 	testReply := testComments[1]
 

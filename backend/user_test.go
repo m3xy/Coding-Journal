@@ -22,10 +22,12 @@ func TestGetUserProfile(t *testing.T) {
 	router.HandleFunc(SUBROUTE_USER+"/{id}", getUserProfile)
 
 	// Populate database for testing and test valid user.
+	var err error
 	globalUsers := make([]GlobalUser, len(testGlobUsers))
 	for i, u := range testGlobUsers {
-		globalUsers[i] = u
-		globalUsers[i].ID, _ = registerTestUser(u)
+		globalUsers[i] = *u.getCopy()
+		globalUsers[i].ID, err = registerTestUser(u)
+		if !assert.NoError(t, err, "error registering test users") { return }
 	}
 
 	t.Run("Valid user profiles", func(t *testing.T) {
@@ -71,7 +73,7 @@ func TestGetUserQuery(t *testing.T) {
 	router := mux.NewRouter()
 	router.HandleFunc(SUBROUTE_USERS+ENDPOINT_QUERY_USER, GetQueryUsers)
 
-	// registers a test user with the given fields and returns their global ID
+	// registers a test user with the given fields and returns their global ID (just makes calling registerTestUser more compact)
 	registerTestUser := func(email string, fname string, lname string, userType int, organization string) string {
 		user := User{Email: email, Password: VALID_PW, PhoneNumber: "07375942117", Organization: organization}
 		globUser := GlobalUser{FirstName: fname, LastName: lname, UserType: userType, User: &user}
@@ -113,7 +115,7 @@ func TestGetUserQuery(t *testing.T) {
 			return respData
 		}
 
-		// confirms that the query requests return a full user profile
+		// confirms that the query requests return a full user profile not just ID
 		t.Run("confirm data", func(t *testing.T) {
 			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
 			respData := handleValidQuery(queryRoute)

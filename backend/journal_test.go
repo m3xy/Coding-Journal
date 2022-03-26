@@ -41,10 +41,11 @@ func TestJournalLogIn(t *testing.T) {
 
 	// Test valid logins
 	t.Run("Valid logins", func(t *testing.T) {
-		for i := range testUsers {
-			// Create a request for user login.
-			loginBody := JournalLoginPostBody{Email: testGlobUsers[i].User.Email, Password: testGlobUsers[i].User.Password}
-			reqBody, _ := json.Marshal(loginBody)
+		for i := range trialUsers {
+			// Create a request for user login. NOTE: must use testGlobUsers for password because trialUsers[i].User.Password is encrypted
+			loginBody := JournalLoginPostBody{Email: trialUsers[i].User.Email, Password: testGlobUsers[i].User.Password}
+			reqBody, err := json.Marshal(loginBody)
+			if !assert.NoError(t, err, "error marshaling request") { return }
 			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			resp := w.Result()
@@ -63,8 +64,8 @@ func TestJournalLogIn(t *testing.T) {
 
 	// Test invalid password login.
 	t.Run("Invalid password logins", func(t *testing.T) {
-		for i := 0; i < len(testUsers); i++ {
-			loginMap := JournalLoginPostBody{Email: testUsers[i].Email, Password: VALID_PW}
+		for i := 0; i < len(trialUsers); i++ {
+			loginMap := JournalLoginPostBody{Email: trialUsers[i].User.Email, Password: VALID_PW}
 
 			reqBody, _ := json.Marshal(loginMap)
 			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
@@ -77,8 +78,8 @@ func TestJournalLogIn(t *testing.T) {
 
 	// Test invalid email login.
 	t.Run("Invalid email logins", func(t *testing.T) {
-		for i := 1; i < len(testUsers); i++ {
-			loginMap := JournalLoginPostBody{Email: testUsers[0].Email, Password: testUsers[i].Password}
+		for i := 1; i < len(trialUsers); i++ {
+			loginMap := JournalLoginPostBody{Email: "a"+trialUsers[0].User.Email, Password: testGlobUsers[i].User.Password}
 
 			reqBody, _ := json.Marshal(loginMap)
 			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
