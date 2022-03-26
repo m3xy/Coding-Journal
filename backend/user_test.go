@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"bytes"
 	"testing"
+	"context"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -64,6 +66,58 @@ func TestGetUserProfile(t *testing.T) {
 		res := w.Result()
 
 		assert.Equalf(t, http.StatusNotFound, res.StatusCode, "Request should return status %d", http.StatusNotFound)
+	})
+}
+
+func TestChangeUserPermissions(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_CHANGE_PERMISSIONS, PostChangePermissions)
+
+	testUser := *testGlobUsers[0].getCopy()
+	userID, err := registerUser(testUser)
+	if !assert.NoError(t, err, "Error occurred while registering test user") {
+		return
+	}
+
+	testEditor := *testEditors[0].getCopy()
+	editorID, err := registerUser(testEditor)
+	if !assert.NoError(t, err, "Error occurred while registering test editor") {
+		return
+	}
+
+	// sends query to the proper endpoint and returns the response
+	handleQuery := func(queryRoute string, reqStruct ChangePermissionsPostBody, ctx *RequestContext) *http.Response {
+		reqBody, err := json.Marshal(reqStruct)
+		if !assert.NoError(t, err, "Error while marshalling assign reviewers body!") {
+			return nil
+		}
+		req := httptest.NewRequest(http.MethodPost, queryRoute, bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		rCtx := context.WithValue(req.Context(), "data", ctx)
+		router.ServeHTTP(w, req.WithContext(rCtx))
+		return w.Result()
+	}
+
+	t.Run("valid request", func(t *testing.T) {
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_CHANGE_PERMISSIONS)
+		reqBody := ChangePermissionsPostBody{ Permissions: USERTYPE_PUBLISHER }
+		ctx := &RequestContext{ ID: editorID, UserType: USERTYPE_EDITOR }
+		resp := handleQuery(queryRoute, reqBody, ctx)
+		queriedUser := &GlobalUser{}
+		switch {
+			case !assert.Equalf(t, http.StatusOK, resp.StatusCode, "incorrect status code"),
+				!assert.NoError(t, gormDb.Select("user_type").Find(queriedUser, "id = ?", userID).Error, "user could not be retrieved"),
+				!assert.Equal(t, USERTYPE_PUBLISHER, queriedUser.UserType, "permissions not changed"):
+				return
+		}
+	})
+
+	t.Run("request validation", func(t *testing.T) {
+
 	})
 }
 

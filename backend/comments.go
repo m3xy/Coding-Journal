@@ -30,7 +30,7 @@ const (
 // -----------
 
 // upload comment router function.
-// POST /file/{id}/newcomment
+// POST /file/{id}/comment
 func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := &NewCommentResponse{}

@@ -17,7 +17,9 @@ import (
 const (
 	SUBROUTE_USERS      = "/users"
 	SUBROUTE_USER       = "/user"
+
 	ENDPOINT_GET        = "/get"
+	ENDPOINT_CHANGE_PERMISSIONS = "/changepermissions"
 	ENDPOINT_QUERY_USER = "/query"
 )
 
@@ -72,7 +74,64 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Router function for editors to change user's permissions
+// POST /user/{id}/changepermissions
+func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
+	reqBody := &ChangePermissionsPostBody{}
+	resp := &StandardResponse{Message: "successfully changed permissions!", Error: false}
+	// gets the user ID from the vars and logged in user details from request context
+	params := mux.Vars(r)
+	userID := string(params["id"])
+	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if ctx.UserType != USERTYPE_EDITOR { // logged in user must be an editor to change another user's permissions
+		resp = &StandardResponse{Message: 
+			"The client must have editor permissions to change another user's permissions.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
+		// request body could not be validated or decoded
+		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	} else if err := ControllerUpdatePermissions(userID, reqBody.Permissions); err != nil {
+		switch err.(type) {
+		case *BadUserError:
+			fmt.Println(err)
+			resp = &StandardResponse{Message:"Cannot update permissions - user does not exist", Error:true}
+			w.WriteHeader(http.StatusBadRequest)
+
+		// Unexpected error - error out as server error.
+		default:
+			log.Printf("[ERROR] could not change user permissions: %v\n", err)
+			resp = &StandardResponse{Message: "Internal Server Error - could not change user permissions", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+
+	// Return response body after function successful.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller to change a user's permissions (UserType)
+func ControllerUpdatePermissions(userID string, permissions int) error {
+	fmt.Println(userID)
+	if res := gormDb.Model(&GlobalUser{ID: userID}).
+		Update("user_type", permissions); res.Error != nil {
+			return res.Error
+	} else if res.RowsAffected == 0 {
+		return &BadUserError{userID: userID}
+	}
+	return nil
+}
+
 // generalized query function for users
+// GET /users/query
 func GetQueryUsers(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var stdResp StandardResponse

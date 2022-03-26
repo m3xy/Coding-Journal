@@ -21,6 +21,11 @@ type AuthLoginPostBody struct {
 	GroupNumber int    `json:"groupNumber,string"`
 }
 
+// POST /user/{id}/changepermissions
+type ChangePermissionsPostBody struct {
+	Permissions int `json:"permissions" validate:"min=0,max=4,required"`
+}
+
 // ----------
 // Submissions Endpoints
 // ----------
