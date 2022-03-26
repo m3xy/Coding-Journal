@@ -188,7 +188,7 @@ function Code({ id }) {
 					<Comments
 						id={id}
 						comments={comments}
-                        setComments={setComments}
+						setComments={setComments}
 						startLine={startLine}
 						endLine={endLine}
 						show={showComments}

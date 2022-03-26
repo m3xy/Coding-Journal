@@ -20,7 +20,14 @@ const userEndpoint = "/user"
 const editEndpoint = "/edit"
 const deleteEndpoint = "/delete"
 
-function Comment({ fileID, comment, show, postReply, fileEndpoint, commentEndpoint }) {
+function Comment({
+	fileID,
+	comment,
+	show,
+	postReply,
+	fileEndpoint,
+	commentEndpoint
+}) {
 	const [reply, setReply] = useState("")
 	const [showReplies, setShowReplies] = useState(false)
 	const [openReplies, setOpenReplies] = useState(false)
@@ -44,33 +51,52 @@ function Comment({ fileID, comment, show, postReply, fileEndpoint, commentEndpoi
 	}
 
 	const postEdit = () => {
-        const b64Edit = btoa(edit)
+		const b64Edit = btoa(edit)
 		if (b64Edit == comment.base64Value) {
 			console.log("Comment unchanged")
 		}
 
-        let data = {
-            base64Value: b64Edit
-        }
-        
-        axiosInstance
-            .post(fileEndpoint + "/" + fileID + commentEndpoint + "/" + comment.ID + editEndpoint, data)
-            .then((response) => {
-                console.log(response)
-            }).catch((error) => {
-                console.log(error)
-            })
+		let data = {
+			base64Value: b64Edit
+		}
+
+		axiosInstance
+			.post(
+				fileEndpoint +
+					"/" +
+					fileID +
+					commentEndpoint +
+					"/" +
+					comment.ID +
+					editEndpoint,
+				data
+			)
+			.then((response) => {
+				console.log(response)
+			})
+			.catch((error) => {
+				console.log(error)
+			})
 	}
 
-    const postDelete = () => {
-        axiosInstance
-            .post(fileEndpoint + "/" + fileID + commentEndpoint + "/" + comment.ID + deleteEndpoint)
-            .then((response) => {
-                console.log(response)
-            }).catch((error) => {
-                console.log(error)
-            })
-    }
+	const postDelete = () => {
+		axiosInstance
+			.post(
+				fileEndpoint +
+					"/" +
+					fileID +
+					commentEndpoint +
+					"/" +
+					comment.ID +
+					deleteEndpoint
+			)
+			.then((response) => {
+				console.log(response)
+			})
+			.catch((error) => {
+				console.log(error)
+			})
+	}
 
 	const repliesHTML = comment.comments
 		? comment.comments.map((reply) => {
@@ -146,7 +172,9 @@ function Comment({ fileID, comment, show, postReply, fileEndpoint, commentEndpoi
 								}}>
 								✎
 							</Button>
-							<Button variant="light" onClick={postDelete}>🗑</Button>
+							<Button variant="light" onClick={postDelete}>
+								🗑
+							</Button>
 						</>
 					)}
 					{comment.comments && (

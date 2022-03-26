@@ -15,6 +15,7 @@ import {
 	ApprovalModal
 } from "./Children"
 import { Badge, Collapse, Button } from "react-bootstrap"
+import Code from "../Code"
 
 function Submission() {
 	// Router hooks
@@ -31,7 +32,7 @@ function Submission() {
 			abstract: "",
 			reviews: []
 		},
-		files: [{ID:null, path:""}],
+		files: [{ ID: null, path: "" }],
 		approved: null
 	})
 	const [review, showReview] = useState(false)
@@ -97,8 +98,8 @@ function Submission() {
 		let [bg, status] = submission.approved
 			? ["primary", "Approved"]
 			: submission.approved === null
-				? ["secondary", "In review"]
-				: ["danger", "Rejected"]
+			? ["secondary", "In review"]
+			: ["danger", "Rejected"]
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
@@ -109,9 +110,9 @@ function Submission() {
 				{users?.length > 1 ? "s: " : ": "}
 				{users?.length > 0
 					? users?.map(
-						(user, i) =>
-							(i === 0 ? " " : ", ") + getUserFullName(user)
-					)
+							(user, i) =>
+								(i === 0 ? " " : ", ") + getUserFullName(user)
+					  )
 					: "No " + role + "s..."}
 			</h5>
 		)
@@ -131,7 +132,8 @@ function Submission() {
 			)
 		else if (
 			permissionLevel[perm] === "reviewer" &&
-			submission.reviewers?.map((reviewer) => {
+			submission.reviewers
+				?.map((reviewer) => {
 					return reviewer.userId
 				})
 				.includes(JwtService.getUserID())
@@ -172,7 +174,7 @@ function Submission() {
 					setShow={(e) => setShowFile(e)}
 					inversed
 				/>
-				<FileViewer id={fileId} show={showFile} />
+				<Code id={fileId} />
 			</div>
 		)
 	}
