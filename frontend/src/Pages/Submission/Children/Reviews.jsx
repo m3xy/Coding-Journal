@@ -1,24 +1,39 @@
 import React, { useEffect, useState } from "react"
 import { Card, Badge, ListGroup, ListGroupItem } from "react-bootstrap"
+import ReviewModal from "./ReviewModal"
 import axiosInstance from "../../../Web/axiosInstance"
 
-export default ({ reviewerIds, reviews }) => {
+export default ({ noProfileReviewers, reviews }) => {
 	const [reviewers, setReviewers] = useState({})
+	const [showModal, setShowModal] = useState()
+	const [modalReview, setModalReview] = useState(<></>)
 
 	useEffect(() => {
-		reviewerIds.map((reviewerId) => {
-			axiosInstance.get('/user/' + reviewerId.userId)
+		noProfileReviewers.map((reviewer) => {
+			axiosInstance
+				.get("/user/" + reviewer.userId)
 				.then((response) => {
-					setReviewers(reviewers => { return { ...reviewers, [reviewerId.userId]: response.data } })
+					setReviewers((reviewers) => {
+						return {
+							...reviewers,
+							[reviewer.userId]: response.data
+						}
+					})
 				})
 				.catch((err) => {
 					console.log(err)
 				})
 		})
-	}, [])
+	}, [noProfileReviewers])
 
-	const getFullName = (reviewer) => {
-		return reviewer.profile.firstName + " " + reviewer.profile.lastName
+	const getFullName = (reviewerId) => {
+		if (reviewers.hasOwnProperty(reviewerId))
+			return (
+				reviewers[reviewerId].profile.firstName +
+				" " +
+				reviewers[reviewerId].profile.lastName
+			)
+		else return reviewerId
 	}
 
 	const getBadge = (approval) => {
@@ -28,25 +43,43 @@ export default ({ reviewerIds, reviews }) => {
 		return <Badge bg={bg}>{text}</Badge>
 	}
 
+	const clickReview = (target) => {
+		setModalReview(target)
+		setShowModal(true)
+	}
+
 	return (
-		<Card body>
-			<h4>Reviews</h4>
-			<ListGroup>
-				{reviews.map((review) => {
-					<ListGroupItem>
-						<div style={{ display: "flex" }}>
-							<Card.Link style={{ flex: "0.2" }}>
-								{getFullName(reviewers.hasOwnProperty(review.reviewerId) ?
-									reviewers[review.reviewerId] :
-									review.reviewerId)}
-							</Card.Link>
-							<div style={{ flex: "1" }}>
-							</div>
-							{getBadge(review.approved)}
-						</div>
-					</ListGroupItem>
+		<Card style={{ marginTop: "15px" }}>
+			<Card.Body>
+				<h4>Reviews</h4>
+			</Card.Body>
+			<ListGroup className="list-group-flush">
+				{reviews.map((review, i) => {
+					return (
+						<ListGroupItem key={i}>
+							<h5 style={{ display: "flex" }}>
+								<Card.Link
+									style={{ flex: "1" }}
+									onClick={() => clickReview(review)}>
+									{getFullName(review.reviewerId)}
+								</Card.Link>
+								<div
+									style={{
+										flex: "0.2",
+										textAlign: "right"
+									}}></div>
+								{getBadge(review.approved)}
+							</h5>
+						</ListGroupItem>
+					)
 				})}
 			</ListGroup>
+			<ReviewModal
+				show={showModal}
+				setShow={setShowModal}
+				review={modalReview}
+				reviewer={reviewers[modalReview.reviewerId]}
+			/>
 		</Card>
 	)
 }

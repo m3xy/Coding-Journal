@@ -4,14 +4,17 @@ import axiosInstance from "../../Web/axiosInstance"
 import { useParams, useNavigate } from "react-router-dom"
 import { CSSTransition, SwitchTransition } from "react-transition-group"
 import FadeInTransition from "../../Components/Transitions/FadeIn.module.css"
+import JwtService from "../../Web/jwt.service"
 import {
 	Abstract,
 	FileViewer,
 	FileExplorer,
 	TagsList,
-	Reviews
+	Reviews,
+	ReviewEditor as EditorModal,
+	ApprovalModal
 } from "./Children"
-import { Badge, Collapse } from "react-bootstrap"
+import { Badge, Collapse, Button } from "react-bootstrap"
 
 function Submission() {
 	// Router hooks
@@ -33,16 +36,40 @@ function Submission() {
 	})
 	const [authors, setAuthors] = useState([])
 	const [reviewers, setReviewers] = useState([])
-	const [showError, setShowError] = useState(false)
-	const [errMsg, setErrMsg] = useState("")
+	const [review, showReview] = useState(false)
+	const [approval, showApproval] = useState(false)
+
+	// Setters for file mode and file ID.
 	const [showFile, setShowFile] = useState(false)
 	const [fileId, setFileId] = useState(-1)
 
+	// Error handling states
+	const [showAlert, setAlert] = useState(false)
+	const [alertMsg, setAlertMsg] = useState("")
+
+	// Editor and reviewer variant controllers
+	// 0 - user, 1 - author, 2 - reviewer, 3 - editor.
+	const permissionLevel = ["editor", "author", "reviewer", "editor"]
+	const [perm, setPermissions] = useState(0)
+
 	useEffect(() => {
+		// Check if the page has an ID
 		if (!params.hasOwnProperty("id")) {
 			navigate("/")
 		}
 		getSubmission(params.id)
+
+		// Get required permissions
+		setPermissions(() => {
+			switch (JwtService.getUserType()) {
+				case 3:
+					return 2
+				case 4:
+					return 3
+				default:
+					return JwtService.getUserType()
+			}
+		})
 	}, [])
 
 	// Get the given submission from an ID.
@@ -95,8 +122,8 @@ function Submission() {
 		let [bg, status] = submission.approved
 			? ["primary", "Approved"]
 			: submission.approved === null
-			? ["secondary", "In review"]
-			: ["danger", "Rejected"]
+				? ["secondary", "In review"]
+				: ["danger", "Rejected"]
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
@@ -107,11 +134,97 @@ function Submission() {
 				{users.length > 1 ? "s: " : ": "}
 				{users.length > 0
 					? users.map(
-							(user, i) =>
-								(i === 0 ? " " : ", ") + getUserFullName(user)
-					  )
+						(user, i) =>
+							(i === 0 ? " " : ", ") + getUserFullName(user)
+					)
 					: "No " + role + "s..."}
 			</h5>
+		)
+	}
+
+	const permissionButtons = () => {
+		if (permissionLevel[perm] === "editor")
+			return (
+				<Button
+					onClick={() => showApproval(true)}
+					style={{
+						flex: "0.15",
+						justifyContent: "right"
+					}}>
+					Set Approval
+				</Button>
+			)
+		else if (
+			permissionLevel[perm] === "reviewer" &&
+			submission.reviewers
+				.map((reviewer) => {
+					return reviewer.userId
+				})
+				.includes(JwtService.getUserID())
+		) {
+			const disabled = submission.metaData.reviews
+				?.map((review) => {
+					return review.reviewerId
+				})
+				.includes(JwtService.getUserID())
+			if (!disabled)
+				return (
+					<Button
+						style={{
+							flex: "0.15",
+							justifyContent: "right"
+						}}
+						onClick={
+							!disabled ? () => showReview(true) : () => null
+						}>
+						Review
+					</Button>
+				)
+			else
+				return (
+					<h5 className={`text-muted ${styles.DisabledReviewButton}`}>
+						You've already reviewed this submission...
+					</h5>
+				)
+		}
+	}
+
+	const leftContainer = () => {
+		return (
+			<div className={styles.LeftContainer}>
+				<Abstract
+					markdown={submission.metaData.abstract}
+					show={showFile}
+					setShow={(e) => setShowFile(e)}
+					inversed
+				/>
+				<FileViewer id={fileId} show={showFile} />
+			</div>
+		)
+	}
+
+	const rightContainer = () => {
+		return (
+			<div className={styles.RightContainer}>
+				<FileExplorer
+					files={submission.files}
+					onClick={(id) => {
+						setFileId(id)
+						setShowFile(true)
+					}}
+				/>
+				<TagsList tags={submission.categories} />
+				{submission.metaData.hasOwnProperty("reviews") && (
+					<Reviews
+						reviews={submission.metaData.reviews}
+						noProfileReviewers={
+							submission.hasOwnProperty("reviewers")
+								? submission.reviewers
+								: []
+						}
+					/>
+				)}
+			</div>
 		)
 	}
 
@@ -131,10 +244,11 @@ function Submission() {
 						</div>
 					) : (
 						<div style={{ display: "flex" }}>
-							<h2>{getBadge()}</h2>
-							<h1 style={{ marginLeft: "15px" }}>
+							<h2 style={{ flex: "0.1" }}>{getBadge()}</h2>
+							<h1 style={{ flex: "1", marginLeft: "15px" }}>
 								{submission.name}
 							</h1>
+							{permissionButtons()}
 						</div>
 					)}
 				</CSSTransition>
@@ -142,40 +256,41 @@ function Submission() {
 			<Collapse in={!showFile}>
 				<div className="text-muted">
 					{getUsersString(authors, "Author")}
-					{getUsersString(reviewers, "Reviewer")}
+					<div style={{ display: "flex" }}>
+						{permissionLevel[perm] === "editor" && (
+							<Button style={{ marginRight: "5px" }} size="sm">
+								Assign
+							</Button>
+						)}
+						<div
+							className={
+								permissionLevel[perm] === "editor"
+									? styles.ButtonTextCenter
+									: ""
+							}>
+							{getUsersString(reviewers, "Reviewer")}
+						</div>
+					</div>
 				</div>
 			</Collapse>
 			<div style={{ display: "flex" }}>
-				<div className={styles.LeftContainer}>
-					<Abstract
-						markdown={submission.metaData.abstract}
-						show={showFile}
-						setShow={(e) => setShowFile(e)}
-						inversed
-					/>
-					<FileViewer id={fileId} show={showFile} />
-				</div>
-				<div className={styles.RightContainer}>
-					<FileExplorer
-						files={submission.files}
-						onClick={(id) => {
-							setFileId(id)
-							setShowFile(true)
-						}}
-					/>
-					<TagsList tags={submission.categories} />
-					{submission.hasOwnProperty("reviews") && (
-						<Reviews
-							reviews={submission.reviews}
-							reviewrIds={
-								submission.hasOwnProperty("reviewers")
-									? submission.reviewers
-									: []
-							}
-						/>
-					)}
-				</div>
+				{leftContainer()}
+				{rightContainer()}
 			</div>
+			<EditorModal
+				id={params.id}
+				show={review}
+				setShow={showReview}
+				setValidation={setAlert}
+				setValidationMsg={setAlertMsg}
+			/>
+			<ApprovalModal
+				submission={submission}
+				show={approval}
+				setShow={showApproval}
+				showAlertMsg={setAlert}
+				setAlertMsg={setAlertMsg}
+			/>
 		</div>
 	)
 }

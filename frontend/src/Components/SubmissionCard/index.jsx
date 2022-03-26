@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react"
 import axiosInstance from "../../Web/axiosInstance"
 import { Card, Button, Badge } from "react-bootstrap"
 import styles from "./SubmissionCard.module.css"
+import JwtService from "../../Web/axiosInstance"
 import { useNavigate } from "react-router-dom"
 
 export default ({ submission }) => {
@@ -99,7 +100,7 @@ export default ({ submission }) => {
 	}
 
 	return (
-		<Card className={styles.SubmissionCard}>
+		<Card className={`shadow rounded ${styles.SubmissionCard}`}>
 			<Card.Body>
 				<Card.Title>
 					<div style={{ display: "flex" }}>

@@ -69,6 +69,12 @@ type NewCommentPostBody struct {
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
+// POST /file/{id}/editcomment body
+type EditCommentPostBody struct {
+	ID uint `json:"id" validate:"required"`
+	Base64Value string `json:"base64Value" validate:"required"`
+}
+
 // ----------
 // Journal Endpoints
 // ----------

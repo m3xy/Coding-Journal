@@ -160,7 +160,7 @@ func TestQuerySubmissions(t *testing.T) {
 			resp := w.Result()
 
 			respData := &QuerySubmissionsResponse{}
-			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding request body") {
+			if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(respData), "Error decoding response body") {
 				return nil
 			} else if !assert.Falsef(t, respData.StandardResponse.Error,
 				"Error returned on query - %v", respData.StandardResponse.Message) {
@@ -455,122 +455,6 @@ func TestQuerySubmissions(t *testing.T) {
 			}
 
 		})
-	})
-}
-
-// Tests that submissions.go can upload submissions properly
-func TestUploadSubmission(t *testing.T) {
-	// Set up server and configures filesystem/db
-	testInit()
-	defer testEnd()
-
-	// Create mux router
-	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_SUBMISSIONS+ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission)
-	route := SUBROUTE_SUBMISSIONS + ENDPOINT_UPLOAD_SUBMISSION
-
-	globalAuthors, globalReviewers, err := initMockUsers(t)
-	if err != nil {
-		return
-	}
-
-	// Check all cases in which an uploaded submission is valid.
-	t.Run("Upload valid submissions", func(t *testing.T) {
-		testValidUpload := func(submission UploadSubmissionBody, t *testing.T) bool {
-			// Get body marshal then send request.
-			reqBody, err := json.Marshal(submission)
-			if !assert.NoErrorf(t, err, "Marshalling should not error, but got: %v", err) {
-				return false
-			}
-			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			ctx := context.WithValue(req.Context(), "data", &RequestContext{
-				ID:       globalAuthors[0].ID,
-				UserType: globalAuthors[0].UserType,
-			})
-			router.ServeHTTP(w, req.WithContext(ctx))
-			resp := w.Result()
-
-			// Check success and response.
-			var respBody UploadSubmissionResponse
-			if err := json.NewDecoder(resp.Body).Decode(&respBody); !assert.NoError(t, err, "Response in invalid format!") {
-				return false
-			} else if !assert.Equalf(t, http.StatusOK, resp.StatusCode, "Response should succeed, but got: %d - %s", resp.StatusCode, respBody.Message) {
-				return false
-			} else if !assert.NotEqual(t, "", respBody.SubmissionID, "Returned ID should not be nil!") {
-				return false
-			}
-			return true
-		}
-
-		t.Run("Simple submission", func(t *testing.T) {
-			// Valid submission - Minimum amount of information.
-			testSubmission := UploadSubmissionBody{Name: "Test", Authors: []string{globalAuthors[0].ID}}
-			testValidUpload(testSubmission, t)
-		})
-		t.Run("Full submission", func(t *testing.T) {
-			// Valid submission - Minimum amount of information.
-			testSubmission := UploadSubmissionBody{
-				Name: "Test", Authors: []string{globalAuthors[0].ID},
-				Reviewers: []string{globalReviewers[0].ID},
-				Files: []File{
-					{Path: "test.txt", Base64Value: "test"}, // Check correct file paths.
-					{Path: "test/test.txt", Base64Value: "test"},
-				},
-			}
-			testValidUpload(testSubmission, t)
-		})
-	})
-
-	// Check all invalid upload cases.
-	t.Run("Invalid uploads", func(t *testing.T) {
-
-		// Function to check if a request returns valid error.
-		testInvalidUpload := func(submission UploadSubmissionBody, status int, authed bool, t *testing.T) bool {
-			// Get body marshal then send request.
-			reqBody, err := json.Marshal(submission)
-			if !assert.NoErrorf(t, err, "Marshalling should not error, but got: %v", err) {
-				return false
-			}
-			req, w := httptest.NewRequest(http.MethodPost, route, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
-			if authed {
-				ctx := context.WithValue(req.Context(), "data", &RequestContext{
-					ID:       globalAuthors[0].ID,
-					UserType: globalAuthors[0].UserType,
-				})
-				router.ServeHTTP(w, req.WithContext(ctx))
-			} else {
-				router.ServeHTTP(w, req)
-			}
-			resp := w.Result()
-
-			return assert.Equalf(t, status, resp.StatusCode, "Should return code %d but got %d", status, resp.StatusCode)
-		}
-
-		// Suite of cases in which submission upload should fail.
-		t.Run("No authors", func(t *testing.T) {
-			testSubmission := UploadSubmissionBody{
-				Name: "Test", License: "MIT",
-			}
-			testInvalidUpload(testSubmission, http.StatusBadRequest, true, t)
-		}) // Return: 400
-		t.Run("Unregistered author", func(t *testing.T) {
-			testSubmission := UploadSubmissionBody{
-				Name: "Test", License: "MIT",
-				Authors: []string{"-"},
-			}
-			testInvalidUpload(testSubmission, http.StatusUnauthorized, true, t)
-		}) // Return: 401
-		t.Run("No name", func(t *testing.T) {
-			testSubmission := UploadSubmissionBody{
-				Authors: []string{globalAuthors[0].ID},
-			}
-			testInvalidUpload(testSubmission, http.StatusBadRequest, true, t)
-		}) // Return: 400
-		t.Run("Unauthenticated user", func(t *testing.T) {
-			testSubmission := UploadSubmissionBody{Name: "Test", Authors: []string{globalAuthors[0].ID}}
-			testInvalidUpload(testSubmission, http.StatusUnauthorized, false, t)
-		}) // Return: 401
-
 	})
 }
 
@@ -929,10 +813,6 @@ func TestAddSubmission(t *testing.T) {
 }
 
 // tests the getSubmission() function, which returns a submission struct
-//
-// Test Depends On:
-// 	- TestAddSubmission
-// 	- TestAddFile
 func TestGetSubmission(t *testing.T) {
 	testInit()
 	defer testEnd()
@@ -1030,9 +910,6 @@ func TestGetSubmission(t *testing.T) {
 }
 
 // This function tests the getSubmissionMetaData function
-//
-// This test depends on:
-// 	- TestAddSubmission
 func TestGetSubmissionMetaData(t *testing.T) {
 	testInit()
 	defer testEnd()
