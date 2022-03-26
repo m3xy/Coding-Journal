@@ -303,6 +303,21 @@ func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
 		return nil
 	}
 }
+func (c *Comment) getCopy() (*Comment) {
+	commentArray := make([]Comment, len(c.Comments))
+	for i, comment := range c.Comments {
+		commentArray[i] = *comment.getCopy()
+	}
+	return &Comment{
+		AuthorID: c.AuthorID,
+		FileID: c.FileID,
+		Base64Value: c.Base64Value,
+		StartLine: c.StartLine,
+		EndLine: c.EndLine,
+		ParentID: c.ParentID,
+		Comments: c.Comments,
+	}
+}
 
 // -------------
 // Tests

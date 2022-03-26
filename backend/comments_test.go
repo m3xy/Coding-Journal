@@ -301,6 +301,138 @@ func TestEditUserComment(t *testing.T) {
 	})
 }
 
+// Tests the basic ability of the CodeFiles module to delete a comment's content
+func TestDeleteUserComment(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT+ENDPOINT_DELETE, PostDeleteUserComment)
+
+	// the test values added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0]
+	testSubmission := *testSubmissions[0].getCopy()
+
+	// Register test users.
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if !assert.NoError(t, err, "error registering mock users") {
+		return
+	}
+
+	// Add submission, and test file linked to submission.
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Files = []File{testFile}
+	_, err = addSubmission(&testSubmission)
+	if !assert.NoErrorf(t, err, "error occurred while adding test submission: %v", err) {
+		return
+	}
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") {
+		return
+	}
+	fileID := testFile.ID
+
+	// adds comment to db
+	addComment := func(c *Comment, fileID uint) uint {
+		assert.NoError(t, gormDb.Model(&Comment{}).Create(c).Error,
+			"Comment unable to be added")
+		return c.ID
+	}
+
+	// clears the comments for the test file
+	clearComments := func() {
+		var comments []Comment
+		assert.NoError(t, gormDb.Find(&comments).Error, "error while clearing comments table")
+		for _, comment := range comments {
+			gormDb.Select(clause.Associations).Unscoped().Delete(&comment)
+		}
+	}
+
+	// sends request to edit a comment
+	handleRequest := func(ctx *RequestContext, reqStruct *DeleteCommentPostBody) *http.Response {
+		reqBody, err := json.Marshal(reqStruct)
+		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
+
+		// formats and executes the request
+		queryRoute := fmt.Sprintf("%s/%d%s%s", SUBROUTE_FILE, fileID, ENDPOINT_COMMENT, ENDPOINT_DELETE)
+		req, w := httptest.NewRequest("POST", fmt.Sprintf(queryRoute),
+			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+
+		// sends a request to the server to post a user comment
+		rCtx := context.WithValue(req.Context(), "data", ctx)
+		router.ServeHTTP(w, req.WithContext(rCtx))
+		return w.Result()
+	}
+
+	t.Run("valid delete", func(t *testing.T) {
+		defer clearComments()
+
+		// adds a test comment
+		comment := &Comment{AuthorID: globalReviewers[0].ID, FileID: fileID,
+			StartLine: 0, EndLine: 0, Base64Value: "test"}
+
+		// upload a single user comment to a valid file in a valid submission
+		t.Run("delete childless", func(t *testing.T) {
+			commentCopy := comment.getCopy()
+			addComment(commentCopy, fileID)
+			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
+			req := &DeleteCommentPostBody{ID: commentCopy.ID}
+			resp := handleRequest(ctx, req)
+			defer resp.Body.Close()
+			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
+
+			// makes sure comment not returned on standard query
+			addedComment := &Comment{}
+			result := gormDb.Model(&Comment{}).Find(addedComment, commentCopy.ID)
+			assert.Empty(t, result.RowsAffected, "Comment not deleted")
+		})
+
+		// upload a single user comment to a valid file in a valid submission
+		t.Run("delete parent", func(t *testing.T) {
+			parent := comment.getCopy()
+			child := comment.getCopy()
+			child.ParentID = &parent.ID
+			addComment(parent, fileID)
+			addComment(child, fileID)
+			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
+			req := &DeleteCommentPostBody{ID: parent.ID}
+			resp := handleRequest(ctx, req)
+			defer resp.Body.Close()
+			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
+
+			// makes sure parent was deleted
+			result := gormDb.Model(&Comment{}).Find(&Comment{}, parent.ID)
+			assert.Empty(t, result.RowsAffected, "Could not query added comment")
+
+			// gets the child from the db
+			addedComment := &Comment{}
+			assert.NoError(t, gormDb.Model(&Comment{}).Find(addedComment, child.ID).Error,
+				"Could not query child comment")
+			assert.Empty(t, addedComment.ParentID, "Parent ID of child not set to nil")
+		})
+	})
+
+	t.Run("Request Validation", func(t *testing.T) {
+		// adds a test comment
+		comment := &Comment{AuthorID: globalReviewers[0].ID, FileID: fileID,
+			StartLine: 0, EndLine: 0, Base64Value: "test"}
+		addComment(comment, fileID)
+		defer clearComments()
+
+		t.Run("Not logged in", func(t *testing.T) {
+			reqStruct := &DeleteCommentPostBody{ID: comment.ID}
+			resp := handleRequest(nil, reqStruct)
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
+		})
+
+		t.Run("Incorrect Author", func(t *testing.T) {
+			ctx := &RequestContext{ID: globalAuthors[1].ID, UserType: USERTYPE_NIL}
+			reqStruct := &DeleteCommentPostBody{ID: comment.ID}
+			resp := handleRequest(ctx, reqStruct)
+			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
+		})
+	})
+}
+
 // -------------
 // Helper Function Tests
 // -------------

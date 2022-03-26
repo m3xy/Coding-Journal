@@ -73,7 +73,7 @@ type UpdateSubmissionStatusBody struct {
 // Comments Endpoints
 // ----------
 
-// POST /file/{id}/newcomment body. {id} in the URL is the file id
+// POST /file/{id}/comment body. {id} in the URL is the file id
 type NewCommentPostBody struct {
 	ParentID    *uint  `json:"parentId,omitempty"` // optionally set for replies
 	StartLine   int    `json:"startLine" validate:"min=0"`
@@ -81,10 +81,15 @@ type NewCommentPostBody struct {
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
-// POST /file/{id}/editcomment body
+// POST /file/{id}/comment/edit body
 type EditCommentPostBody struct {
 	ID          uint   `json:"id" validate:"required"`
 	Base64Value string `json:"base64Value" validate:"required"`
+}
+
+// POST /file/{id}/comment/delete body
+type DeleteCommentPostBody struct {
+	ID          uint   `json:"id" validate:"required"`
 }
 
 // ----------
