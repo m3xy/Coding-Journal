@@ -26,10 +26,14 @@ func TestJournalLogIn(t *testing.T) {
 	defer testEnd()
 
 	// Populate database with valid users.
+	var err error
 	trialUsers := make([]GlobalUser, len(testGlobUsers))
 	for i, u := range testGlobUsers {
-		trialUsers[i] = u
-		trialUsers[i].ID, _ = registerTestUser(trialUsers[i])
+		trialUsers[i] = *u.getCopy()
+		trialUsers[i].ID, err = registerTestUser(trialUsers[i])
+		if !assert.NoError(t, err, "error while registering test users") {
+			return
+		}
 	}
 
 	router := mux.NewRouter()
@@ -39,7 +43,7 @@ func TestJournalLogIn(t *testing.T) {
 	t.Run("Valid logins", func(t *testing.T) {
 		for i := range testUsers {
 			// Create a request for user login.
-			loginBody := JournalLoginPostBody{Email: testUsers[i].Email, Password: testUsers[i].Password}
+			loginBody := JournalLoginPostBody{Email: testGlobUsers[i].User.Email, Password: testGlobUsers[i].User.Password}
 			reqBody, _ := json.Marshal(loginBody)
 			req, w := httptest.NewRequest("POST", SUBROUTE_JOURNAL+ENDPOINT_LOGIN, bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 			router.ServeHTTP(w, req)
