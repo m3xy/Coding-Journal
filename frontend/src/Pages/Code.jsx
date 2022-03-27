@@ -48,7 +48,7 @@ function Code({ id }) {
 					//Set file, code and comments
 					setFile(response.data.file)
 					setCode(atob(response.data.file.base64Value))
-					monacoRef.current.editor?.setSelection(
+					monacoRef?.current?.editor?.setSelection(
 						new monaco.Selection(0, 0, 0, 0)
 					) //Fixes line issue
 					setComments(response.data.file.comments)
