@@ -1,3 +1,9 @@
+/*
+ * Submission.jsx
+ * Main file for the submission page.
+ * Author: 190014935
+ */
+
 import React, { useState, useEffect } from "react"
 import styles from "./Submission.module.css"
 import axiosInstance from "../../Web/axiosInstance"
@@ -15,8 +21,9 @@ import {
 	AssignmentModal,
 	ApprovalModal
 } from "./Children"
-import { Badge, Collapse, Button } from "react-bootstrap"
+import { Alert, Badge, Collapse, Button } from "react-bootstrap"
 import Code from "../Code"
+
 
 function Submission() {
 	// Router hooks
@@ -105,6 +112,7 @@ function Submission() {
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
+	// Get list of users in human-readable format( user: name1, name2, ... )
 	const getUsersString = (users, role) => {
 		return (
 			<h5>
@@ -120,6 +128,8 @@ function Submission() {
 		)
 	}
 
+	// Buttons for editor and reviewer, for review posting
+	// and submission approval.
 	const permissionButtons = () => {
 		if (permissionLevel[perm] === "editor")
 			return (
@@ -167,6 +177,7 @@ function Submission() {
 		}
 	}
 
+	// Container shown on the left side of the page.
 	const leftContainer = () => {
 		return (
 			<div className={styles.LeftContainer}>
@@ -181,6 +192,7 @@ function Submission() {
 		)
 	}
 
+	// Container shown on the right side of the page.
 	const rightContainer = () => {
 		return (
 			<div className={styles.RightContainer}>
@@ -208,11 +220,26 @@ function Submission() {
 
 	return (
 		<div className={styles.SubmissionContainer}>
+			<CSSTransition
+				in={showAlert}
+				timeout={100}
+				unmountOnExit
+				classNames={{ ...FadeInTransition }}>
+				<Alert
+					variant="success"
+					dismissible
+					onClose={() => {
+						setAlert(false)
+					}}>
+					{alertMsg}
+				</Alert>
+			</CSSTransition>
 			<SwitchTransition>
 				<CSSTransition
 					key={!showFile}
 					timeout={100}
 					classNames={{ ...FadeInTransition }}>
+					{/* Transition on the page's header - big for abstract, small for files. */}
 					{showFile ? (
 						<div style={{ display: "flex" }}>
 							<p>{getBadge()}</p>
@@ -231,6 +258,7 @@ function Submission() {
 					)}
 				</CSSTransition>
 			</SwitchTransition>
+			{/* Authors and reviewers - if editor, show assignment button on reviewers */}
 			<Collapse in={!showFile}>
 				<div className="text-muted">
 					{getUsersString(submission.authors, "Author")}
@@ -254,6 +282,7 @@ function Submission() {
 					</div>
 				</div>
 			</Collapse>
+			{/* Main body - contains left and right containers. */}
 			<div style={{ display: "flex" }}>
 				{leftContainer()}
 				{rightContainer()}
