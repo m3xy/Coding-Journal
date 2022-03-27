@@ -16,6 +16,8 @@ const defaultLanguage = "javascript"
 const defaultTheme = "vs"
 const defaultLine = 1
 
+const CODE_HEIGHT = 400
+
 function Code({ id, show }) {
 	const [file, setFile] = useState({
 		ID: null,
@@ -176,7 +178,7 @@ function Code({ id, show }) {
 				</div>
 				<MonacoEditor
 					ref={monacoRef}
-					height="300"
+					height={CODE_HEIGHT}
 					language={language}
 					theme={theme}
 					value={code}
@@ -189,55 +191,74 @@ function Code({ id, show }) {
 
 	const pdfHTML = () => {
 		return (
-			<embed
-				height="1000"
-				width="100%"
-				src={"data:application/pdf;base64," + file.base64Value}
-			/>
+			<div style={{ textAlign: "center" }}>
+				<embed
+					height={CODE_HEIGHT * 2}
+					width="80%"
+					src={"data:application/pdf;base64," + file.base64Value}
+				/>
+			</div>
 		)
 	}
 
-	return id && id != -1 ? (
-		<Collapse in={show}>
-			<div>
-				<Card.Body>
-					<Card.Title>{file.path}</Card.Title>
-					<Card.Text>
-						Created: {new Date(file.CreatedAt).toDateString()}
-					</Card.Text>
-					{file.path.split(".").pop() !== "pdf"
-						? codeHTML()
-						: pdfHTML()}
-					<br />
-					<Button
-						variant="dark"
-						onClick={
-							monacoRef.current
-								? monacoRef.current.editor._actions.Comment._run
-								: () => {
-										setShowComments(true)
-										setStartLine(defaultLine)
-										setEndLine(defaultLine)
-								  }
-						}>
-						Show comments
-					</Button>
-					<Comments
-						id={id}
-						comments={comments}
-						setComments={setComments}
-						startLine={startLine}
-						endLine={endLine}
-						show={showComments}
-						setShow={setShowComments}
-						refresh={getFile}></Comments>
-				</Card.Body>
-			</div>
-		</Collapse>
-	) : (
-		<Collapse in={show}>
-			<div>No file selected.</div>
-		</Collapse>
+	return (
+		<Card>
+			<Card.Body>
+				{show ? (
+					<div
+						style={{
+							display: "flex",
+							justifyContent: "space-between"
+						}}>
+						<h4>{file.path}</h4>
+						<Button
+							variant="dark"
+							onClick={
+								monacoRef.current
+									? monacoRef.current.editor._actions.Comment
+											._run
+									: () => {
+											setShowComments(true)
+											setStartLine(defaultLine)
+											setEndLine(defaultLine)
+									  }
+							}>
+							Show comments
+						</Button>
+					</div>
+				) : (
+					<h4>File Viewer</h4>
+				)}
+				<Collapse in={show}>
+					<div>
+						{id && id != -1 ? (
+							<div>
+								<Card.Text>
+									Created:{" "}
+									{new Date(file.CreatedAt).toDateString()}
+								</Card.Text>
+								{file.path.split(".").pop() !== "pdf"
+									? codeHTML()
+									: pdfHTML()}
+								<br />
+							</div>
+						) : (
+							<div>No file selected.</div>
+						)}
+					</div>
+				</Collapse>
+			</Card.Body>
+			<Comments
+				id={id}
+				comments={comments}
+				setComments={setComments}
+				startLine={startLine}
+				endLine={endLine}
+				show={showComments}
+				setShow={setShowComments}
+				refresh={getFile}
+			/>
+		</Card>
 	)
 }
 
