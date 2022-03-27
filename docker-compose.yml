@@ -21,7 +21,7 @@ services:
       - file_sys:/filesystem
     environment:
       LOG_PATH: "/var/tmp/cs3099-log/cs3099-backend.log"
-      DATABASE_URL: "myuser:mypass@tcp(0.0.0.0:3307)"
+      DATABASE_URL: "myuser:mypass@tcp(db:3306)"
 
   frontend:
     build: ./frontend
