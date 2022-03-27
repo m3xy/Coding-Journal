@@ -1,39 +1,23 @@
-import React, { useEffect, useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, Badge, ListGroup, ListGroupItem } from "react-bootstrap"
 import ReviewModal from "./ReviewModal"
-import axiosInstance from "../../../Web/axiosInstance"
 
-export default ({ noProfileReviewers, reviews }) => {
-	const [reviewers, setReviewers] = useState({})
+export default ({ reviewers, reviews }) => {
 	const [showModal, setShowModal] = useState()
+	const [reviewerMap, setReviewerMap] = useState({})
 	const [modalReview, setModalReview] = useState(<></>)
 
 	useEffect(() => {
-		noProfileReviewers.map((reviewer) => {
-			axiosInstance
-				.get("/user/" + reviewer.userId)
-				.then((response) => {
-					setReviewers((reviewers) => {
-						return {
-							...reviewers,
-							[reviewer.userId]: response.data
-						}
-					})
-				})
-				.catch((err) => {
-					console.log(err)
-				})
+		if (Object.keys(reviewerMap).length > 0) setReviewerMap({})
+		reviewers?.map((reviewer) => {
+			setReviewerMap((reviewerMap) => {
+				return { ...reviewerMap, [reviewer.userId]: reviewer }
+			})
 		})
-	}, [noProfileReviewers])
+	})
 
-	const getFullName = (reviewerId) => {
-		if (reviewers.hasOwnProperty(reviewerId))
-			return (
-				reviewers[reviewerId].profile.firstName +
-				" " +
-				reviewers[reviewerId].profile.lastName
-			)
-		else return reviewerId
+	const getFullName = (reviewer) => {
+		reviewer.firstName + " " + reviewer.lastName
 	}
 
 	const getBadge = (approval) => {
@@ -55,13 +39,14 @@ export default ({ noProfileReviewers, reviews }) => {
 			</Card.Body>
 			<ListGroup className="list-group-flush">
 				{reviews?.map((review, i) => {
+					const reviewer = reviewerMap[review.reviewerId]
 					return (
 						<ListGroupItem key={i}>
 							<h5 style={{ display: "flex" }}>
 								<Card.Link
 									style={{ flex: "1" }}
 									onClick={() => clickReview(review)}>
-									{getFullName(review.reviewerId)}
+									{getFullName(reviewer)}
 								</Card.Link>
 								<div
 									style={{
@@ -78,7 +63,7 @@ export default ({ noProfileReviewers, reviews }) => {
 				show={showModal}
 				setShow={setShowModal}
 				review={modalReview}
-				reviewer={reviewers[modalReview.reviewerId]}
+				reviewer={reviewerMap[modalReview.reviewerId]}
 			/>
 		</Card>
 	)
