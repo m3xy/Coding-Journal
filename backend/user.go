@@ -20,8 +20,6 @@ const (
 
 	ENDPOINT_GET        = "/get"
 	ENDPOINT_CHANGE_PERMISSIONS = "/changepermissions"
-	ENDPOINT_QUERY_USER = "/query"
-	ENDPOINT_DELETE_USER = "/delete"
 )
 
 func getUserSubroutes(r *mux.Router) {
@@ -35,10 +33,11 @@ func getUserSubroutes(r *mux.Router) {
 	// + POST /user/{id}/changepermissions - editor changing user permissions
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
 	user.HandleFunc("/{id}"+ENDPOINT_CHANGE_PERMISSIONS, PostChangePermissions).Methods(http.MethodOptions, http.MethodPost)
+	user.HandleFunc("/{id}"+ENDPOINT_DELETE, PostDeleteUser).Methods(http.MethodOptions, http.MethodPost)
 
 	// Users routes:
 	// + GET /users/query
-	users.HandleFunc(ENDPOINT_QUERY_USER, GetQueryUsers).Methods(http.MethodGet)
+	users.HandleFunc(ENDPOINT_QUERY, GetQueryUsers).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
@@ -190,7 +189,6 @@ func ControllerDeleteUser(userID string) error {
 	}
 	return nil
 }
-
 
 // generalized query function for users
 // GET /users/query

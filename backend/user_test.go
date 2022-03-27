@@ -127,7 +127,7 @@ func TestDeleteUser(t *testing.T) {
 
 	// Create mux router
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_DELETE_USER, PostDeleteUser)
+	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_DELETE, PostDeleteUser)
 
 	// registers a test users
 	testUser := *testGlobUsers[0].getCopy()
@@ -146,7 +146,7 @@ func TestDeleteUser(t *testing.T) {
 	}
 
 	t.Run("delete non-logged in user", func(t *testing.T) {
-		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE_USER)
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE)
 		ctx := &RequestContext{ ID: otherUserID, UserType: otherUser.UserType }
 		resp := handleQuery(queryRoute, ctx)
 		if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") { return }
@@ -154,14 +154,14 @@ func TestDeleteUser(t *testing.T) {
 
 	t.Run("delete non-existant user", func(t *testing.T) {
 		fakeID := "afeigrbnrilfdalkja-88ra9rakrb"
-		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, fakeID, ENDPOINT_DELETE_USER)
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, fakeID, ENDPOINT_DELETE)
 		ctx := &RequestContext{ ID: fakeID, UserType: USERTYPE_NIL }
 		resp := handleQuery(queryRoute, ctx)
 		if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") { return }
 	})
 
 	t.Run("delete valid", func(t *testing.T) {
-		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE_USER)
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE)
 		ctx := &RequestContext{ ID: userID, UserType: testUser.UserType }
 		resp := handleQuery(queryRoute, ctx)
 
@@ -183,7 +183,7 @@ func TestGetUserQuery(t *testing.T) {
 
 	// Create mux router
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_USERS+ENDPOINT_QUERY_USER, GetQueryUsers)
+	router.HandleFunc(SUBROUTE_USERS+ENDPOINT_QUERY, GetQueryUsers)
 
 	// registers a test user with the given fields and returns their global ID (just makes calling registerUser more compact)
 	registerUser := func(email string, fname string, lname string, userType int, organization string) string {
@@ -234,7 +234,7 @@ func TestGetUserQuery(t *testing.T) {
 
 		// confirms that the query requests return a full user profile not just ID
 		t.Run("confirm data", func(t *testing.T) {
-			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_USERS, ENDPOINT_QUERY)
 			respData := handleValidQuery(queryRoute)
 			user := respData.Users[0]
 			switch {
@@ -251,7 +251,7 @@ func TestGetUserQuery(t *testing.T) {
 
 		t.Run("order by name", func(t *testing.T) {
 			t.Run("first name", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?orderBy=firstName", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				queryRoute := fmt.Sprintf("%s%s?orderBy=firstName", SUBROUTE_USERS, ENDPOINT_QUERY)
 				respData := handleValidQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, respData.Users[0].ID, userID3, "incorrect user order"),
@@ -262,7 +262,7 @@ func TestGetUserQuery(t *testing.T) {
 				}
 			})
 			t.Run("last name", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?orderBy=lastName", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				queryRoute := fmt.Sprintf("%s%s?orderBy=lastName", SUBROUTE_USERS, ENDPOINT_QUERY)
 				respData := handleValidQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, respData.Users[0].ID, userID1, "incorrect user order"),
@@ -276,25 +276,25 @@ func TestGetUserQuery(t *testing.T) {
 
 		t.Run("filter by permissions", func(t *testing.T) {
 			t.Run("nil", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY_USER, USERTYPE_NIL)
+				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY, USERTYPE_NIL)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
 				assert.Equal(t, respData.Users[0].ID, userID1, "incorrect user")
 			})
 			t.Run("publisher", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY_USER, USERTYPE_PUBLISHER)
+				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY, USERTYPE_PUBLISHER)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
 				assert.Equal(t, respData.Users[0].ID, userID2, "incorrect user")
 			})
 			t.Run("reviewer", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY_USER, USERTYPE_REVIEWER)
+				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY, USERTYPE_REVIEWER)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
 				assert.Equal(t, respData.Users[0].ID, userID3, "incorrect user")
 			})
 			t.Run("editor", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY_USER, USERTYPE_EDITOR)
+				queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY, USERTYPE_EDITOR)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
 				assert.Equal(t, respData.Users[0].ID, userID4, "incorrect user")
@@ -303,14 +303,14 @@ func TestGetUserQuery(t *testing.T) {
 
 		t.Run("filter by name", func(t *testing.T) {
 			t.Run("full name", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?name=Joe+Shmo", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				queryRoute := fmt.Sprintf("%s%s?name=Joe+Shmo", SUBROUTE_USERS, ENDPOINT_QUERY)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
 				assert.Equal(t, respData.Users[0].ID, userID1, "incorrect user")
 			})
 
 			t.Run("partial name", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?name=Ta", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				queryRoute := fmt.Sprintf("%s%s?name=Ta", SUBROUTE_USERS, ENDPOINT_QUERY)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 2, len(respData.Users), "incorrect number of users returned")
 				assert.Contains(t, []string{userID2, userID3}, respData.Users[0].ID, "incorrect user")
@@ -320,14 +320,14 @@ func TestGetUserQuery(t *testing.T) {
 
 		t.Run("filter by organization", func(t *testing.T) {
 			t.Run("full org", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?organization=testtest", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				queryRoute := fmt.Sprintf("%s%s?organization=testtest", SUBROUTE_USERS, ENDPOINT_QUERY)
 				respData := handleValidQuery(queryRoute)
 				assert.Equal(t, 1, len(respData.Users), "incorrect number of users returned")
 				assert.Equal(t, userID4, respData.Users[0].ID, "incorrect user")
 			})
 
 			t.Run("partial org", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?organization=org", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+				queryRoute := fmt.Sprintf("%s%s?organization=org", SUBROUTE_USERS, ENDPOINT_QUERY)
 				respData := handleValidQuery(queryRoute)
 				expectedUsers := []string{userID1, userID2, userID3}
 				switch {
@@ -346,11 +346,11 @@ func TestGetUserQuery(t *testing.T) {
 		// tests user types which are non-integers, or out of the 0-4 range
 		// returns status 400 - bad request
 		t.Run("userType", func(t *testing.T) {
-			queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY_USER, -1)
+			queryRoute := fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY, -1)
 			resp1 := handleQuery(queryRoute)
-			queryRoute = fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY_USER, 5)
+			queryRoute = fmt.Sprintf("%s%s?userType=%d", SUBROUTE_USERS, ENDPOINT_QUERY, 5)
 			resp2 := handleQuery(queryRoute)
-			queryRoute = fmt.Sprintf("%s%s?userType=%f", SUBROUTE_USERS, ENDPOINT_QUERY_USER, 1.5)
+			queryRoute = fmt.Sprintf("%s%s?userType=%f", SUBROUTE_USERS, ENDPOINT_QUERY, 1.5)
 			resp3 := handleQuery(queryRoute)
 			switch {
 			case !assert.Equal(t, http.StatusBadRequest, resp1.StatusCode, "incorrect status code"),
@@ -363,7 +363,7 @@ func TestGetUserQuery(t *testing.T) {
 		// tests user types which are non-integers, or out of the 0-4 range
 		// returns status 400 - bad request
 		t.Run("orderBy", func(t *testing.T) {
-			queryRoute := fmt.Sprintf("%s%s?orderBy=invalid", SUBROUTE_USERS, ENDPOINT_QUERY_USER)
+			queryRoute := fmt.Sprintf("%s%s?orderBy=invalid", SUBROUTE_USERS, ENDPOINT_QUERY)
 			resp := handleQuery(queryRoute)
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code")
 		})

@@ -21,8 +21,6 @@ import (
 
 const (
 	ENDPOINT_COMMENT = "/comment"
-	ENDPOINT_EDIT    = "/edit"
-	ENDPOINT_DELETE  = "/delete"
 )
 
 // -----------
