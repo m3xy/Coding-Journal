@@ -14,6 +14,15 @@ type SignUpPostBody struct {
 	Organization string `json:"organization,omitempty"`
 }
 
+// POST /user/{id}/edit body.
+type EditUserPostBody struct {
+	Password     string `json:"password,omitempty" validate:"min=8,max=64,ispw"`
+	FirstName    string `json:"firstName,omitempty" validate:"max=32"`
+	LastName     string `json:"lastName,omitempty" validate:"max=32"`
+	PhoneNumber  string `json:"phoneNumber,omitempty"`
+	Organization string `json:"organization,omitempty"`
+}
+
 // POST /auth/login body.
 type AuthLoginPostBody struct {
 	Email       string `json:"email"`

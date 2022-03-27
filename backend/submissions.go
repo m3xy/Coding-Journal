@@ -34,7 +34,6 @@ const (
 	SUBROUTE_SUBMISSION  = "/submission"
 	SUBROUTE_SUBMISSIONS = "/submissions"
 
-	ENDPOINT_QUERY_SUBMISSIONS   = "/query"
 	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
 	ENDPOINT_GET_TAGS            = "/tags"
@@ -70,7 +69,7 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submissions/query - queries a list of submissions based upon parameters
 	// + /submissions/create - Create a submissions
 	submissions.HandleFunc(ENDPOINT_GET_TAGS, GetAvailableTags).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions).Methods(http.MethodGet)
+	submissions.HandleFunc(ENDPOINT_QUERY, GetQuerySubmissions).Methods(http.MethodGet)
 	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmissionByZip).Methods(http.MethodPost, http.MethodOptions)
 }
 

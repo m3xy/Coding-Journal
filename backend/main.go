@@ -31,6 +31,11 @@ const (
 
 	ENDPOINT_USERINFO = "/users"
 	ENDPOINT_VALIDATE = "/validate"
+
+	// general endpoints used in multiple sub-routes
+	ENDPOINT_QUERY = "/query"
+	ENDPOINT_DELETE = "/delete"
+	ENDPOINT_EDIT = "/edit"
 )
 
 var prodLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{

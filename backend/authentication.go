@@ -329,7 +329,6 @@ func PostSignUp(w http.ResponseWriter, r *http.Request) {
 			Error:   true,
 		}}
 	} else if validate.Struct(*user) != nil {
-		log.Println("A")
 		w.WriteHeader(http.StatusBadRequest)
 		resp = FormResponse{StandardResponse: StandardResponse{
 			Message: "Registration failed",
