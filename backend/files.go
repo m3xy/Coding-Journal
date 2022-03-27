@@ -45,10 +45,12 @@ func getFilesSubRoutes(r *mux.Router) {
 	// File subroutes:
 	// + GET /file/{id} - Get given file.
 	// + POST /file/{id}/comment - Post a new comment
-	// + POST /file/{id}/comment/edit - Edit an existing comment
+	// + POST /file/{id}/comment/{commentId}/edit - Edit an existing comment
+	// + POST /file/{id}/comment/{commentId}/delete - Delete an existing comment
 	files.HandleFunc("/{id}", GetFile).Methods(http.MethodGet)
 	files.HandleFunc("/{id}"+ENDPOINT_COMMENT, PostUploadUserComment).Methods(http.MethodPost, http.MethodOptions)
-	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+ENDPOINT_EDIT, PostEditUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+"/{commentId}"+ENDPOINT_EDIT, PostEditUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+"/{commentId}"+ENDPOINT_DELETE, PostDeleteUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // Get the path to the submissions directory.

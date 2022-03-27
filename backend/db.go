@@ -84,7 +84,13 @@ type Submission struct {
 	Name     string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
 	License  string `gorm:"size:64" json:"license" validate:"max=118"`
 	Approved *bool  `json:"approved" gorm:"default:NULL"` // pointer to allow nil values as neither approved nor dissaproved
+	
+	// booleans for running code using Judge0. All fields in this section only get used if Runnable = true
 	Runnable bool   `json:"runnable" gorm:"default:false"`
+	TakesStdIn bool `json:"takesStdIn" gorm:"default:false"`
+	TakesCmdLn bool `json:"takseCmdLn" gorm:"default:false"`
+	TakesInputFile bool `json:"takesInputFile" gorm:"default:false"`
+	ReqNetworkAccess bool `json:"reqNetworkAccess" gorm:"default:false"`
 
 	// associations to other tables
 	Files      []File       `json:"files,omitempty" validate:"dive"`

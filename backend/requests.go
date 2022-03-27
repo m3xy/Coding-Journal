@@ -33,13 +33,19 @@ type ChangePermissionsPostBody struct {
 // POST /submissions/upload/zip
 type UploadSubmissionByZipBody struct {
 	Name           string   `json:"name" validate:"required"`
-	License        string   `json:"license"`
-	Abstract       string   `json:"abstract"`
+	License        string   `json:"license" validate:"required"`
+	Abstract       string   `json:"abstract" validate:"required"`
+	ZipBase64Value string   `json:"base64" validate:"base64,required"`
+
+	Runnable         bool   `json:"runnable"`
+	TakesStdIn       bool   `json:"takesStdIn"`
+	TakesCmdLn       bool   `json:"takseCmdLn"`
+	TakesInputFile   bool   `json:"takesInputFile"`
+	ReqNetworkAccess bool   `json:"reqNetworkAccess"`
+
 	Tags           []string `json:"tags"`
 	Authors        []string `json:"authors" validate:"required"`
 	Reviewers      []string `json:"reviewers"`
-	ZipBase64Value string   `json:"base64" validate:"base64,required"`
-	Runnable       bool     `json:"runnable"`
 }
 
 // POST /submissions/create body
@@ -86,15 +92,9 @@ type NewCommentPostBody struct {
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
-// POST /file/{id}/comment/edit body
+// POST /file/{id}/comment/{commentId}/edit body
 type EditCommentPostBody struct {
-	ID          uint   `json:"id" validate:"required"`
 	Base64Value string `json:"base64Value" validate:"required"`
-}
-
-// POST /file/{id}/comment/delete body
-type DeleteCommentPostBody struct {
-	ID          uint   `json:"id" validate:"required"`
 }
 
 // ----------
