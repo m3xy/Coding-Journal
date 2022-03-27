@@ -10,9 +10,9 @@ body {
 }
 
 .myContentClass {
-	background: lightblue;
+	/* background: lightblue; */
 }
 
-.myGlyphMarginClass {
-	background: red;
+.myGlyphMarginClass::before {
+	content: "💬";
 }

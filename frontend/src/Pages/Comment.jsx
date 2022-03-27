@@ -15,6 +15,7 @@ import {
 } from "react-bootstrap"
 import JwtService from "../Web/jwt.service"
 import axiosInstance from "../Web/axiosInstance"
+import ReactMarkdown from "react-markdown"
 
 const userEndpoint = "/user"
 const editEndpoint = "/edit"
@@ -113,7 +114,7 @@ function Comment({
 	return (
 		show && (
 			<Toast
-				style={{ verticalAlign: "top" }}
+				style={{ verticalAlign: "top", minWidth: "100%" }}
 				className="d-inline-block m-1">
 				<Toast.Header closeButton={false}>
 					<strong className="me-auto">{name}</strong>
@@ -145,15 +146,18 @@ function Comment({
 							</Button>
 						</InputGroup>
 					) : (
-						atob(comment.base64Value)
+						<ReactMarkdown>
+							{atob(comment.base64Value)}
+						</ReactMarkdown>
 					)}
 					<p />
 					<small className="text-muted">
 						{comment.DeletedAt
 							? "(deleted)"
 							: comment.CreatedAt == comment.UpdatedAt
-							? comment.CreatedAt
-							: comment.UpdatedAt + " (edited)"}
+							? new Date(comment.CreatedAt).toDateString()
+							: new Date(comment.UpdatedAt).toDateString() +
+							  " (edited)"}
 					</small>
 					<br />
 

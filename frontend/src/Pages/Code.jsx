@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import axiosInstance from "../Web/axiosInstance"
 import { Form, InputGroup, Card, Button } from "react-bootstrap"
-import MonacoEditor from "react-monaco-editor"
+import MonacoEditor, { monaco } from "react-monaco-editor"
 import Comments from "./Comments"
 
 const fileEndpoint = "/file"
@@ -31,6 +31,7 @@ function Code({ id }) {
 	const [language, setLanguage] = useState(defaultLanguage)
 	const [startLine, setStartLine] = useState(defaultLine)
 	const [endLine, setEndLine] = useState(defaultLine)
+	const [decorations, setDecorations] = useState([])
 
 	const [comments, setComments] = useState([])
 	const [showComments, setShowComments] = useState(false)
@@ -47,8 +48,11 @@ function Code({ id }) {
 					//Set file, code and comments
 					setFile(response.data.file)
 					setCode(atob(response.data.file.base64Value))
-					// monacoRef.current.editor.setValue(atob(response.data.file.base64Value)); //Fixes problem with selecting
+					monacoRef.current.editor?.setSelection(
+						new monaco.Selection(0, 0, 0, 0)
+					) //Fixes line issue
 					setComments(response.data.file.comments)
+					getDecorations(response.data.file.comments)
 				})
 				.catch((error) => {
 					console.log(error)
@@ -64,6 +68,38 @@ function Code({ id }) {
 			setComments([])
 			setCode("")
 		}
+	}
+
+	const getDecorations = (comments) => {
+		let newDecorations = comments?.map((comment) => {
+			return {
+				range: new monaco.Range(
+					comment.startLine,
+					1,
+					comment.endLine,
+					1
+				),
+				options: {
+					isWholeLine: true,
+					className: "myContentClass",
+					glyphMarginClassName: "myGlyphMarginClass",
+					hoverMessage: [],
+					glyphMarginHoverMessage: [
+						{
+							value: atob(comment.base64Value)
+						}
+					]
+				}
+			}
+		})
+		setDecorations(
+			monacoRef.current
+				? monacoRef.current.editor.deltaDecorations(
+						decorations,
+						newDecorations ? newDecorations : []
+				  )
+				: []
+		)
 	}
 
 	const editorDidMount = (editor, monaco) => {
@@ -96,53 +132,57 @@ function Code({ id }) {
 	const codeHTML = () => {
 		return (
 			<>
-				<div className="w-50">
-					<InputGroup size="sm" className="mb-3">
-						<InputGroup.Text id="inputGroup-sizing-sm">
-							Language:{" "}
-						</InputGroup.Text>
-						<Form.Select
-							defaultValue={language}
-							size="sm"
-							onChange={(e) => {
-								setLanguage(e.target.value)
-							}}>
-							<option value="javascript">Javascript</option>
-							<option value="html">HTML</option>
-							<option value="css">CSS</option>
-							<option value="json">JSON</option>
-							<option value="java">Java</option>
-							<option value="python">Python</option>
-						</Form.Select>
-					</InputGroup>
+				<div style={{ display: "flex" }}>
+					<div style={{ flex: "1", marginRight: "5px" }}>
+						<InputGroup size="sm" className="mb-3">
+							<InputGroup.Text id="inputGroup-sizing-sm">
+								Language:{" "}
+							</InputGroup.Text>
+							<Form.Select
+								defaultValue={language}
+								size="sm"
+								onChange={(e) => {
+									setLanguage(e.target.value)
+								}}>
+								<option value="javascript">Javascript</option>
+								<option value="html">HTML</option>
+								<option value="css">CSS</option>
+								<option value="json">JSON</option>
+								<option value="java">Java</option>
+								<option value="python">Python</option>
+							</Form.Select>
+						</InputGroup>
+					</div>
+					<div style={{ flex: "1", marginLeft: "5px" }}>
+						<InputGroup size="sm" className="mb-3">
+							<InputGroup.Text id="inputGroup-sizing-sm">
+								Theme:{" "}
+							</InputGroup.Text>
+							<Form.Select
+								size="sm"
+								onChange={(e) => {
+									setTheme(e.target.value)
+								}}>
+								<option value="vs">Visual Studio</option>
+								<option value="vs-dark">
+									Visual Studio Dark
+								</option>
+								<option value="hc-black">
+									High Contrast Dark
+								</option>
+							</Form.Select>
+						</InputGroup>
+					</div>
 				</div>
-				<div className="w-50">
-					<InputGroup size="sm" className="mb-3">
-						<InputGroup.Text id="inputGroup-sizing-sm">
-							Theme:{" "}
-						</InputGroup.Text>
-						<Form.Select
-							size="sm"
-							onChange={(e) => {
-								setTheme(e.target.value)
-							}}>
-							<option value="vs">Visual Studio</option>
-							<option value="vs-dark">Visual Studio Dark</option>
-							<option value="hc-black">High Contrast Dark</option>
-						</Form.Select>
-					</InputGroup>
-				</div>
-				<div className="w-100">
-					<MonacoEditor
-						ref={monacoRef}
-						height="1000"
-						language={language}
-						theme={theme}
-						value={code}
-						options={options}
-						editorDidMount={editorDidMount}
-					/>
-				</div>
+				<MonacoEditor
+					ref={monacoRef}
+					height="1000"
+					language={language}
+					theme={theme}
+					value={code}
+					options={options}
+					editorDidMount={editorDidMount}
+				/>
 			</>
 		)
 	}
@@ -157,51 +197,47 @@ function Code({ id }) {
 		)
 	}
 
-	return (
+	return id && id != -1 ? (
 		<Card border="light" className="row no-gutters">
 			<Card.Header>
 				<b>Code</b>
 			</Card.Header>
-			{id && id != -1 ? (
-				<Card.Body>
-					<Card.Title>{file.path}</Card.Title>
-					<Card.Text>
-						Created: {new Date(file.CreatedAt).toDateString()}
-					</Card.Text>
-					{file.path.split(".").pop() !== "pdf"
-						? codeHTML()
-						: pdfHTML()}
-					<br />
-					<Button
-						variant="dark"
-						onClick={
-							monacoRef.current
-								? monacoRef.current.editor._actions.Comment._run
-								: () => {
-										setShowComments(true)
-										setStartLine(defaultLine)
-										setEndLine(defaultLine)
-								  }
-						}>
-						Show comments
-					</Button>
-					<Comments
-						id={id}
-						comments={comments}
-						setComments={setComments}
-						startLine={startLine}
-						endLine={endLine}
-						show={showComments}
-						setShow={setShowComments}
-						refresh={getFile}></Comments>
-				</Card.Body>
-			) : (
-				<>No file selected</>
-			)}
+			<Card.Body>
+				<Card.Title>{file.path}</Card.Title>
+				<Card.Text>
+					Created: {new Date(file.CreatedAt).toDateString()}
+				</Card.Text>
+				{file.path.split(".").pop() !== "pdf" ? codeHTML() : pdfHTML()}
+				<br />
+				<Button
+					variant="dark"
+					onClick={
+						monacoRef.current
+							? monacoRef.current.editor._actions.Comment._run
+							: () => {
+									setShowComments(true)
+									setStartLine(defaultLine)
+									setEndLine(defaultLine)
+							  }
+					}>
+					Show comments
+				</Button>
+				<Comments
+					id={id}
+					comments={comments}
+					setComments={setComments}
+					startLine={startLine}
+					endLine={endLine}
+					show={showComments}
+					setShow={setShowComments}
+					refresh={getFile}></Comments>
+			</Card.Body>
 			<Card.Footer className="text-muted">
 				Last updated: {new Date(file.UpdatedAt).toDateString()}
 			</Card.Footer>
 		</Card>
+	) : (
+		<>No file selected.</>
 	)
 }
 
