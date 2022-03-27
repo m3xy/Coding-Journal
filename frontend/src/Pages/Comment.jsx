@@ -96,7 +96,7 @@ function Comment({
 			)
 			.then((response) => {
 				console.log(response)
-				refresh();
+				refresh()
 			})
 			.catch((error) => {
 				console.log(error)
