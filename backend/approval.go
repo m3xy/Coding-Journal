@@ -289,14 +289,14 @@ func updateSubmissionStatus(status bool, submissionID uint) error {
 	reviews := make(map[string]bool)
 	if len(submission.Reviewers) == 0 && status { // no reviews uploaded, cannot accept submission
 		return &MissingReviewsError{SubmissionID: submissionID}
-	}
+	} 
 	for _, review := range submission.MetaData.Reviews {
 		reviews[review.ReviewerID] = review.Approved
 	}
 	// checks that each reviewer has submitted a review
 	for _, reviewer := range submission.Reviewers {
-		if approved, ok := reviews[reviewer.ID]; !ok {
-			// a review is missing -> cannot change submission status
+		if approved, ok := reviews[reviewer.ID]; !ok && status {
+			// a review is missing -> cannot accept submission
 			return &MissingReviewsError{SubmissionID: submissionID}
 		} else if !approved && status {
 			// a reviewer does not approve, hence the editor cannot accept the submission (but can still reject)
