@@ -99,7 +99,6 @@ func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
 	} else if err := ControllerUpdatePermissions(userID, reqBody.Permissions); err != nil {
 		switch err.(type) {
 		case *BadUserError:
-			fmt.Println(err)
 			resp = &StandardResponse{Message:"Cannot update permissions - user does not exist", Error:true}
 			w.WriteHeader(http.StatusBadRequest)
 
@@ -120,7 +119,6 @@ func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
 
 // Controller to change a user's permissions (UserType)
 func ControllerUpdatePermissions(userID string, permissions int) error {
-	fmt.Println(userID)
 	if res := gormDb.Model(&GlobalUser{ID: userID}).
 		Update("user_type", permissions); res.Error != nil {
 			return res.Error

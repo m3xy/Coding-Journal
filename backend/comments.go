@@ -76,7 +76,13 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 	req := &EditCommentPostBody{}
 
 	// gets context struct and validates it
-	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+	commentID64, err := strconv.ParseUint(mux.Vars(r)["commentId"], 10, 32)
+	if err != nil {
+		resp = &StandardResponse{Message: "Bad Request - could not parse comment ID", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	// gets context struct and validates it
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Bad Request - No user logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
@@ -85,7 +91,7 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 
 		// edits the comment using the given controller method
-	} else if err := ControllerEditComment(req, ctx.ID); err != nil {
+	} else if err := ControllerEditComment(uint(commentID64), req, ctx.ID); err != nil {
 		switch err.(type) {
 		case *CommentNotFoundError:
 			resp = &StandardResponse{Message: "Given comment does not exist.", Error: true}
@@ -110,14 +116,14 @@ func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // takes in the body of an edit comment request and returns an error if one occurs
-func ControllerEditComment(r *EditCommentPostBody, authorID string) error {
+func ControllerEditComment(commentID uint, r *EditCommentPostBody, authorID string) error {
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// gets the comment from the db if it exists
-		comment := &Comment{Model: gorm.Model{ID: r.ID}}
+		comment := &Comment{Model: gorm.Model{ID: commentID}}
 		if res := tx.Model(comment).Find(comment); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected == 0 {
-			return &CommentNotFoundError{ID: r.ID}
+			return &CommentNotFoundError{ID: commentID}
 		} else if comment.AuthorID != authorID {
 			return &WrongPermissionsError{userID: authorID}
 		}

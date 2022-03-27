@@ -86,15 +86,9 @@ type NewCommentPostBody struct {
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
-// POST /file/{id}/comment/edit body
+// POST /file/{id}/comment/{commentId}/edit body
 type EditCommentPostBody struct {
-	ID          uint   `json:"id" validate:"required"`
 	Base64Value string `json:"base64Value" validate:"required"`
-}
-
-// POST /file/{id}/comment/delete body
-type DeleteCommentPostBody struct {
-	ID          uint   `json:"id" validate:"required"`
 }
 
 // ----------

@@ -182,7 +182,8 @@ func TestEditUserComment(t *testing.T) {
 	defer testEnd()
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT+ENDPOINT_EDIT, PostEditUserComment)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT+
+		"/{commentId}"+ENDPOINT_EDIT, PostEditUserComment)
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
@@ -223,12 +224,13 @@ func TestEditUserComment(t *testing.T) {
 	}
 
 	// sends request to edit a comment
-	handleRequest := func(ctx *RequestContext, reqStruct *EditCommentPostBody) *http.Response {
+	handleRequest := func(ctx *RequestContext, commentID uint, reqStruct *EditCommentPostBody) *http.Response {
 		reqBody, err := json.Marshal(reqStruct)
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		queryRoute := fmt.Sprintf("%s/%d%s%s", SUBROUTE_FILE, fileID, ENDPOINT_COMMENT, ENDPOINT_EDIT)
+		queryRoute := fmt.Sprintf("%s/%d%s/%d%s", SUBROUTE_FILE, fileID, 
+			ENDPOINT_COMMENT, commentID, ENDPOINT_EDIT)
 		req, w := httptest.NewRequest("POST", fmt.Sprintf(queryRoute),
 			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
 
@@ -251,8 +253,8 @@ func TestEditUserComment(t *testing.T) {
 			// formats the request body to send to the server to add a comment
 			newContent := "new content"
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
-			req := &EditCommentPostBody{ID: comment.ID, Base64Value: newContent}
-			resp := handleRequest(ctx, req)
+			req := &EditCommentPostBody{Base64Value: newContent}
+			resp := handleRequest(ctx, comment.ID, req)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
@@ -267,8 +269,8 @@ func TestEditUserComment(t *testing.T) {
 			newContent := "new new content"
 			// formats the request body to send to the server to add a comment
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
-			req := &EditCommentPostBody{ID: comment.ID, Base64Value: newContent}
-			resp := handleRequest(ctx, req)
+			req := &EditCommentPostBody{Base64Value: newContent}
+			resp := handleRequest(ctx, comment.ID, req)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
@@ -287,15 +289,15 @@ func TestEditUserComment(t *testing.T) {
 		defer clearComments()
 
 		t.Run("Not logged in", func(t *testing.T) {
-			reqStruct := &EditCommentPostBody{ID: comment.ID, Base64Value: "content"}
-			resp := handleRequest(nil, reqStruct)
+			reqStruct := &EditCommentPostBody{Base64Value: "content"}
+			resp := handleRequest(nil, comment.ID, reqStruct)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 
 		t.Run("Incorrect Author", func(t *testing.T) {
 			ctx := &RequestContext{ID: globalAuthors[1].ID, UserType: USERTYPE_NIL}
-			reqStruct := &EditCommentPostBody{ID: comment.ID, Base64Value: "content"}
-			resp := handleRequest(ctx, reqStruct)
+			reqStruct := &EditCommentPostBody{Base64Value: "content"}
+			resp := handleRequest(ctx, comment.ID, reqStruct)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 	})
