@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"path/filepath"
 
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm/logger"
@@ -132,9 +133,14 @@ var testLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.Lstd
 // Utils
 // -----------
 
+var getTestSubmissionDirectoryPath = func(s Submission) string {
+	return filepath.Join(TEST_FILES_DIR, fmt.Sprintf("%d-%d", s.ID, s.CreatedAt.Unix()))
+}
+
 // Initialise the database for testing.
 func testInit() {
 	gormDb, _ = gormInit(TEST_DB, testLogger)
+	getSubmissionDirectoryPath = getTestSubmissionDirectoryPath
 	setup(gormDb, TEST_LOG_PATH)
 	if err := gormDb.Transaction(gormClear); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)

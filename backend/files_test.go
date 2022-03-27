@@ -244,7 +244,7 @@ func TestGetFileData(t *testing.T) {
 		return
 	}
 
-	// getting single valid file TODO: add comments here
+	// getting single valid file
 	t.Run("Single Valid File", func(t *testing.T) {
 
 		// queries the file's data from it's ID
