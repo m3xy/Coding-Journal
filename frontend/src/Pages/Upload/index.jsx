@@ -2,7 +2,12 @@ import React, { useState, useEffect } from "react"
 import axiosInstance from "../../Web/axiosInstance"
 import { Form, Button, Card, Tabs, Tab, Alert } from "react-bootstrap"
 import JwtService from "../../Web/jwt.service"
-import { FormText, FormAdder, FormFile } from "../../Components/FormComponents"
+import {
+	FormText,
+	FormAdder,
+	FormFile,
+	FormUser
+} from "../../Components/FormComponents"
 import { useNavigate } from "react-router-dom"
 import { CSSTransition } from "react-transition-group"
 import styles from "./Upload.module.css"
@@ -26,6 +31,7 @@ const Upload = () => {
 	})
 	const [errors, setErrors] = useState({})
 	const [moddedFields, setModdedFields] = useState([])
+	const [initAuthors, setInitAuthors] = useState([])
 
 	const [show, setShowAlert] = useState(false)
 	const [msg, setMsg] = useState()
@@ -34,16 +40,18 @@ const Upload = () => {
 
 	// Immediately exit if the user is not logged in.
 	useEffect(() => {
-		let user = JwtService.getUserID()
-		if (!user) {
+		let userID = JwtService.getUserID()
+		if (!userID) {
 			navigate("/login")
 		} else {
-			setForm((form) => {
-				return { ...form, ["authors"]: [user] }
-			})
-			setModdedFields((fields) => {
-				return [...fields, "authors"]
-			})
+			axiosInstance
+				.get("/user/" + userID)
+				.then((response) => {
+					setInitAuthors((authors) => {
+						return [...authors, response.data]
+					})
+				})
+				.catch(() => null)
 		}
 	}, [])
 
@@ -54,6 +62,8 @@ const Upload = () => {
 			case "tags":
 			case "submissionAbstract":
 				return true
+			case "authors":
+				return val.length > 0
 			// Enforce ZIP format for file name.
 			case "file":
 				return /^([A-z0-9-_+]+\.(zip))$/.test(val.name)
@@ -66,7 +76,6 @@ const Upload = () => {
 			case "submissionName":
 				return val.length > 0 && val.length < 127
 			case "tag":
-			case "author":
 				return val.length > 0
 			default:
 				return false
@@ -98,7 +107,7 @@ const Upload = () => {
 	const showError = (err) => {
 		setMsg(
 			<>
-				<bold>Upload failed</bold> - {err}
+				<b>Upload failed</b> - {err}
 			</>
 		)
 		setShowAlert(true)
@@ -130,7 +139,9 @@ const Upload = () => {
 	const uploadSubmission = async () => {
 		let data = {
 			name: form.submissionName,
-			authors: form.authors,
+			authors: form.authors.map((author) => {
+				return author.userId
+			}),
 			abstract: optionals.submissionAbstract,
 			tags: optionals.tags
 		}
@@ -144,11 +155,11 @@ const Upload = () => {
 				})
 				.catch((error) => {
 					console.log(error)
-					if (error.hasOwnProperty("repsonse")) {
+					if (error.hasOwnProperty("response")) {
 						showError(
-							error.response.data.message +
+							error.response?.data?.message +
 								" - " +
-								error.response.status
+								error.response?.status
 						)
 					} else {
 						showError("Please try again later - 500")
@@ -205,6 +216,20 @@ const Upload = () => {
 		</Tab>
 	)
 
+	// The tab to add new users
+	let usersTab = (
+		<Tab eventKey="users" title="Authors">
+			<FormUser
+				display="Authors"
+				name="authors"
+				immutables={[]}
+				initUsers={initAuthors}
+				query={{ userType: 1 }}
+				onChange={handleRequired}
+			/>
+		</Tab>
+	)
+
 	// The tab for file selection.
 	let filesTab = (
 		<Tab eventKey="files" title="Files">
@@ -232,6 +257,7 @@ const Upload = () => {
 							id="profileTabs"
 							className="mb-3">
 							{detailsTab}
+							{usersTab}
 							{filesTab}
 						</Tabs>
 					</Card.Body>
