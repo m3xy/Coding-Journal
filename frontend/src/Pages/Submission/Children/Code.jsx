@@ -8,7 +8,9 @@
 import React, { useState, useEffect, useRef } from "react"
 import axiosInstance from "../../../Web/axiosInstance"
 import { Form, InputGroup, Card, Button, Collapse } from "react-bootstrap"
+import { SwitchTransition, CSSTransition } from "react-transition-group"
 import MonacoEditor, { monaco } from "react-monaco-editor"
+import FadeInTransition from "../../../Components/Transitions/FadeIn.module.css"
 import Comments from "./Comments"
 
 const fileEndpoint = "/file"
@@ -122,7 +124,7 @@ function Code({ id, show }) {
 				setShowComments(true)
 			}
 		})
-		// editor.focus()
+		editor.focus()
 	}
 
 	const options = {
@@ -204,31 +206,38 @@ function Code({ id, show }) {
 	return (
 		<Card>
 			<Card.Body>
-				{show ? (
-					<div
-						style={{
-							display: "flex",
-							justifyContent: "space-between"
-						}}>
-						<h4>{file.path}</h4>
-						<Button
-							variant="dark"
-							onClick={
-								monacoRef.current
-									? monacoRef.current.editor._actions.Comment
-											._run
-									: () => {
-											setShowComments(true)
-											setStartLine(defaultLine)
-											setEndLine(defaultLine)
-									  }
-							}>
-							Show comments
-						</Button>
-					</div>
-				) : (
-					<h4>File Viewer</h4>
-				)}
+				<SwitchTransition>
+					<CSSTransition
+						key={show}
+						timeout={100}
+						classNames={{ ...FadeInTransition }}>
+						{show ? (
+							<div
+								style={{
+									display: "flex",
+									justifyContent: "space-between"
+								}}>
+								<h4>{file.path}</h4>
+								<Button
+									variant="dark"
+									onClick={
+										monacoRef.current
+											? monacoRef.current.editor._actions
+													.Comment._run
+											: () => {
+													setShowComments(true)
+													setStartLine(defaultLine)
+													setEndLine(defaultLine)
+											  }
+									}>
+									Show comments
+								</Button>
+							</div>
+						) : (
+							<h4>File Viewer</h4>
+						)}
+					</CSSTransition>
+				</SwitchTransition>
 				<Collapse in={show}>
 					<div>
 						{id && id != -1 ? (
