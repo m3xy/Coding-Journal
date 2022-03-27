@@ -307,7 +307,8 @@ func TestDeleteUserComment(t *testing.T) {
 	defer testEnd()
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT+ENDPOINT_DELETE, PostDeleteUserComment)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}"+ENDPOINT_COMMENT+
+		"/{commentId}"+ENDPOINT_DELETE, PostDeleteUserComment)
 
 	// the test values added to the db and filesystem (saved here so it can be easily changed)
 	testFile := testFiles[0]
@@ -348,14 +349,13 @@ func TestDeleteUserComment(t *testing.T) {
 	}
 
 	// sends request to edit a comment
-	handleRequest := func(ctx *RequestContext, reqStruct *DeleteCommentPostBody) *http.Response {
-		reqBody, err := json.Marshal(reqStruct)
+	handleRequest := func(ctx *RequestContext, commentID uint) *http.Response {
+		// reqBody, err := json.Marshal(reqStruct)
 		assert.NoErrorf(t, err, "Error formatting request body: %v", err)
 
 		// formats and executes the request
-		queryRoute := fmt.Sprintf("%s/%d%s%s", SUBROUTE_FILE, fileID, ENDPOINT_COMMENT, ENDPOINT_DELETE)
-		req, w := httptest.NewRequest("POST", fmt.Sprintf(queryRoute),
-			bytes.NewBuffer(reqBody)), httptest.NewRecorder()
+		queryRoute := fmt.Sprintf("%s/%d%s/%d%s", SUBROUTE_FILE, fileID, ENDPOINT_COMMENT, commentID, ENDPOINT_DELETE)
+		req, w := httptest.NewRequest("POST", fmt.Sprintf(queryRoute), nil), httptest.NewRecorder()
 
 		// sends a request to the server to post a user comment
 		rCtx := context.WithValue(req.Context(), "data", ctx)
@@ -375,8 +375,7 @@ func TestDeleteUserComment(t *testing.T) {
 			commentCopy := comment.getCopy()
 			addComment(commentCopy, fileID)
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
-			req := &DeleteCommentPostBody{ID: commentCopy.ID}
-			resp := handleRequest(ctx, req)
+			resp := handleRequest(ctx, commentCopy.ID)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
@@ -394,8 +393,7 @@ func TestDeleteUserComment(t *testing.T) {
 			addComment(parent, fileID)
 			addComment(child, fileID)
 			ctx := &RequestContext{ID: globalReviewers[0].ID, UserType: USERTYPE_NIL}
-			req := &DeleteCommentPostBody{ID: parent.ID}
-			resp := handleRequest(ctx, req)
+			resp := handleRequest(ctx, parent.ID)
 			defer resp.Body.Close()
 			assert.Equalf(t, http.StatusOK, resp.StatusCode, "HTTP request error: %d", resp.StatusCode)
 
@@ -419,15 +417,13 @@ func TestDeleteUserComment(t *testing.T) {
 		defer clearComments()
 
 		t.Run("Not logged in", func(t *testing.T) {
-			reqStruct := &DeleteCommentPostBody{ID: comment.ID}
-			resp := handleRequest(nil, reqStruct)
+			resp := handleRequest(nil, comment.ID)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 
 		t.Run("Incorrect Author", func(t *testing.T) {
 			ctx := &RequestContext{ID: globalAuthors[1].ID, UserType: USERTYPE_NIL}
-			reqStruct := &DeleteCommentPostBody{ID: comment.ID}
-			resp := handleRequest(ctx, reqStruct)
+			resp := handleRequest(ctx, comment.ID)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "status code incorrect")
 		})
 	})

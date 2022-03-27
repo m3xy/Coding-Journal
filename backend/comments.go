@@ -69,7 +69,7 @@ func PostUploadUserComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // edit existing comment
-// POST /file/{id}/comment/edit
+// POST /file/{id}/comment/{commentId}/edit
 func PostEditUserComment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var resp *StandardResponse
@@ -133,23 +133,23 @@ func ControllerEditComment(r *EditCommentPostBody, authorID string) error {
 }
 
 // edit existing comment
-// POST /file/{id}/comment/delete
+// POST /file/{id}/comment/{commentId}/delete
 func PostDeleteUserComment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var resp *StandardResponse
-	req := &DeleteCommentPostBody{}
 
 	// gets context struct and validates it
-	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+	commentID64, err := strconv.ParseUint(mux.Vars(r)["commentId"], 10, 32)
+	if err != nil {
+		resp = &StandardResponse{Message: "Bad Request - could not parse comment ID", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Bad Request - No user logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
-	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil || validate.Struct(req) != nil {
-		resp = &StandardResponse{Message: "Bad Request - Request format is invalid.", Error: true}
-		w.WriteHeader(http.StatusBadRequest)
-
 		// deletes the comment using the given controller method
-	} else if err := ControllerDeleteComment(req, ctx.ID); err != nil {
+	} else if err := ControllerDeleteComment(uint(commentID64), ctx.ID); err != nil {
 		switch err.(type) {
 		case *CommentNotFoundError:
 			resp = &StandardResponse{Message: "Given comment does not exist.", Error: true}
@@ -174,14 +174,14 @@ func PostDeleteUserComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // takes in the body of an edit comment request and returns an error if one occurs
-func ControllerDeleteComment(r *DeleteCommentPostBody, authorID string) error {
+func ControllerDeleteComment(commentID uint, authorID string) error {
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// gets the comment from the db if it exists
-		comment := &Comment{Model: gorm.Model{ID: r.ID}}
+		comment := &Comment{Model: gorm.Model{ID: commentID}}
 		if res := tx.Model(comment).Find(comment); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected == 0 {
-			return &CommentNotFoundError{ID: r.ID}
+			return &CommentNotFoundError{ID: commentID}
 		} else if comment.AuthorID != authorID {
 			return &WrongPermissionsError{userID: authorID}
 		}
