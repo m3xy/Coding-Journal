@@ -71,13 +71,13 @@ type AssignReviewersBody struct {
 
 // POST /submissions/{id}/review
 type UploadReviewBody struct {
-	Approved    bool   `json:"approved" validate:"required"`
+	Approved    bool   `json:"approved"`
 	Base64Value string `json:"base64Value" validate:"required"`
 }
 
 // POST /submissions/{id}/approve
 type UpdateSubmissionStatusBody struct {
-	Status bool `json:"status" validate:"required"`
+	Status bool `json:"status"`
 }
 
 // ----------

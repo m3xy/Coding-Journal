@@ -31,7 +31,9 @@ func getUserSubroutes(r *mux.Router) {
 
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
+	// + POST /user/{id}/changepermissions - editor changing user permissions
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
+	user.HandleFunc("/{id}"+ENDPOINT_CHANGE_PERMISSIONS, PostChangePermissions).Methods(http.MethodOptions, http.MethodPost)
 
 	// Users routes:
 	// + GET /users/query
