@@ -242,10 +242,22 @@ function Code({ id, show }) {
 					<div>
 						{id && id != -1 ? (
 							<div>
-								<Card.Text>
-									Created:{" "}
-									{new Date(file.CreatedAt).toDateString()}
-								</Card.Text>
+								<div
+									style={{
+										display: "flex",
+										justifyContent: "space-between"
+									}}>
+									<Card.Text>
+										Created:{" "}
+										{new Date(
+											file.CreatedAt
+										).toDateString()}
+									</Card.Text>
+									<div className="text-muted">
+										Press Ctrl + m to display comments on
+										line...
+									</div>
+								</div>
 								{file.path.split(".").pop() !== "pdf"
 									? codeHTML()
 									: pdfHTML()}
