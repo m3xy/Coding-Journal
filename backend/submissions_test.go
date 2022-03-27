@@ -971,6 +971,8 @@ func TestUploadSubmissionByZip(t *testing.T) {
 		// Valid Zip file for a submission
 		testFileZipSubmission := UploadSubmissionByZipBody{
 			Name:           "Test",
+			Abstract:       "test",
+			License:        "MIT",
 			Authors:        []string{authors[0].ID},
 			ZipBase64Value: base64.URLEncoding.EncodeToString(content),
 		}
