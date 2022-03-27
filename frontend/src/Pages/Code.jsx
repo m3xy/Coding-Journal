@@ -198,44 +198,36 @@ function Code({ id }) {
 	}
 
 	return id && id != -1 ? (
-		<Card border="light" className="row no-gutters">
-			<Card.Header>
-				<b>Code</b>
-			</Card.Header>
-			<Card.Body>
-				<Card.Title>{file.path}</Card.Title>
-				<Card.Text>
-					Created: {new Date(file.CreatedAt).toDateString()}
-				</Card.Text>
-				{file.path.split(".").pop() !== "pdf" ? codeHTML() : pdfHTML()}
-				<br />
-				<Button
-					variant="dark"
-					onClick={
-						monacoRef.current
-							? monacoRef.current.editor._actions.Comment._run
-							: () => {
-									setShowComments(true)
-									setStartLine(defaultLine)
-									setEndLine(defaultLine)
-							  }
-					}>
-					Show comments
-				</Button>
-				<Comments
-					id={id}
-					comments={comments}
-					setComments={setComments}
-					startLine={startLine}
-					endLine={endLine}
-					show={showComments}
-					setShow={setShowComments}
-					refresh={getFile}></Comments>
-			</Card.Body>
-			<Card.Footer className="text-muted">
-				Last updated: {new Date(file.UpdatedAt).toDateString()}
-			</Card.Footer>
-		</Card>
+		<Card.Body>
+			<Card.Title>{file.path}</Card.Title>
+			<Card.Text>
+				Created: {new Date(file.CreatedAt).toDateString()}
+			</Card.Text>
+			{file.path.split(".").pop() !== "pdf" ? codeHTML() : pdfHTML()}
+			<br />
+			<Button
+				variant="dark"
+				onClick={
+					monacoRef.current
+						? monacoRef.current.editor._actions.Comment._run
+						: () => {
+								setShowComments(true)
+								setStartLine(defaultLine)
+								setEndLine(defaultLine)
+						  }
+				}>
+				Show comments
+			</Button>
+			<Comments
+				id={id}
+				comments={comments}
+				setComments={setComments}
+				startLine={startLine}
+				endLine={endLine}
+				show={showComments}
+				setShow={setShowComments}
+				refresh={getFile}></Comments>
+		</Card.Body>
 	) : (
 		<>No file selected.</>
 	)
