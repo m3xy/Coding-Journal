@@ -1,32 +1,47 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { Form, Table, Button, Dropdown, InputGroup } from "react-bootstrap"
 import axiosInstance from "../../Web/axiosInstance"
 
-export default ({ display, initUsers, query, onChange }) => {
+export default ({ display, name, immutables, initUsers, query, onChange }) => {
 	const [array, setArray] = useState([])
 	const [input, setInput] = useState("")
 	const [results, setResults] = useState([])
 	const searchBar = useRef()
-	const dropdown = useRef()
 
 	useEffect(() => {
-		onChange(array)
+		onChange({ target: { name: name, value: array } })
 	}, [array])
 
 	useEffect(() => {
 		setResults([])
-		if (input.length > 3)
+		if (input.length > 1)
 			axiosInstance
 				.get("/users/query", { params: { ...query, name: input } })
 				.then((response) => {
 					setResults(
-						response.users !== undefined ? response.users : []
+						response.data.users !== undefined
+							? response.data.users
+							: []
 					)
 				})
 				.catch(() => {
 					return
 				})
 	}, [input])
+
+	useEffect(() => {
+		if (initUsers.length > 0)
+			setArray((array) => {
+				return [
+					...array.filter((elem) => {
+						return !initUsers
+							.map((initUser) => initUser.userId)
+							.includes(elem.userId)
+					}),
+					...initUsers
+				]
+			})
+	}, [initUsers])
 
 	const handleChange = (e) => {
 		setInput(e.target.value)
@@ -38,7 +53,7 @@ export default ({ display, initUsers, query, onChange }) => {
 			return [...array, user]
 		})
 		setInput("")
-		val.current.value = ""
+		searchBar.current.value = ""
 	}
 
 	// Get a row entry for an user
@@ -62,7 +77,7 @@ export default ({ display, initUsers, query, onChange }) => {
 	}
 
 	return (
-		<Row>
+		<div>
 			<Form.Label>{display}</Form.Label>
 			<InputGroup>
 				<Form.Control
@@ -74,25 +89,34 @@ export default ({ display, initUsers, query, onChange }) => {
 			</InputGroup>
 			<Dropdown
 				show={
-					results.length > 0 &&
-					input.length > 0 &&
+					input.length > 2 &&
 					document.activeElement === searchBar.current
 				}>
 				<Dropdown.Menu>
-					{results.map((resUser) => {
-						return (
-							<Dropdown.Item
-								key={i}
-								onClick={() => {
-									handleSelect(resUser)
-								}}>
-								{resUser.userId}
-							</Dropdown.Item>
-						)
-					})}
+					{results !== null ? (
+						results?.map((resUser, i) => {
+							return (
+								<Dropdown.Item
+									key={i + 1}
+									onClick={() => {
+										handleSelect(resUser)
+									}}>
+									{resUser.firstName} {resUser.lastName} {"("}
+									{resUser.profile?.email}
+									{")"}
+								</Dropdown.Item>
+							)
+						})
+					) : (
+						<Dropdown.Item>
+							<div className="text-muted">
+								No users fit search...
+							</div>
+						</Dropdown.Item>
+					)}
 				</Dropdown.Menu>
 			</Dropdown>
-			<Table striped bordered hover>
+			<Table striped bordered hover style={{ marginTop: "15px" }}>
 				<thead>
 					<tr>
 						<th>#</th>
@@ -102,13 +126,13 @@ export default ({ display, initUsers, query, onChange }) => {
 					</tr>
 				</thead>
 				<tbody>
-					{initUsers.map((user, i) => {
+					{immutables.map((user, i) => {
 						return getUserRow(user, i)
 					})}
 					{array.map((user, i) => {
 						return getUserRow(
 							user,
-							i + initUsers?.length,
+							i + immutables?.length,
 							<Button
 								variant="danger"
 								onClick={() => {
@@ -125,6 +149,6 @@ export default ({ display, initUsers, query, onChange }) => {
 					})}
 				</tbody>
 			</Table>
-		</Row>
+		</div>
 	)
 }
