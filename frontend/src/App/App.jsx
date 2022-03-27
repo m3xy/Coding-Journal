@@ -21,37 +21,34 @@ import {
 	About,
 	Contact,
 	Footer,
-	Submission,
 	Home,
 	Upload,
 	Profile,
-	Comment,
-	Submissions
+	Submissions,
+    Submission
 } from "../Pages"
 import Navigation from "../Components/Navbar"
 
 function App() {
-	return (
-		<Container fluid="true">
-			<Router>
-				<Navigation />
-				<Routes>
-					<Route path="/" element={<Home />} />
-					<Route path="/login" element={<Login />} />
-					<Route path="/register" element={<Register />} />
-					<Route path="/about" element={<About />} />
-					<Route path="/code" element={<Submission />} />
-					<Route path="/comment" element={<Comment />} />
-					<Route path="/contact" element={<Contact />} />
-					<Route path="/upload" element={<Upload />} />
-					<Route path="/profile" element={<Profile />} />
-					<Route path="/submission/:id" element={<Submission />} />
-					<Route path="/submissions" element={<Submissions />} />
-				</Routes>
-				<Footer />
-			</Router>
-		</Container>
-	)
+    return(
+        <Container fluid="true">
+            <Router>
+                <Navigation />
+                <Routes>
+                    <Route path="/" element = {<Home />} />
+                    <Route path="/login" element = {<Login />} />
+                    <Route path="/register" element = {<Register />} />
+                    <Route path="/about" element = {<About />} />
+                    <Route path="/contact" element = {<Contact />} />
+                    <Route path="/upload" element = {<Upload />} />
+                    <Route path="/profile" element = {<Profile />} />
+                    <Route path="/submission/:id" element = {<Submission />} />
+                    <Route path="/submissions" element = {<Submissions />} />
+                </Routes>
+                <Footer />
+            </Router>
+        </Container>
+    );
 }
 
 export default App

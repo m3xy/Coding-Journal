@@ -1,350 +1,244 @@
 /**
  * Code.jsx
  * Author: 190019931
- * 
- * This file stores the info for rendering the Code page of our Journal
+ *
+ * React component for displaying code
  */
 
-import React, {useState, useEffect, useRef} from "react";
-import {useParams} from 'react-router-dom';
-import axiosInstance from "../Web/axiosInstance";
-import {Container, Row, Col, Form, InputGroup, Card, Breadcrumb, Modal, Button, Toast} from "react-bootstrap"
-import MonacoEditor from 'react-monaco-editor';
+import React, { useState, useEffect, useRef } from "react"
+import axiosInstance from "../Web/axiosInstance"
+import { Form, InputGroup, Card, Button } from "react-bootstrap"
+import MonacoEditor, { monaco } from "react-monaco-editor"
+import Comments from "./Comments"
 
-const submissionEndpoint = '/submission'
-const fileEndpoint = '/file'
-// const codeEndpoint = '/submission/file'
-// const commentEndpoint = '/submission/file/newcomment';
+const fileEndpoint = "/file"
+const defaultLanguage = "javascript"
+const defaultTheme = "vs"
+const defaultLine = 1
 
-function Code(props) {
+function Code({ id }) {
+	const [file, setFile] = useState({
+		ID: null,
+		submissionId: null,
+		path: "",
+		CreatedAt: "",
+		UpdatedAt: ""
+	})
+	const [code, setCode] = useState("")
 
-    // const [code, setCode] = useState('// type your code...');
-    // const [submissionName, setSubmissionName] = useState('Submission');
-    // const [submissionId, setSubmissionId] = useState(0);
-    // const [filePath, setFilePath] = useState('App/Pages/index.js');
-    // const [fileId, setFileId] = useState(0);
+	const monacoRef = useRef(null)
+	const [theme, setTheme] = useState(defaultTheme)
+	const [language, setLanguage] = useState(defaultLanguage)
+	const [startLine, setStartLine] = useState(defaultLine)
+	const [endLine, setEndLine] = useState(defaultLine)
+	const [decorations, setDecorations] = useState([])
 
-    const params = useParams();
+	const [comments, setComments] = useState([])
+	const [showComments, setShowComments] = useState(false)
 
-    const [code, setCode] = useState("// type your code...");
-    const [file, setFile] = useState({ID:null, submissionId:null, path:"", name:""});
-    const [submission, setSubmission] = useState({
-        ID:null,
-        name:"",
-        license:"",
-        files:[file],
-        authors:[],
-        reviewers:[],
-        categories:[],
-        metaData:{
-            abstract:"",
-            reviews:[]
-        }
-    });
-    
-    
+	useEffect(() => {
+		getFile()
+	}, [id])
 
-    // const [fileName, setFileName] = useState('App/Pages/index.js');
+	const getFile = () => {
+		if (id && id != -1) {
+			axiosInstance
+				.get(fileEndpoint + "/" + id)
+				.then((response) => {
+					//Set file, code and comments
+					setFile(response.data.file)
+					setCode(atob(response.data.file.base64Value))
+					monacoRef?.current?.editor?.setSelection(
+						new monaco.Selection(0, 0, 0, 0)
+					) //Fixes line issue
+					setComments(response.data.file.comments)
+					getDecorations(response.data.file.comments)
+				})
+				.catch((error) => {
+					console.log(error)
+				})
+		} else {
+			setFile({
+				ID: null,
+				submissionId: null,
+				path: "",
+				CreatedAt: "",
+				UpdatedAt: ""
+			})
+			setComments([])
+			setCode("")
+		}
+	}
 
-    // let { submissionId, filePath } = useParams();
+	const getDecorations = (comments) => {
+		let newDecorations = comments?.map((comment) => {
+			return {
+				range: new monaco.Range(
+					comment.startLine,
+					1,
+					comment.endLine,
+					1
+				),
+				options: {
+					isWholeLine: true,
+					className: "myContentClass",
+					glyphMarginClassName: "myGlyphMarginClass",
+					hoverMessage: [],
+					glyphMarginHoverMessage: [
+						{
+							value: atob(comment.base64Value)
+						}
+					]
+				}
+			}
+		})
+		setDecorations(
+			monacoRef.current
+				? monacoRef.current.editor.deltaDecorations(
+						decorations,
+						newDecorations ? newDecorations : []
+				  )
+				: []
+		)
+	}
 
-    // const [comments, setComments] = useState({
-    //     1:[ {submissionId: null, filePath: null, author: "John Doe", base64Value: "Looks Good!"}, 
-    //         {submissionId: null, filePath: null, author: "Jane Doe", base64Value: "I disagree."},
-    //         {submissionId: null, filePath: null, author: "Jim Doe", base64Value: "I have 500 more citations than both of you, I can assure you, this code is mediocre."}
-    //       ]
-    // });
+	const editorDidMount = (editor, monaco) => {
+		editor.addAction({
+			id: "Comment", // An unique identifier of the contributed action.
+			label: "Comment", // A label of the action that will be presented to the user. (Right-click)
+			keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyM], // An optional array of keybindings for the action.
+			precondition: null, // A precondition for this action.
+			keybindingContext: null, // A rule to evaluate on top of the precondition in order to dispatch the keybindings.
+			contextMenuGroupId: "navigation",
+			contextMenuOrder: 1.5,
 
-    const [comments, setComments] = useState({
-        1:[ {submissionId: null, filePath: null, author: "John Doe", base64Value: "Looks Good!"}, 
-            {submissionId: null, filePath: null, author: "Jane Doe", base64Value: "I disagree."},
-            {submissionId: null, filePath: null, author: "Jim Doe", base64Value: "I have 500 more citations than both of you, I can assure you, this code is mediocre."}
-          ]
-    });
+			// Method that will be executed when the action is triggered.
+			// @param editor The editor instance is passed in
+			run: function (ed) {
+				setStartLine(ed.getSelection().startLineNumber)
+				setEndLine(ed.getSelection().endLineNumber)
+				setShowComments(true)
+			}
+		})
+		editor.focus()
+	}
 
-    const [showComments, setShowComments] = useState(false);
+	const options = {
+		selectOnLineNumbers: true,
+		glyphMargin: true,
+		readOnly: true
+	}
 
-    const monacoRef = useRef();
-    const [theme, setTheme] = useState('vs');
-    const [language, setLanguage] = useState('javascript');
-    const [lineNumber, setLineNumber] = useState(1);
-    const [isLoading, setLoading] = useState(false);
+	const codeHTML = () => {
+		return (
+			<>
+				<div style={{ display: "flex" }}>
+					<div style={{ flex: "1", marginRight: "5px" }}>
+						<InputGroup size="sm" className="mb-3">
+							<InputGroup.Text id="inputGroup-sizing-sm">
+								Language:{" "}
+							</InputGroup.Text>
+							<Form.Select
+								defaultValue={language}
+								size="sm"
+								onChange={(e) => {
+									setLanguage(e.target.value)
+								}}>
+								<option value="javascript">Javascript</option>
+								<option value="html">HTML</option>
+								<option value="css">CSS</option>
+								<option value="json">JSON</option>
+								<option value="java">Java</option>
+								<option value="python">Python</option>
+							</Form.Select>
+						</InputGroup>
+					</div>
+					<div style={{ flex: "1", marginLeft: "5px" }}>
+						<InputGroup size="sm" className="mb-3">
+							<InputGroup.Text id="inputGroup-sizing-sm">
+								Theme:{" "}
+							</InputGroup.Text>
+							<Form.Select
+								size="sm"
+								onChange={(e) => {
+									setTheme(e.target.value)
+								}}>
+								<option value="vs">Visual Studio</option>
+								<option value="vs-dark">
+									Visual Studio Dark
+								</option>
+								<option value="hc-black">
+									High Contrast Dark
+								</option>
+							</Form.Select>
+						</InputGroup>
+					</div>
+				</div>
+				<MonacoEditor
+					ref={monacoRef}
+					height="1000"
+					language={language}
+					theme={theme}
+					value={code}
+					options={options}
+					editorDidMount={editorDidMount}
+				/>
+			</>
+		)
+	}
 
+	const pdfHTML = () => {
+		return (
+			<embed
+				height="1000"
+				width="100%"
+				src={"data:application/pdf;base64," + file.base64Value}
+			/>
+		)
+	}
 
-    useEffect(() => {
-        // if(typeof window.submission !== 'undefined'){
-        //     setCode(atob(window.submission.base64Value));
-        //     setSubmissionId(window.submissionId);
-        //     setFilePath(window.submission.webkitRelativePath);
-        // }
-
-        // if (isLoading) {
-        //     simulateNetworkRequest().then(() => {
-        //       setLoading(false);
-        //     });
-        // }
-
-        //Get submission
-        axiosInstance.get(submissionEndpoint + "/" + params.id)
-            .then((response) => {
-                console.log(response.data);
-                
-                axiosInstance.get(fileEndpoint + "/" + response.data.files[0].ID)
-                    .then((response2) => {
-                        console.log(response2.data);
-                        setSubmission(response.data);
-                        setFile(response2.data);
-                        setCode(atob(response2.data.base64Value));
-                    }).catch((error) => {
-                        console.log(error);
-                    })
-
-                
-            }).catch((error) => {
-                console.log(error);
-            })
-
-
-        //Remember to also request comments for submission
-        // axiosInstance.post(codeEndpoint, null, {params: {submissionId, filePath}})
-        //             .then((response) => {
-        //                 console.log(response);
-        //             })
-        //             .catch((error) => {
-        //                 console.log(error)
-        //             });
-    }, [])
-
-    const editorDidMount = (editor, monaco) => {
-        console.log('editorDidMount', editor);
-
-        // monaco.languages.registerHoverProvider(language, {
-        //     provideHover: function(model, position) {
-        //         // console.log(model.getWordAtPosition(position).word); //Able to retrieve word
-        //         // console.log(position); //Can also support any arbritrary range within code (Comment on lines/words)
-
-        //         return {
-        //             range: new monaco.Range(position.lineNumber, 1, model.getLineMaxColumn(position.lineNumber)),
-        //             contents: [
-        //                 { value: '**Comments**' },
-        //                 { supportHtml: true, value: "[Reviewer Comments](http://localhost:23409/comment)"}
-        //             ]
-        //         }
-        //     }
-        // });
-
-        editor.addAction({
-
-            id: 'Comment',                                                  // An unique identifier of the contributed action.
-            label: 'Comment',                                               // A label of the action that will be presented to the user. (Right-click)
-            keybindings: [ monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyM ],   // An optional array of keybindings for the action.
-            precondition: null,                                             // A precondition for this action.
-            keybindingContext: null,                                        // A rule to evaluate on top of the precondition in order to dispatch the keybindings.
-            contextMenuGroupId: 'navigation',
-            contextMenuOrder: 1.5,
-        
-            // Method that will be executed when the action is triggered.
-            // @param editor The editor instance is passed in as a convenience
-            run: function (ed) {
-                // let comment = prompt("Comment on line " + ed.getPosition().lineNumber, "Type Here");
-                setLineNumber(ed.getPosition().lineNumber);
-                handleShow();
-            }
-        });
-        // editor.deltaDecorations(
-        //     [],
-        //     [
-        //         {
-        //             range: new monaco.Range(1, 1, 1, 1),
-        //             options: { 
-        //                 isWholeLine: true,
-        //                 linesDecorationsClassName: 'myLineDecoration',
-        //                 inlineClassName: 'myInlineDecoration',
-        //                 hoverMessage: [{value: "Hello"}, {value: "[link](#comments)"}],
-        //                 glyphMarginHoverMessage: [{value: "Bye"}, {value: "[link](https://www.google.com)"}],
-        //                 glyphMarginClassName: 'myGlyphMarginClass'
-        //             }
-        //         }
-        //     ]
-        // )
-        editor.focus();
-    };
-
-    const onChange = (newValue, e) => {
-        console.log('onChange', newValue, e);
-        setCode(newValue)
-    };
-
-    const options = {
-        selectOnLineNumbers: true,
-        glyphMargin: true
-        // readOnly: true
-    };
-
-    const postComment = (e) => {
-        e.preventDefault();
-        let comment = document.getElementById("CommentText").value;
-
-        if (comment == null || comment == "") {
-            console.log("No comment written");
-            return;
-        }
-        
-        let userId = JwtService.getUserID();        //Preparing to get userId from session cookie
-        if(userId === null){                        //If user has not logged in, disallow submit
-            console.log("Not logged in");
-            return;
-        }
-
-        let data = {
-            authorId: userId,
-            base64Value: btoa(comment)
-        }
-        console.log(data);
-        axiosInstance.post(fileEndpoint + "/" + file.ID + "/comment", data)
-                    .then((response) => {
-                        console.log(response);
-                        document.getElementById("CommentText").value = "";
-                    })
-                    .catch((error) => {
-                        console.log(error);
-                    });
-        
-        
-    }
-
-    const handleClose = () => {
-        setShowComments(false);
-    }
-
-    const handleShow = () => {
-        setShowComments(true);
-    }
-
-    const handleClick = () => setLoading(true);
-
-    // const commentsHTML = Object.values(comments).map((line, i) => {
-    //     return line.map((comment, j) => {
-    //         return (
-    //             <Toast className="d-inline-block m-1" key={i.toString() + ":" + j.toString()}>
-    //                 <Toast.Header closeButton={false}>
-    //                     {/* <img src="holder.js/20x20?text=%20" className="rounded me-2" alt="" /> */}
-    //                     <strong className="me-auto">{comment.author}</strong>
-    //                     <small>{"Line: " + line}</small>
-    //                 </Toast.Header>
-    //                 <Toast.Body>{comment.base64Value}</Toast.Body>
-    //             </Toast>
-    //         );
-    //     })
-    // })
-
-    const commentsHTML = Object.entries(comments).map((line, i) => {
-        return line[1].map((comment, j) => {
-            return (
-                <Toast className="d-inline-block m-1" key={i + ":" + j}>
-                    <Toast.Header closeButton={false}>
-                        {/* <img src="holder.js/20x20?text=%20" className="rounded me-2" alt="" /> */}
-                        <strong className="me-auto">{comment.author}</strong>
-                        <small>{"Line: " + line[0]}</small>
-                    </Toast.Header>
-                    <Toast.Body>{comment.base64Value}</Toast.Body>
-                </Toast>
-            );
-        })
-    })
-
-    const filePathHTML = file.path.split("/").map((part, i) => {
-        return (<Breadcrumb.Item href={'/code/' + submission.ID + '/' + file.path.match(new RegExp('^(.*?)' + part))[0]} key={i}>{part}</Breadcrumb.Item>);
-    })
-
-    return(
-        <Container>
-            <br />
-            <Card>
-            <Card.Header>{submission.name}</Card.Header>
-            <Card.Body>
-            <Card.Title>
-                <Breadcrumb>
-                    {filePathHTML}
-                </Breadcrumb>
-            </Card.Title>
-            <Card.Text>{submission.metaData.abstract}</Card.Text>
-            <Row>
-                <Col>
-                    <InputGroup size="sm" className="mb-3">
-                        <InputGroup.Text id="inputGroup-sizing-sm">Language: </InputGroup.Text>
-                        <Form.Select defaultValue={language} size="sm" onChange={(e) => { setLanguage(e.target.value) }}>
-                            <option value="javascript">Javascript</option>
-                            <option value="html">HTML</option>
-                            <option value="css">CSS</option>
-                            <option value="json">JSON</option>
-                            <option value="java">Java</option>
-                            <option value="python">Python</option>
-                        </Form.Select>
-                    </InputGroup>
-                </Col>
-                <Col>
-                    <InputGroup size="sm" className="mb-3">
-                        <InputGroup.Text id="inputGroup-sizing-sm">Theme: </InputGroup.Text>
-                        <Form.Select size="sm" onChange={(e) => { setTheme(e.target.value) }}>
-                            <option value="vs">Visual Studio</option>
-                            <option value="vs-dark">Visual Studio Dark</option>
-                            <option value="hc-black">High Contrast Dark</option>
-                        </Form.Select>
-                    </InputGroup>
-                </Col>
-            </Row>
-            <Row>
-            <Modal show={showComments} onHide={handleClose} size="lg">
-            <Form onSubmit={postComment}>
-                <Modal.Header closeButton>
-                    <Modal.Title>Comments</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {commentsHTML}
-                    <div className="d-grid gap-2">
-                        <Button variant="link" disabled={isLoading} onClick={!isLoading ? handleClick : null}>
-                            {isLoading ? 'Loading…' : 'Load more'}
-                        </Button>
-                    </div>
-                    <br />
-                    
-                        <Form.Group className="mb-3" controlId="CommentText">
-                            <Form.Label>Enter a comment below:</Form.Label>
-                            <Form.Control as="textarea" rows={3} aria-describedby="lineNumber"/>
-                            <Form.Text id="lineNumber" muted>(Line: {lineNumber})</Form.Text>
-                        </Form.Group>              
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={handleClose}>
-                        Close
-                    </Button>
-                    <Button variant="primary" type="submit">
-                        Post comment
-                    </Button>
-                </Modal.Footer>
-            </Form>
-            </Modal>
-            </Row>
-            <Row>
-                <Col>
-                    <MonacoEditor
-                        ref={monacoRef}
-                        height="1000"
-                        language={language}
-                        theme={theme}
-                        value={code}
-                        options={options}
-                        onChange={onChange}
-                        editorDidMount={editorDidMount}
-                    />
-                </Col>
-            </Row>
-            </Card.Body>
-            <Card.Footer className="text-muted">2 days ago</Card.Footer>
-            </Card>
-        </Container>
-    )
+	return id && id != -1 ? (
+		<Card border="light" className="row no-gutters">
+			<Card.Header>
+				<b>Code</b>
+			</Card.Header>
+			<Card.Body>
+				<Card.Title>{file.path}</Card.Title>
+				<Card.Text>
+					Created: {new Date(file.CreatedAt).toDateString()}
+				</Card.Text>
+				{file.path.split(".").pop() !== "pdf" ? codeHTML() : pdfHTML()}
+				<br />
+				<Button
+					variant="dark"
+					onClick={
+						monacoRef.current
+							? monacoRef.current.editor._actions.Comment._run
+							: () => {
+									setShowComments(true)
+									setStartLine(defaultLine)
+									setEndLine(defaultLine)
+							  }
+					}>
+					Show comments
+				</Button>
+				<Comments
+					id={id}
+					comments={comments}
+					setComments={setComments}
+					startLine={startLine}
+					endLine={endLine}
+					show={showComments}
+					setShow={setShowComments}
+					refresh={getFile}></Comments>
+			</Card.Body>
+			<Card.Footer className="text-muted">
+				Last updated: {new Date(file.UpdatedAt).toDateString()}
+			</Card.Footer>
+		</Card>
+	) : (
+		<>No file selected.</>
+	)
 }
 
-export default Code;
+export default Code
