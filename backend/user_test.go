@@ -174,7 +174,107 @@ func TestDeleteUser(t *testing.T) {
 		if !assert.NoError(t, res.Error, "error querying db") { return }
 		if !assert.Equal(t, int64(0), res.RowsAffected, "global user not deleted!") { return }
 	})
+}
 
+func TestEditUser(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_EDIT, PostEditUser)
+
+	// registers a test users
+	testUser := *testGlobUsers[0].getCopy()
+	userID, err := registerUser(testUser)
+	if !assert.NoError(t, err, "error registering user") { return }
+
+	otherUser := *testGlobUsers[1].getCopy()
+	otherUserID, err := registerUser(otherUser)
+	if !assert.NoError(t, err, "error registering user") { return }
+
+	handleQuery := func(queryRoute string, ctx *RequestContext, reqStruct *EditUserPostBody) *http.Response {
+		reqBody, err := json.Marshal(reqStruct)
+		if !assert.NoError(t, err, "Error while marshalling assign reviewers body!") {
+			return nil
+		}
+		req := httptest.NewRequest(http.MethodGet, queryRoute, bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+		rCtx := context.WithValue(req.Context(), "data", ctx)
+		router.ServeHTTP(w, req.WithContext(rCtx))
+		return w.Result()
+	}
+
+	// helper function to test whether the new user profile matches that which was given
+	testEdit := func(newProfile *EditUserPostBody, userID string) {
+		// gets the user objects
+		globUser := &GlobalUser{}
+		if !assert.NoError(t, gormDb.Model(globUser).Preload("User").Find(globUser, "id = ?", userID).Error, 
+			"could not retrieve user") {
+			return
+		}
+		// tests for equality between the queried user and the new profile (only testing for equality in non-empty fields)
+		if len(newProfile.Password) > 0 &&
+			!assert.True(t, comparePw(newProfile.Password, globUser.User.Password), "passwords do not match") {
+			return
+		} else if len(newProfile.FirstName) > 0 &&
+			!assert.Equal(t, newProfile.FirstName, globUser.FirstName, "first names do not match") {
+			return
+		} else if len(newProfile.LastName) > 0 &&
+			!assert.Equal(t, newProfile.LastName, globUser.LastName, "last names do not match") {
+			return
+		} else if len(newProfile.PhoneNumber) > 0 &&
+			!assert.Equal(t, newProfile.PhoneNumber, globUser.User.PhoneNumber, "phone numbers do not match") {
+			return
+		} else if len(newProfile.Organization) > 0 &&
+			!assert.Equal(t, newProfile.Organization, globUser.User.Organization, "organizations do not match") {
+			return
+		}
+	} 
+
+	t.Run("valid cases", func(t *testing.T) {
+		handleValidEdit := func(reqStruct *EditUserPostBody) {
+			queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_EDIT)
+			ctx := &RequestContext{ ID: userID, UserType: otherUser.UserType }
+			resp := handleQuery(queryRoute, ctx, reqStruct)
+			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "incorrect status code returned") { return }
+			testEdit(reqStruct, userID)
+		}
+		t.Run("edit password", func(t *testing.T) {
+			handleValidEdit(&EditUserPostBody{Password: VALID_PW+"a"})
+		})
+		t.Run("edit first name", func(t *testing.T) {
+			handleValidEdit(&EditUserPostBody{FirstName: "newName"})
+		})
+		t.Run("edit last name", func(t *testing.T) {
+			handleValidEdit(&EditUserPostBody{LastName: "newName"})
+		})
+		t.Run("edit phone number", func(t *testing.T) {
+			handleValidEdit(&EditUserPostBody{PhoneNumber: "07375942117"})
+		})
+		t.Run("edit organization", func(t *testing.T) {
+			handleValidEdit(&EditUserPostBody{Organization: "org org org"})
+		})
+	})
+
+	t.Run("request validation", func(t *testing.T) {
+		t.Run("edit non-logged in user", func(t *testing.T) {
+			queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_EDIT)
+			ctx := &RequestContext{ ID: otherUserID, UserType: otherUser.UserType }
+			reqStruct := &EditUserPostBody{}
+			resp := handleQuery(queryRoute, ctx, reqStruct)
+			if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") { return }
+		})
+
+		t.Run("delete non-existant user", func(t *testing.T) {
+			fakeID := "afeigrbnrilfdalkja-88ra9rakrb"
+			queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, fakeID, ENDPOINT_EDIT)
+			ctx := &RequestContext{ ID: fakeID, UserType: USERTYPE_NIL }
+			reqStruct := &EditUserPostBody{}
+			resp := handleQuery(queryRoute, ctx, reqStruct)
+			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") { return }
+		})
+	})
 }
 
 func TestGetUserQuery(t *testing.T) {
