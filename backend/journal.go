@@ -92,7 +92,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// gets an array of users using GORM smart select fields
 	users := []GlobalUser{}
-	if err := gormDb.Model(&GlobalUser{}).Preload("User").Find(&users).Error; err != nil {
+	if err := gormDb.Model(&GlobalUser{}).Where("id REGEXP ?", "^11").Preload("User").Find(&users).Error; err != nil {
 		log.Printf("[ERROR] SQL Query Error: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
