@@ -238,7 +238,7 @@ func TestUploadReview(t *testing.T) {
 		// passes on no error
 		t.Run("Valid approving", func(t *testing.T) {
 			reqStruct := &UploadReviewBody{
-				Approved:    true,
+				Approved:    false,
 				Base64Value: "test",
 			}
 			reqBody, err := json.Marshal(reqStruct)
@@ -469,14 +469,6 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
 			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID,
 				globalReviewers[0].ID, USERTYPE_REVIEWER, reqStruct), "Wrong error code, was expecting 401")
-		})
-
-		t.Run("Bad Request body", func(t *testing.T) {
-			reqStruct := &UpdateSubmissionStatusBody{}
-			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID,
-				editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 400")
-			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID,
-				editorID, USERTYPE_EDITOR, nil), "Wrong error code, was expecting 400")
 		})
 	})
 

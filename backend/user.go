@@ -17,8 +17,9 @@ import (
 const (
 	SUBROUTE_USERS      = "/users"
 	SUBROUTE_USER       = "/user"
+
 	ENDPOINT_GET        = "/get"
-	ENDPOINT_QUERY_USER = "/query"
+	ENDPOINT_CHANGE_PERMISSIONS = "/changepermissions"
 )
 
 func getUserSubroutes(r *mux.Router) {
@@ -29,11 +30,17 @@ func getUserSubroutes(r *mux.Router) {
 
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
+	// + POST /user/{id}/changepermissions - editor changing user permissions
+	// + POST /user/{id}/edit - edits a user profile 
+	// + POST /user/{id}/delete - deletes a user profile 
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
+	user.HandleFunc("/{id}"+ENDPOINT_CHANGE_PERMISSIONS, PostChangePermissions).Methods(http.MethodOptions, http.MethodPost)
+	user.HandleFunc("/{id}"+ENDPOINT_EDIT, PostEditUser).Methods(http.MethodOptions, http.MethodPost)
+	user.HandleFunc("/{id}"+ENDPOINT_DELETE, PostDeleteUser).Methods(http.MethodOptions, http.MethodPost)
 
 	// Users routes:
 	// + GET /users/query
-	users.HandleFunc(ENDPOINT_QUERY_USER, GetQueryUsers).Methods(http.MethodGet)
+	users.HandleFunc(ENDPOINT_QUERY, GetQueryUsers).Methods(http.MethodGet)
 }
 
 func getUserOutFromUser(tx *gorm.DB) *gorm.DB {
@@ -72,7 +79,201 @@ func getUserProfile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Router function for editors to change user's permissions
+// POST /user/{id}/changepermissions
+func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
+	reqBody := &ChangePermissionsPostBody{}
+	resp := &StandardResponse{Message: "successfully changed permissions!", Error: false}
+	// gets the user ID from the vars and logged in user details from request context
+	params := mux.Vars(r)
+	userID := string(params["id"])
+	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if ctx.UserType != USERTYPE_EDITOR { // logged in user must be an editor to change another user's permissions
+		resp = &StandardResponse{Message: 
+			"The client must have editor permissions to change another user's permissions.", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
+		// request body could not be validated or decoded
+		resp = &StandardResponse{Message: "Unable to parse request body.", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	} else if err := ControllerUpdatePermissions(userID, reqBody.Permissions); err != nil {
+		switch err.(type) {
+		case *BadUserError:
+			resp = &StandardResponse{Message:"Cannot update permissions - user does not exist", Error:true}
+			w.WriteHeader(http.StatusBadRequest)
+
+		// Unexpected error - error out as server error.
+		default:
+			log.Printf("[ERROR] could not change user permissions: %v\n", err)
+			resp = &StandardResponse{Message: "Internal Server Error - could not change user permissions", Error: true}
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+
+	// Return response body after function successful.
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting response: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller to change a user's permissions (UserType)
+func ControllerUpdatePermissions(userID string, permissions int) error {
+	if res := gormDb.Model(&GlobalUser{ID: userID}).
+		Update("user_type", permissions); res.Error != nil {
+			return res.Error
+	} else if res.RowsAffected == 0 {
+		return &BadUserError{userID: userID}
+	}
+	return nil
+}
+
+// router function to edit a user's profile
+// POST /user/{id}/edit
+func PostEditUser(w http.ResponseWriter, r *http.Request) {
+	req := &EditUserPostBody{}
+	resp := StandardResponse{ Message: "profile edited successfully", Error: false }
+
+	// parse the userID from the url
+	params := mux.Vars(r)
+	userID := string(params["id"])
+
+	// validates request context 
+	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = StandardResponse{ Message: "Bad Request Context"}
+		w.WriteHeader(http.StatusBadRequest)
+	
+	} else if userID != ctx.ID {
+		resp = StandardResponse{ Message: "Unauthorized - cannot edit an account which is not yours", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil || validate.Struct(resp) != nil {
+		resp = StandardResponse{ Message: "Bad Request - unable to parse request body", Error: true }
+		w.WriteHeader(http.StatusBadRequest)
+
+	} else if err := ControllerEditUserProfile(req, ctx.ID); err != nil {
+		switch err.(type) {
+		case *BadUserError:
+			resp = StandardResponse{ Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		default:
+			log.Printf("[ERROR] could not delete user %s: %v", userID, err)
+			resp = StandardResponse{ Message: "Internal Server Error - could not edit profile", Error: true }
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+
+	// writes the response
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting json response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller which does the work of actually editing a user's profile
+func ControllerEditUserProfile(r *EditUserPostBody, userID string) error {
+	// makes sure an empty password is not passed to the hashPw function
+	password := ""
+	if r.Password != "" {
+		password = string(hashPw(r.Password))
+	}
+	// converts request body struct into user and global user
+	globUser := GlobalUser{
+		FirstName: r.FirstName,
+		LastName: r.LastName,
+	}
+	user := User{
+		Password:     password,
+		PhoneNumber:  r.PhoneNumber,
+		Organization: r.Organization,
+	}
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// updates the global user table in accordance with the request body
+		if res := gormDb.Model(&GlobalUser{}).Where("id = ?", userID).Updates(globUser); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected != 1 {
+			return &BadUserError{ userID: userID }
+		}
+		// updates the local user table in accordance with the request body
+		if res := gormDb.Model(&User{}).Where("global_user_id = ?", userID).Updates(user); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected != 1 {
+			return &BadUserError{ userID: userID }
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// router function for users to delete their accounts
+// POST /user/{id}/delete
+func PostDeleteUser(w http.ResponseWriter, r *http.Request) {
+	resp := StandardResponse{ Message: "user deleted successfully", Error: false }
+
+	// parse the userID from the url
+	params := mux.Vars(r)
+	userID := string(params["id"])
+
+	// validates request context 
+	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = StandardResponse{ Message: "Bad Request Context - user not logged in"}
+		w.WriteHeader(http.StatusBadRequest)
+	
+	} else if userID != ctx.ID {
+		resp = StandardResponse{ Message: "Unauthorized - cannot delete an account which is not yours", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if err := ControllerDeleteUser(ctx.ID); err != nil {
+		switch err.(type) {
+		case *BadUserError:
+			resp = StandardResponse{ Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		default:
+			log.Printf("[ERROR] could not delete user %s: %v", userID, err)
+			resp = StandardResponse{ Message: "Internal Server Error - could not delete user", Error: true }
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+
+	// writes the response
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting json response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller function to do the actual work of removing a user from the database
+func ControllerDeleteUser(userID string) error {
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// deletes global user
+		globUser := &GlobalUser{ID: userID}
+		if res := gormDb.Delete(globUser); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected != 1 {
+			return &BadUserError{ userID: userID }
+		}
+		// deletes local user
+		if res := gormDb.Delete(&User{}, "global_user_id = ?", userID); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected != 1 {
+			return &BadUserError{ userID: userID }
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 // generalized query function for users
+// GET /users/query
 func GetQueryUsers(w http.ResponseWriter, r *http.Request) {
 	var err error
 	var stdResp StandardResponse

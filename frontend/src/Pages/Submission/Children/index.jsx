@@ -5,6 +5,7 @@ import TagsList from "./TagsList"
 import Reviews from "./Reviews"
 import ReviewEditor from "./ReviewEditor"
 import ApprovalModal from "./ApprovalModal"
+import AssignmentModal from "./AssignmentModal"
 
 export {
 	Abstract,
@@ -13,5 +14,6 @@ export {
 	TagsList,
 	Reviews,
 	ReviewEditor,
+	AssignmentModal,
 	ApprovalModal
 }

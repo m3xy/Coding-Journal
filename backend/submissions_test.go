@@ -1,11 +1,11 @@
-// ===========================
+// ===============================
 // submissions_test.go
 // Authors: 190010425
 // Created: November 18, 2021
 //
 // This file takes care of testing
 // submissions.go
-// ===========================
+// ===============================
 
 package main
 
@@ -112,7 +112,7 @@ func TestQuerySubmissions(t *testing.T) {
 
 	// Create mux router
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_SUBMISSIONS+ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions)
+	router.HandleFunc(SUBROUTE_SUBMISSIONS+ENDPOINT_QUERY, GetQuerySubmissions)
 
 	globalAuthors, globalReviewers, err := initMockUsers(t)
 	if err != nil {
@@ -177,7 +177,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[2] = addTestSubmission("test3", &fval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected (submissionIDs[2] should not be in the result set as it is a rejected submission)
-			resp := handleQuery(SUBROUTE_SUBMISSIONS + ENDPOINT_QUERY_SUBMISSIONS)
+			resp := handleQuery(SUBROUTE_SUBMISSIONS + ENDPOINT_QUERY)
 			switch {
 			case !assert.Equal(t, 1, len(resp.Submissions), "incorrect number of submissions returned"),
 				!assert.Contains(t, submissionIDs[1:2], resp.Submissions[0].ID, "Missing submission 1 ID"):
@@ -192,7 +192,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("test2", &tval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected
-			queryRoute := fmt.Sprintf("%s%s?orderBy=newest", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s?orderBy=newest", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			resp := handleQuery(queryRoute)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
@@ -202,7 +202,7 @@ func TestQuerySubmissions(t *testing.T) {
 			}
 
 			// test that the response is as expected
-			queryRoute = fmt.Sprintf("%s%s?orderBy=oldest", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute = fmt.Sprintf("%s%s?orderBy=oldest", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			resp = handleQuery(queryRoute)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
@@ -219,7 +219,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("atest", &tval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			// test that the response is as expected
-			queryRoute := fmt.Sprintf("%s%s?orderBy=alphabetical", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s?orderBy=alphabetical", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			resp := handleQuery(queryRoute)
 			switch {
 			case !assert.NotEmpty(t, resp, "request response is nil"),
@@ -235,7 +235,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[0] = addTestSubmission("test1", &tval, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", &tval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
-			queryRoute := fmt.Sprintf("%s%s?tags=python", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s?tags=python", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			respData := handleQuery(queryRoute)
 			if !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned") {
 				return
@@ -250,7 +250,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[1] = addTestSubmission("test2", &tval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[2] = addTestSubmission("test3", &tval, []string{"java", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
-			queryRoute := fmt.Sprintf("%s%s?tags=python&tags=go", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s?tags=python&tags=go", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			respData := handleQuery(queryRoute)
 			switch {
 			case !assert.Equal(t, 2, len(respData.Submissions), "too many submissions returned"),
@@ -266,7 +266,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[0] = addTestSubmission("test1", &tval, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", &tval, []string{"go", "sorting"}, globalAuthors[1:2], globalReviewers[:1])
 
-			queryRoute := fmt.Sprintf("%s%s?authors=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS, globalAuthors[0].ID)
+			queryRoute := fmt.Sprintf("%s%s?authors=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY, globalAuthors[0].ID)
 			respData := handleQuery(queryRoute)
 			switch {
 			case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
@@ -281,7 +281,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[0] = addTestSubmission("test1", &tval, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", &tval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
 
-			queryRoute := fmt.Sprintf("%s%s?reviewers=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS, globalReviewers[0].ID)
+			queryRoute := fmt.Sprintf("%s%s?reviewers=%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY, globalReviewers[0].ID)
 			respData := handleQuery(queryRoute)
 			switch {
 			case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
@@ -301,7 +301,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs[4] = addTestSubmission("[$]python", &tval, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 
 			t.Run("full name", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?name=unique", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+				queryRoute := fmt.Sprintf("%s%s?name=unique", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 				respData := handleQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
@@ -311,7 +311,7 @@ func TestQuerySubmissions(t *testing.T) {
 			})
 
 			t.Run("part of name", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?name=test", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+				queryRoute := fmt.Sprintf("%s%s?name=test", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 				respData := handleQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, 3, len(respData.Submissions), "too many submissions returned"),
@@ -323,7 +323,7 @@ func TestQuerySubmissions(t *testing.T) {
 			})
 
 			t.Run("regex with spaces", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?name=unique+test", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+				queryRoute := fmt.Sprintf("%s%s?name=unique+test", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 				respData := handleQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, 4, len(respData.Submissions), "too many submissions returned"),
@@ -336,7 +336,7 @@ func TestQuerySubmissions(t *testing.T) {
 			})
 
 			t.Run("include regex chars", func(t *testing.T) {
-				queryRoute := fmt.Sprintf("%s%s?name=[$]", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+				queryRoute := fmt.Sprintf("%s%s?name=[$]", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 				respData := handleQuery(queryRoute)
 				switch {
 				case !assert.Equal(t, 1, len(respData.Submissions), "too many submissions returned"),
@@ -355,7 +355,7 @@ func TestQuerySubmissions(t *testing.T) {
 		submissionIDs[2] = addTestSubmission("test3", &fval, []string{"go", "sorting"}, globalAuthors[1:2], globalReviewers[1:2])
 
 		handleQuery := func(id string, userType int) *QuerySubmissionsResponse {
-			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
 			reqCtx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       id,
@@ -429,7 +429,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
-			queryRoute := fmt.Sprintf("%s%s?orderBy=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s?orderBy=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			resp := handleQuery(queryRoute)
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Incorrect status code returned")
 		})
@@ -439,7 +439,7 @@ func TestQuerySubmissions(t *testing.T) {
 			submissionIDs := make([]uint, 2)
 			submissionIDs[0] = addTestSubmission("test1", nil, []string{"python", "sorting"}, globalAuthors[:1], globalReviewers[:1])
 			submissionIDs[1] = addTestSubmission("test2", nil, []string{"go", "sorting"}, globalAuthors[:1], globalReviewers[1:2])
-			queryRoute := fmt.Sprintf("%s%s?tags=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY_SUBMISSIONS)
+			queryRoute := fmt.Sprintf("%s%s?tags=blub", SUBROUTE_SUBMISSIONS, ENDPOINT_QUERY)
 			resp := handleQuery(queryRoute)
 			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "Incorrect status code returned") {
 				return
@@ -971,6 +971,8 @@ func TestUploadSubmissionByZip(t *testing.T) {
 		// Valid Zip file for a submission
 		testFileZipSubmission := UploadSubmissionByZipBody{
 			Name:           "Test",
+			Abstract:       "test",
+			License:        "MIT",
 			Authors:        []string{authors[0].ID},
 			ZipBase64Value: base64.URLEncoding.EncodeToString(content),
 		}

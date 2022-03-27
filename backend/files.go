@@ -27,7 +27,6 @@ import (
 
 // file constants, includes
 const (
-	// TEMP: hard coded for testing. Adapt to using an environment variable
 	FILESYSTEM_ROOT = "../filesystem/" // path to the root directory holding all submission directories
 	DATA_DIR_NAME   = ".data"          // name of the hidden data dir to be put into the submission directory structure
 
@@ -45,14 +44,16 @@ func getFilesSubRoutes(r *mux.Router) {
 	// File subroutes:
 	// + GET /file/{id} - Get given file.
 	// + POST /file/{id}/comment - Post a new comment
-	// + POST /file/{id}/comment/edit - Edit an existing comment
+	// + POST /file/{id}/comment/{commentId}/edit - Edit an existing comment
+	// + POST /file/{id}/comment/{commentId}/delete - Delete an existing comment
 	files.HandleFunc("/{id}", GetFile).Methods(http.MethodGet)
 	files.HandleFunc("/{id}"+ENDPOINT_COMMENT, PostUploadUserComment).Methods(http.MethodPost, http.MethodOptions)
-	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+ENDPOINT_EDIT, PostEditUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+"/{commentId}"+ENDPOINT_EDIT, PostEditUserComment).Methods(http.MethodPost, http.MethodOptions)
+	files.HandleFunc("/{id}"+ENDPOINT_COMMENT+"/{commentId}"+ENDPOINT_DELETE, PostDeleteUserComment).Methods(http.MethodPost, http.MethodOptions)
 }
 
-// Get the path to the submissions directory.
-func getSubmissionDirectoryPath(s Submission) string {
+// Get the path to the submissions directory. (defined anonymously to allow for mocking in the tests)
+var getSubmissionDirectoryPath = func(s Submission) string {
 	return filepath.Join(FILESYSTEM_ROOT, fmt.Sprintf("%d-%d", s.ID, s.CreatedAt.Unix()))
 }
 

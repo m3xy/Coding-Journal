@@ -72,7 +72,7 @@ func PostAssignReviewers(w http.ResponseWriter, r *http.Request) {
 
 		default: // Unexpected error - error out as server error.
 			log.Printf("[ERROR] could not change submission status: %v\n", err)
-			resp = &StandardResponse{Message: "Internal Server Error - could not change submission status", Error: true}
+			resp = &StandardResponse{Message: "Internal Server Error - could not assign reviewers", Error: true}
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}

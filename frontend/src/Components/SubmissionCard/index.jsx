@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"
+import React from "react"
 import { Card, Button, Badge } from "react-bootstrap"
 import styles from "./SubmissionCard.module.css"
 import JwtService from "../../Web/axiosInstance"
@@ -6,10 +6,6 @@ import { useNavigate } from "react-router-dom"
 
 export default ({ submission }) => {
 	const navigate = useNavigate()
-
-	useEffect(() => {
-		setAuthorsNotFetched(submission.authors)
-	})
 
 	const getBadge = (submission) => {
 		const [bg, text] = submission.approved
@@ -25,11 +21,7 @@ export default ({ submission }) => {
 	}
 
 	const getAuthorFullName = (author) => {
-		if (authors.hasOwnProperty(author.userId)) {
-			return author.firstName + " " + author.lastName
-		} else {
-			return author.userId
-		}
+		return author.firstName + " " + author.lastName
 	}
 
 	const getTags = (submission) => {
