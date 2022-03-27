@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect, useRef } from "react"
-import axiosInstance from "../Web/axiosInstance"
-import { Form, InputGroup, Card, Button } from "react-bootstrap"
+import axiosInstance from "../../../Web/axiosInstance"
+import { Form, InputGroup, Card, Button, Collapse } from "react-bootstrap"
 import MonacoEditor, { monaco } from "react-monaco-editor"
 import Comments from "./Comments"
 
@@ -16,7 +16,7 @@ const defaultLanguage = "javascript"
 const defaultTheme = "vs"
 const defaultLine = 1
 
-function Code({ id }) {
+function Code({ id, show }) {
 	const [file, setFile] = useState({
 		ID: null,
 		submissionId: null,
@@ -120,7 +120,7 @@ function Code({ id }) {
 				setShowComments(true)
 			}
 		})
-		editor.focus()
+		// editor.focus()
 	}
 
 	const options = {
@@ -176,7 +176,7 @@ function Code({ id }) {
 				</div>
 				<MonacoEditor
 					ref={monacoRef}
-					height="1000"
+					height="300"
 					language={language}
 					theme={theme}
 					value={code}
@@ -198,38 +198,46 @@ function Code({ id }) {
 	}
 
 	return id && id != -1 ? (
-		<Card.Body>
-			<Card.Title>{file.path}</Card.Title>
-			<Card.Text>
-				Created: {new Date(file.CreatedAt).toDateString()}
-			</Card.Text>
-			{file.path.split(".").pop() !== "pdf" ? codeHTML() : pdfHTML()}
-			<br />
-			<Button
-				variant="dark"
-				onClick={
-					monacoRef.current
-						? monacoRef.current.editor._actions.Comment._run
-						: () => {
-								setShowComments(true)
-								setStartLine(defaultLine)
-								setEndLine(defaultLine)
-						  }
-				}>
-				Show comments
-			</Button>
-			<Comments
-				id={id}
-				comments={comments}
-				setComments={setComments}
-				startLine={startLine}
-				endLine={endLine}
-				show={showComments}
-				setShow={setShowComments}
-				refresh={getFile}></Comments>
-		</Card.Body>
+		<Collapse in={show}>
+			<div>
+				<Card.Body>
+					<Card.Title>{file.path}</Card.Title>
+					<Card.Text>
+						Created: {new Date(file.CreatedAt).toDateString()}
+					</Card.Text>
+					{file.path.split(".").pop() !== "pdf"
+						? codeHTML()
+						: pdfHTML()}
+					<br />
+					<Button
+						variant="dark"
+						onClick={
+							monacoRef.current
+								? monacoRef.current.editor._actions.Comment._run
+								: () => {
+										setShowComments(true)
+										setStartLine(defaultLine)
+										setEndLine(defaultLine)
+								  }
+						}>
+						Show comments
+					</Button>
+					<Comments
+						id={id}
+						comments={comments}
+						setComments={setComments}
+						startLine={startLine}
+						endLine={endLine}
+						show={showComments}
+						setShow={setShowComments}
+						refresh={getFile}></Comments>
+				</Card.Body>
+			</div>
+		</Collapse>
 	) : (
-		<>No file selected.</>
+		<Collapse in={show}>
+			<div>No file selected.</div>
+		</Collapse>
 	)
 }
 

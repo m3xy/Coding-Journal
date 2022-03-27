@@ -22,8 +22,6 @@ import {
 	ApprovalModal
 } from "./Children"
 import { Alert, Badge, Collapse, Button } from "react-bootstrap"
-import Code from "../Code"
-
 
 function Submission() {
 	// Router hooks
@@ -187,7 +185,7 @@ function Submission() {
 					setShow={(e) => setShowFile(e)}
 					inversed
 				/>
-				<Code id={fileId} />
+				<FileViewer id={fileId} show={showFile} />
 			</div>
 		)
 	}
@@ -199,8 +197,8 @@ function Submission() {
 				<FileExplorer
 					files={submission.files}
 					onClick={(id) => {
-						setFileId(id)
 						setShowFile(true)
+						setFileId(id)
 					}}
 				/>
 				<TagsList tags={submission.categories} />

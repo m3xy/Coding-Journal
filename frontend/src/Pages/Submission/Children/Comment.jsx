@@ -13,8 +13,8 @@ import {
 	InputGroup,
 	Toast
 } from "react-bootstrap"
-import JwtService from "../Web/jwt.service"
-import axiosInstance from "../Web/axiosInstance"
+import JwtService from "../../../Web/jwt.service"
+import axiosInstance from "../../../Web/axiosInstance"
 import ReactMarkdown from "react-markdown"
 
 const userEndpoint = "/user"

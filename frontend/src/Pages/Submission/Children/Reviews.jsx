@@ -19,7 +19,7 @@ export default ({ reviewers, reviews }) => {
 				return { ...reviewerMap, [reviewer.userId]: reviewer }
 			})
 		})
-	})
+	}, [reviewerMap])
 
 	const getFullName = (reviewer) => {
 		reviewer.firstName + " " + reviewer.lastName
