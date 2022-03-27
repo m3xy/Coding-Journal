@@ -1,3 +1,11 @@
+/*
+ * FileExplorer.jsx
+ * Card showing the file explorer for the submission
+ * Author: 190014935
+ *
+ * @param files The submission's file array.
+ * @param onClick (file.fileId) Function handling a file ID given.
+ */
 import React, { useEffect, useState } from "react"
 import FileBrowser, { Icons } from "react-keyed-file-browser"
 import { Card } from "react-bootstrap"

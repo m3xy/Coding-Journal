@@ -1,4 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from "react"
+/*
+ * FormUser.jsx
+ * Reusable component for user query and selection.
+ * Author: 190014935
+ *
+ * @param display The field's display name
+ * @param name The name on the validation function
+ * @param immutables users given from outside the form
+ * which cannot be modified
+ * @param initUsers Initial users edited from outside the
+ * form which count in the array
+ * @param query Base query made to get user
+ * @param onChange function called on array change
+ * CAUTION: array received as {target: {name: name, value: array}}
+ */
+
+import React, { useState, useEffect, useRef } from "react"
 import { Form, Table, Button, Dropdown, InputGroup } from "react-bootstrap"
 import axiosInstance from "../../Web/axiosInstance"
 
@@ -8,10 +24,12 @@ export default ({ display, name, immutables, initUsers, query, onChange }) => {
 	const [results, setResults] = useState([])
 	const searchBar = useRef()
 
+	// Send array features into the array.
 	useEffect(() => {
 		onChange({ target: { name: name, value: array } })
 	}, [array])
 
+	// Make a query based on the input to get user results.
 	useEffect(() => {
 		setResults([])
 		if (input.length > 1)
@@ -29,6 +47,8 @@ export default ({ display, name, immutables, initUsers, query, onChange }) => {
 				})
 	}, [input])
 
+	// Add initial users (added outside of this form control)
+	// into the array.
 	useEffect(() => {
 		if (initUsers?.length > 0)
 			setArray((array) => {
@@ -126,7 +146,7 @@ export default ({ display, name, immutables, initUsers, query, onChange }) => {
 					</tr>
 				</thead>
 				<tbody>
-					{immutables.map((user, i) => {
+					{immutables?.map((user, i) => {
 						return getUserRow(user, i)
 					})}
 					{array.map((user, i) => {
