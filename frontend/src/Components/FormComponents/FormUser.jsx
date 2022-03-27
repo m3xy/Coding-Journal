@@ -30,7 +30,7 @@ export default ({ display, name, immutables, initUsers, query, onChange }) => {
 	}, [input])
 
 	useEffect(() => {
-		if (initUsers.length > 0)
+		if (initUsers?.length > 0)
 			setArray((array) => {
 				return [
 					...array.filter((elem) => {
