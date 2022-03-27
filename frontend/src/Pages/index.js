@@ -1,4 +1,3 @@
-export { default as Navigation } from "./Navigation"
 export { default as Footer } from "./Footer"
 export { default as Home } from "./HomePage/HomePage"
 export { default as About } from "./About"
