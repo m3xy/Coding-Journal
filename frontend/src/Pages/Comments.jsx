@@ -5,8 +5,8 @@
  * React component for displaying comments
  */
 
-import React, { useEffect, useState } from "react"
-import { Button, Form, Modal, Toast } from "react-bootstrap"
+import React, { useState } from "react"
+import { Button, Form, Modal } from "react-bootstrap"
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
 import Comment from "./Comment"
@@ -17,6 +17,7 @@ const commentEndpoint = "/comment"
 function Comments({
 	id,
 	comments,
+	setComments,
 	startLine,
 	endLine,
 	show,
@@ -53,6 +54,7 @@ function Comments({
 		axiosInstance
 			.post(fileEndpoint + "/" + id + commentEndpoint, comment)
 			.then((response) => {
+				setComments()
 				refresh()
 			})
 			.catch((error) => {
@@ -62,9 +64,8 @@ function Comments({
 
 	const loadMore = () => {
 		setLoading(true)
-		setTimeout(() => {
-			setLoading(false)
-		}, 1000)
+		refresh()
+		setLoading(false)
 	}
 
 	const commentsHTML =
@@ -102,16 +103,6 @@ function Comments({
 					<Modal.Title>Comments</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
-					{commentsHTML}
-					<div className="d-grid gap-2">
-						<Button
-							variant="link"
-							disabled={isLoading}
-							onClick={!isLoading ? () => loadMore() : null}>
-							{isLoading ? "Loading…" : "Load more"}
-						</Button>
-					</div>
-					<br />
 					<Form.Group className="mb-3" controlId="CommentText">
 						<Form.Label>Enter a comment below:</Form.Label>
 						<Form.Control
@@ -123,6 +114,12 @@ function Comments({
 							}}
 							value={text}
 						/>
+						<Button
+							variant="dark"
+							type="submit"
+							style={{ float: "right" }}>
+							Post comment
+						</Button>
 						<Form.Text id="lineNumber" muted>
 							{startLine == endLine ? (
 								<>Line: {startLine}</>
@@ -133,14 +130,21 @@ function Comments({
 							)}
 						</Form.Text>
 					</Form.Group>
+					<br />
+					{commentsHTML}
+					<div className="d-grid gap-2">
+						<Button
+							variant="light"
+							disabled={isLoading}
+							onClick={!isLoading ? () => loadMore() : null}>
+							{isLoading ? "…" : "↻"}
+						</Button>
+					</div>
 				</Modal.Body>
 				<Modal.Footer>
-					<Button variant="secondary" onClick={() => setShow(false)}>
-						Close
-					</Button>
-					<Button variant="primary" type="submit">
-						Post comment
-					</Button>
+					<small className="text-muted">
+						Last refreshed: {new Date().toLocaleString()}
+					</small>
 				</Modal.Footer>
 			</Form>
 		</Modal>
