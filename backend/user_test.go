@@ -121,6 +121,62 @@ func TestChangeUserPermissions(t *testing.T) {
 	})
 }
 
+func TestDeleteUser(t *testing.T) {
+	testInit()
+	defer testEnd()
+
+	// Create mux router
+	router := mux.NewRouter()
+	router.HandleFunc(SUBROUTE_USER+"/{id}"+ENDPOINT_DELETE_USER, PostDeleteUser)
+
+	// registers a test users
+	testUser := *testGlobUsers[0].getCopy()
+	userID, err := registerUser(testUser)
+	if !assert.NoError(t, err, "error registering user") { return }
+
+	otherUser := *testGlobUsers[1].getCopy()
+	otherUserID, err := registerUser(otherUser)
+	if !assert.NoError(t, err, "error registering user") { return }
+
+	handleQuery := func(queryRoute string, ctx *RequestContext) *http.Response {
+		req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
+		rCtx := context.WithValue(req.Context(), "data", ctx)
+		router.ServeHTTP(w, req.WithContext(rCtx))
+		return w.Result()
+	}
+
+	t.Run("delete non-logged in user", func(t *testing.T) {
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE_USER)
+		ctx := &RequestContext{ ID: otherUserID, UserType: otherUser.UserType }
+		resp := handleQuery(queryRoute, ctx)
+		if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") { return }
+	})
+
+	t.Run("delete non-existant user", func(t *testing.T) {
+		fakeID := "afeigrbnrilfdalkja-88ra9rakrb"
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, fakeID, ENDPOINT_DELETE_USER)
+		ctx := &RequestContext{ ID: fakeID, UserType: USERTYPE_NIL }
+		resp := handleQuery(queryRoute, ctx)
+		if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") { return }
+	})
+
+	t.Run("delete valid", func(t *testing.T) {
+		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE_USER)
+		ctx := &RequestContext{ ID: userID, UserType: testUser.UserType }
+		resp := handleQuery(queryRoute, ctx)
+
+		// checks that the user was deleted properly
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "incorrect status code returned") { return }
+		res := gormDb.Find(&User{}, "global_user_id = ?", userID)
+		if !assert.NoError(t, res.Error, "error querying db") { return }
+		if !assert.Equal(t, int64(0), res.RowsAffected, "user not deleted!") { return }
+		res = gormDb.Find(&GlobalUser{}, "id = ?", userID)
+		if !assert.NoError(t, res.Error, "error querying db") { return }
+		if !assert.Equal(t, int64(0), res.RowsAffected, "global user not deleted!") { return }
+	})
+
+}
+
 func TestGetUserQuery(t *testing.T) {
 	testInit()
 	defer testEnd()

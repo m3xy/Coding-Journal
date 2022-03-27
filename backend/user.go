@@ -21,6 +21,7 @@ const (
 	ENDPOINT_GET        = "/get"
 	ENDPOINT_CHANGE_PERMISSIONS = "/changepermissions"
 	ENDPOINT_QUERY_USER = "/query"
+	ENDPOINT_DELETE_USER = "/delete"
 )
 
 func getUserSubroutes(r *mux.Router) {
@@ -129,6 +130,67 @@ func ControllerUpdatePermissions(userID string, permissions int) error {
 	}
 	return nil
 }
+
+// router function for users to delete their accounts
+// POST /user/{id}/delete
+func PostDeleteUser(w http.ResponseWriter, r *http.Request) {
+	resp := StandardResponse{ Message: "user deleted successfully", Error: false }
+
+	// parse the userID from the url
+	params := mux.Vars(r)
+	userID := string(params["id"])
+
+	// validates request context 
+	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
+		resp = StandardResponse{ Message: "Bad Request Context"}
+		w.WriteHeader(http.StatusBadRequest)
+	
+	} else if userID != ctx.ID {
+		resp = StandardResponse{ Message: "Unauthorized - cannot delete an account which is not yours", Error: true}
+		w.WriteHeader(http.StatusUnauthorized)
+
+	} else if err := ControllerDeleteUser(ctx.ID); err != nil {
+		switch err.(type) {
+		case *BadUserError:
+			resp = StandardResponse{ Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		default:
+			log.Printf("[ERROR] could not delete user %s: %v", userID, err)
+			resp = StandardResponse{ Message: "Internal Server Error - could not delete user", Error: true }
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}
+
+	// writes the response
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("[ERROR] error formatting json response: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// Controller function to do the actual work of removing a user from the database
+func ControllerDeleteUser(userID string) error {
+	if err := gormDb.Transaction(func(tx *gorm.DB) error {
+		// deletes global user
+		globUser := &GlobalUser{ID: userID}
+		if res := gormDb.Delete(globUser); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected != 1 {
+			return &BadUserError{ userID: userID }
+		}
+		// deletes local user
+		if res := gormDb.Delete(&User{}, "global_user_id = ?", userID); res.Error != nil {
+			return res.Error
+		} else if res.RowsAffected != 1 {
+			return &BadUserError{ userID: userID }
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 
 // generalized query function for users
 // GET /users/query
