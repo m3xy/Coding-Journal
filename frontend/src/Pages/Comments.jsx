@@ -54,7 +54,6 @@ function Comments({
 		axiosInstance
 			.post(fileEndpoint + "/" + id + commentEndpoint, comment)
 			.then((response) => {
-				setComments()
 				refresh()
 			})
 			.catch((error) => {
@@ -87,6 +86,7 @@ function Comments({
 							}}
 							fileEndpoint={fileEndpoint}
 							commentEndpoint={commentEndpoint}
+							refresh={refresh}
 						/>
 					)
 			  })

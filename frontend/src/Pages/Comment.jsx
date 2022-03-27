@@ -27,14 +27,15 @@ function Comment({
 	show,
 	postReply,
 	fileEndpoint,
-	commentEndpoint
+	commentEndpoint,
+	refresh
 }) {
 	const [reply, setReply] = useState("")
 	const [showReplies, setShowReplies] = useState(false)
 	const [openReplies, setOpenReplies] = useState(false)
 	const [name, setName] = useState("")
 	const [edit, setEdit] = useState("")
-	const [openEdits, setOpenEdits] = useState(false)
+	const [openEdit, setOpenEdit] = useState(false)
 
 	useEffect(() => {
 		getName()
@@ -74,6 +75,8 @@ function Comment({
 			)
 			.then((response) => {
 				console.log(response)
+				refresh()
+				setOpenEdit(false)
 			})
 			.catch((error) => {
 				console.log(error)
@@ -93,6 +96,7 @@ function Comment({
 			)
 			.then((response) => {
 				console.log(response)
+				refresh();
 			})
 			.catch((error) => {
 				console.log(error)
@@ -103,9 +107,13 @@ function Comment({
 		? comment.comments.map((reply) => {
 				return (
 					<Comment
+						fileID={fileID}
 						comment={reply}
 						show={showReplies}
 						postReply={postReply}
+						fileEndpoint={fileEndpoint}
+						commentEndpoint={commentEndpoint}
+						refresh={refresh}
 					/>
 				)
 		  })
@@ -129,7 +137,7 @@ function Comment({
 					</small>
 				</Toast.Header>
 				<Toast.Body>
-					{openEdits ? (
+					{openEdit ? (
 						<InputGroup className="mb-3" size="sm">
 							<FormControl
 								placeholder={"Edit comment"}
@@ -172,7 +180,7 @@ function Comment({
 								variant="light"
 								onClick={() => {
 									setEdit(atob(comment.base64Value))
-									setOpenEdits(!openEdits)
+									setOpenEdit(!openEdit)
 								}}>
 								✎
 							</Button>
