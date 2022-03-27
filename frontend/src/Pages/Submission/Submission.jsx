@@ -12,6 +12,7 @@ import {
 	TagsList,
 	Reviews,
 	ReviewEditor as EditorModal,
+	AssignmentModal,
 	ApprovalModal
 } from "./Children"
 import { Badge, Collapse, Button } from "react-bootstrap"
@@ -36,6 +37,7 @@ function Submission() {
 	})
 	const [review, showReview] = useState(false)
 	const [approval, showApproval] = useState(false)
+	const [assignment, showAssignment] = useState(false)
 
 	// Setters for file mode and file ID.
 	const [showFile, setShowFile] = useState(false)
@@ -233,7 +235,10 @@ function Submission() {
 					{getUsersString(submission.authors, "Author")}
 					<div style={{ display: "flex" }}>
 						{permissionLevel[perm] === "editor" && (
-							<Button style={{ marginRight: "5px" }} size="sm">
+							<Button
+								style={{ marginRight: "5px" }}
+								size="sm"
+								onClick={() => showAssignment(true)}>
 								Assign
 							</Button>
 						)}
@@ -258,6 +263,14 @@ function Submission() {
 				setShow={showReview}
 				setValidation={setAlert}
 				setValidationMsg={setAlertMsg}
+			/>
+			<AssignmentModal
+				reviewers={submission.reviewers}
+				submissionID={submission.ID}
+				show={assignment}
+				setShow={showAssignment}
+				showAlertMsg={setAlert}
+				setAlertMsg={setAlertMsg}
 			/>
 			<ApprovalModal
 				submission={submission}
