@@ -97,8 +97,8 @@ function Submission() {
 		let [bg, status] = submission.approved
 			? ["primary", "Approved"]
 			: submission.approved === null
-				? ["secondary", "In review"]
-				: ["danger", "Rejected"]
+			? ["secondary", "In review"]
+			: ["danger", "Rejected"]
 		return <Badge bg={bg}>{status}</Badge>
 	}
 
@@ -109,9 +109,9 @@ function Submission() {
 				{users?.length > 1 ? "s: " : ": "}
 				{users?.length > 0
 					? users?.map(
-						(user, i) =>
-							(i === 0 ? " " : ", ") + getUserFullName(user)
-					)
+							(user, i) =>
+								(i === 0 ? " " : ", ") + getUserFullName(user)
+					  )
 					: "No " + role + "s..."}
 			</h5>
 		)
@@ -131,7 +131,8 @@ function Submission() {
 			)
 		else if (
 			permissionLevel[perm] === "reviewer" &&
-			submission.reviewers?.map((reviewer) => {
+			submission.reviewers
+				?.map((reviewer) => {
 					return reviewer.userId
 				})
 				.includes(JwtService.getUserID())
@@ -191,7 +192,7 @@ function Submission() {
 				{submission.metaData.hasOwnProperty("reviews") && (
 					<Reviews
 						reviews={submission.metaData.reviews}
-						noProfileReviewers={
+						reviewers={
 							submission.hasOwnProperty("reviewers")
 								? submission.reviewers
 								: []

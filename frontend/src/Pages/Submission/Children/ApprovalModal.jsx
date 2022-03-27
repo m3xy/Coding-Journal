@@ -32,14 +32,14 @@ export default ({ submission, show, setShow, setAlertMsg, showAlertMsg }) => {
 			</Modal.Header>
 			<Modal.Body>
 				<div className="text-muted">
-					{submission.reviewers?.length === 0
+					{submission.reviewers === undefined
 						? "No reviewers yet, please assign reviewers..."
 						: (submission.metaData.hasOwnProperty("reviews")
-							? submission.metaData.reviews?.length
-							: "0") +
-						" reviewers have assigned a review, out of " +
-						submission.reviewers?.length +
-						" reviewers."}
+								? submission.metaData.reviews?.length
+								: "0") +
+						  " reviewers have assigned a review, out of " +
+						  submission.reviewers?.length +
+						  " reviewers."}
 				</div>
 			</Modal.Body>
 			<Modal.Body>
@@ -84,9 +84,7 @@ export default ({ submission, show, setShow, setAlertMsg, showAlertMsg }) => {
 				<ButtonGroup className="mb-2">
 					<Button
 						onClick={() => submitApproval(true)}
-						disabled={
-							!submission.metaData.hasOwnProperty("reviews")
-						}>
+						disabled={submission.metaData.reviews === undefined}>
 						Approve
 					</Button>
 					<Button
