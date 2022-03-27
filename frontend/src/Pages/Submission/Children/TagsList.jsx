@@ -1,3 +1,8 @@
+/*
+ * TagsList.jsx
+ * Card listing a submission's tags
+ * Author: 190014935
+ */
 import React from "react"
 import { Button, Card } from "react-bootstrap"
 

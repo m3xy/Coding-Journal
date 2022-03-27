@@ -1,3 +1,8 @@
+/*
+ * ReviewEditor.jsx
+ * Modal for review submissions
+ * Author: 190014935
+ */
 import React, { useEffect, useState } from "react"
 import { Editor } from "react-draft-wysiwyg"
 import { draftToMarkdown } from "markdown-draft-js"

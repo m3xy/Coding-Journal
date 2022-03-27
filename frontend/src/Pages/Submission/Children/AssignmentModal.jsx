@@ -1,3 +1,8 @@
+/*
+ * AssignmentModal.jsx
+ * Modal for reviewer assignment
+ * Author: 190014935
+ */
 import React, { useState } from "react"
 import { Modal, Button } from "react-bootstrap"
 import { FormUser } from "../../../Components/FormComponents"
@@ -42,7 +47,7 @@ export default ({
 				<FormUser
 					display="Reviewers"
 					name="reviewers"
-					immutables={reviewers ? reviewers : []}
+					immutables={reviewers}
 					query={{ userType: 2 }}
 					onChange={(e) => {
 						setNewReviewers(e.target.value)

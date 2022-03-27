@@ -1,3 +1,8 @@
+/*
+ * ApprovalModal.jsx
+ * Modal for submission approval/rejection
+ * Author: 190014935
+ */
 import React, { useState } from "react"
 import { Modal, Button, Table, ButtonGroup, Alert } from "react-bootstrap"
 import { CSSTransition } from "react-transition-group"

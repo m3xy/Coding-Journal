@@ -1,3 +1,8 @@
+/*
+ * ReviewModal.jsx
+ * Modal showing a single review
+ * Author: 190014935
+ */
 import React from "react"
 import { Modal, Badge } from "react-bootstrap"
 import ReactMarkdown from "react-markdown"
