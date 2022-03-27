@@ -18,7 +18,7 @@ const defaultLanguage = "javascript"
 const defaultTheme = "vs"
 const defaultLine = 1
 
-const CODE_HEIGHT = 400
+const CODE_HEIGHT = "50vh"
 
 function Code({ id, show }) {
 	const [file, setFile] = useState({
@@ -195,7 +195,7 @@ function Code({ id, show }) {
 		return (
 			<div style={{ textAlign: "center" }}>
 				<embed
-					height={CODE_HEIGHT * 2}
+					height="700"
 					width="80%"
 					src={"data:application/pdf;base64," + file.base64Value}
 				/>
