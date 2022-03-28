@@ -10,6 +10,7 @@ import axiosInstance from "../Web/axiosInstance"
 import { Form, InputGroup, Card, Button } from "react-bootstrap"
 import MonacoEditor, { monaco } from "react-monaco-editor"
 import Comments from "./Comments"
+import ReactMarkdown from "react-markdown"
 
 const fileEndpoint = "/file"
 const defaultLanguage = "javascript"
@@ -144,12 +145,105 @@ function Code({ id }) {
 								onChange={(e) => {
 									setLanguage(e.target.value)
 								}}>
-								<option value="javascript">Javascript</option>
-								<option value="html">HTML</option>
-								<option value="css">CSS</option>
-								<option value="json">JSON</option>
-								<option value="java">Java</option>
-								<option value="python">Python</option>
+								<option>abap</option>
+								<option>aes</option>
+								<option>apex</option>
+								<option>azcli</option>
+								<option>bat</option>
+								<option>bicep</option>
+								<option>c</option>
+								<option>cameligo</option>
+								<option>clojure</option>
+								<option>coffeescript</option>
+								<option>cpp</option>
+								<option>csharp</option>
+								<option>csp</option>
+								<option>css</option>
+								<option>dart</option>
+								<option>dockerfile</option>
+								<option>ecl</option>
+								<option>elixir</option>
+								<option>flow9</option>
+								<option>freemarker2</option>
+								<option>
+									freemarker2.tag-angle.interpolation-bracket
+								</option>
+								<option>
+									freemarker2.tag-angle.interpolation-dollar
+								</option>
+								<option>
+									freemarker2.tag-auto.interpolation-bracket
+								</option>
+								<option>
+									freemarker2.tag-auto.interpolation-dollar
+								</option>
+								<option>
+									freemarker2.tag-bracket.interpolation-bracket
+								</option>
+								<option>
+									freemarker2.tag-bracket.interpolation-dollar
+								</option>
+								<option>fsharp</option>
+								<option>go</option>
+								<option>graphql</option>
+								<option>handlebars</option>
+								<option>hcl</option>
+								<option>html</option>
+								<option>ini</option>
+								<option>java</option>
+								<option>javascript</option>
+								<option>json</option>
+								<option>julia</option>
+								<option>kotlin</option>
+								<option>less</option>
+								<option>lexon</option>
+								<option>liquid</option>
+								<option>lua</option>
+								<option>m3</option>
+								<option>markdown</option>
+								<option>mips</option>
+								<option>msdax</option>
+								<option>mysql</option>
+								<option>objective-c</option>
+								<option>pascal</option>
+								<option>pascaligo</option>
+								<option>perl</option>
+								<option>pgsql</option>
+								<option>php</option>
+								<option>pla</option>
+								<option>plaintext</option>
+								<option>postiats</option>
+								<option>powerquery</option>
+								<option>powershell</option>
+								<option>proto</option>
+								<option>pug</option>
+								<option>python</option>
+								<option>qsharp</option>
+								<option>r</option>
+								<option>razor</option>
+								<option>redis</option>
+								<option>redshift</option>
+								<option>restructuredtext</option>
+								<option>ruby</option>
+								<option>rust</option>
+								<option>sb</option>
+								<option>scala</option>
+								<option>scheme</option>
+								<option>scss</option>
+								<option>shell</option>
+								<option>sol</option>
+								<option>sparql</option>
+								<option>sql</option>
+								<option>st</option>
+								<option>swift</option>
+								<option>systemverilog</option>
+								<option>tcl</option>
+								<option>twig</option>
+								<option>typescript</option>
+								<option>vb</option>
+								<option>verilog</option>
+								<option>xml</option>
+								<option>yaml</option>
 							</Form.Select>
 						</InputGroup>
 					</div>
@@ -197,6 +291,39 @@ function Code({ id }) {
 		)
 	}
 
+	const imgHTML = (ext) => {
+		return (
+			<img
+				className="image"
+				src={"data:mage/" + ext + ";base64," + file.base64Value}
+			/>
+		)
+	}
+
+	const mdHTML = () => {
+		return <ReactMarkdown>{atob(file.base64Value)}</ReactMarkdown>
+	}
+
+	const renderFile = () => {
+		const extension = file.path.split(".").pop()
+		switch (extension) {
+			case "md":
+				return (
+					<>
+						{codeHTML()} {mdHTML()}
+					</>
+				)
+			case "pdf":
+				return pdfHTML()
+			case "png":
+			case "jpg":
+			case "jpeg":
+				return imgHTML(extension)
+			default:
+				return codeHTML()
+		}
+	}
+
 	return id && id != -1 ? (
 		<Card border="light" className="row no-gutters">
 			<Card.Header>
@@ -207,7 +334,7 @@ function Code({ id }) {
 				<Card.Text>
 					Created: {new Date(file.CreatedAt).toDateString()}
 				</Card.Text>
-				{file.path.split(".").pop() !== "pdf" ? codeHTML() : pdfHTML()}
+				{renderFile()}
 				<br />
 				<Button
 					variant="dark"

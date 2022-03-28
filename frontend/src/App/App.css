@@ -16,3 +16,11 @@ body {
 .myGlyphMarginClass::before {
 	content: "💬";
 }
+
+.image {
+	display: block;
+	max-width:885px;
+	max-height:1000px;
+	width: auto;
+	height: auto;
+  }
