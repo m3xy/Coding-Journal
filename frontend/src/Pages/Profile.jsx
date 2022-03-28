@@ -11,12 +11,12 @@ import { useNavigate, useParams } from "react-router-dom"
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
 
-const profileEndpoint = "/user"
+const userEndpoint = "/user"
 const userTypeEndpoint = "/changepermissions"
 
 function Profile() {
-	const { id } = useParams()
 	const navigate = useNavigate()
+	const { id } = useParams()
 	const [user, setUser] = useState({})
 
 	const getUserID = () => {
@@ -30,14 +30,14 @@ function Profile() {
 
 	useEffect(() => {
 		axiosInstance
-			.get(profileEndpoint + "/" + getUserID())
+			.get(userEndpoint + "/" + getUserID())
 			.then((response) => {
 				setUser(response.data)
 			})
 			.catch(() => {
 				return <div></div>
 			})
-	}, [])
+	}, [id])
 
 	//Get user comments
 	const comments = []
@@ -101,7 +101,13 @@ function Profile() {
 	}
 
 	const editType = (type) => {
-		// axiosInstance.post()
+		axiosInstance
+			.post(userEndpoint + "/" + getUserID() + userTypeEndpoint, {permissions:type})
+			.then((response) => {
+				console.log(response)
+			}).catch((error) => {
+				console.log(error)
+			})
 	}
 
 	const editTypeBtn = () => {
@@ -113,7 +119,7 @@ function Profile() {
 				<Dropdown.Menu>
 					{userTypes.map((type) => {
 						return (
-							<Dropdown.Item onClick={editType(type)}>
+							<Dropdown.Item onClick={() => editType(userTypes.indexOf(type))}>
 								{type}
 							</Dropdown.Item>
 						)
