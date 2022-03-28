@@ -148,14 +148,9 @@ func TestGetUser(t *testing.T) {
 	defer testEnd()
 
 	// Populate database with valid users.
-	trialUsers := make([]GlobalUser, len(testUsers))
-	for i, u := range testUsers {
-		trialUsers[i] = GlobalUser{
-			FirstName: fmt.Sprint(i),
-			LastName:  fmt.Sprint(i),
-			UserType:  USERTYPE_REVIEWER_PUBLISHER,
-			User:      u.getCopy(),
-		}
+	trialUsers := make([]GlobalUser, len(testGlobUsers))
+	for i, u := range testGlobUsers {
+		trialUsers[i] = *u.getCopy()
 		trialUsers[i].ID, _ = registerUser(trialUsers[i])
 	}
 

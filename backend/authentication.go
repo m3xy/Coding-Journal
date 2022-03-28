@@ -334,7 +334,7 @@ func PostSignUp(w http.ResponseWriter, r *http.Request) {
 			Message: "Registration failed",
 			Error:   true,
 		}}
-	} else if _, err := ControllerRegisterUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
+	} else if _, err := ControllerRegisterUser(*user, USERTYPE_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		switch err.(type) {
 		case *RepeatEmailError:
