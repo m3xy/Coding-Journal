@@ -9,20 +9,10 @@ body {
 	--red: #e53935;
 }
 
-.myInlineDecoration {
-	color: var(--red) !important;
-	cursor: pointer;
-	text-decoration: underline;
-	font-weight: bold;
-	font-style: oblique;
+.myContentClass {
+	/* background: lightblue; */
 }
 
-.myLineDecoration {
-	background: lightblue;
-	width: 5px !important;
-	margin-left: 3px;
-}
-
-.myGlyphMarginClass {
-	background: var(--red);
+.myGlyphMarginClass::before {
+	content: "💬";
 }

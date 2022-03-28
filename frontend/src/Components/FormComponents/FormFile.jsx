@@ -1,3 +1,21 @@
+/*
+ * FormFile.jsx
+ * Form component to select (or drag) files into the form.
+ * Author: 190014935
+ *
+ * @param display The display name for the field.
+ * @param label The DOM label of the field
+ * @param accept List of file formats (as string separated with commas)
+ * 		which the field accepts.
+ * @param placeholder The message placeholder on the form control.
+ * @param name name used on validation function for the whole array.
+ * @param fileLimit Limit of files to add.
+ * @param validate  The validation function ((name, value) => boolean)
+ * @param feedback Default message to use on errors
+ * @param onChange Function connecting form to this component.
+ * 		CAUTION: added to onChange as {target: {name, value}} object.
+ */
+
 import React, { useEffect, useState } from "react"
 import { useDropzone } from "react-dropzone"
 import { Form, ListGroup, Card, CloseButton } from "react-bootstrap"
@@ -11,7 +29,6 @@ const FormFile = ({
 	label,
 	accept,
 	placeholder,
-	elemName,
 	name,
 	fileLimit,
 	validate,

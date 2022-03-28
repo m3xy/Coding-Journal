@@ -1,3 +1,8 @@
+/*
+ * Abstract.jsx
+ * Card rendering the markdown for the abstract.
+ * Author: 190014935
+ */
 import React from "react"
 import ReactMarkdown from "react-markdown"
 import { Card, Collapse, Button } from "react-bootstrap"

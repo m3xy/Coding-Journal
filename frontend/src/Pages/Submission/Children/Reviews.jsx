@@ -1,3 +1,8 @@
+/*
+ * Review.jsx
+ * Card listing all made reviews
+ * Author: 190014935
+ */
 import React, { useState, useEffect } from "react"
 import { Card, Badge, ListGroup, ListGroupItem } from "react-bootstrap"
 import ReviewModal from "./ReviewModal"
@@ -14,7 +19,7 @@ export default ({ reviewers, reviews }) => {
 				return { ...reviewerMap, [reviewer.userId]: reviewer }
 			})
 		})
-	})
+	}, [reviewerMap])
 
 	const getFullName = (reviewer) => {
 		reviewer.firstName + " " + reviewer.lastName
