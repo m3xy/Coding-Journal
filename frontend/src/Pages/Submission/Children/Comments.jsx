@@ -7,8 +7,8 @@
 
 import React, { useState } from "react"
 import { Button, Form, Modal } from "react-bootstrap"
-import axiosInstance from "../Web/axiosInstance"
-import JwtService from "../Web/jwt.service"
+import axiosInstance from "../../../Web/axiosInstance"
+import JwtService from "../../../Web/jwt.service"
 import Comment from "./Comment"
 
 const fileEndpoint = "/file"

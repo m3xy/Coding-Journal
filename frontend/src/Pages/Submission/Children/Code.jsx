@@ -6,9 +6,11 @@
  */
 
 import React, { useState, useEffect, useRef } from "react"
-import axiosInstance from "../Web/axiosInstance"
-import { Form, InputGroup, Card, Button } from "react-bootstrap"
+import axiosInstance from "../../../Web/axiosInstance"
+import { Form, InputGroup, Card, Button, Collapse } from "react-bootstrap"
+import { SwitchTransition, CSSTransition } from "react-transition-group"
 import MonacoEditor, { monaco } from "react-monaco-editor"
+import FadeInTransition from "../../../Components/Transitions/FadeIn.module.css"
 import Comments from "./Comments"
 import ReactMarkdown from "react-markdown"
 
@@ -17,7 +19,9 @@ const defaultLanguage = "javascript"
 const defaultTheme = "vs"
 const defaultLine = 1
 
-function Code({ id }) {
+const CODE_HEIGHT = "50vh"
+
+function Code({ id, show }) {
 	const [file, setFile] = useState({
 		ID: null,
 		submissionId: null,
@@ -270,7 +274,7 @@ function Code({ id }) {
 				</div>
 				<MonacoEditor
 					ref={monacoRef}
-					height="1000"
+					height={CODE_HEIGHT}
 					language={language}
 					theme={theme}
 					value={code}
@@ -283,11 +287,13 @@ function Code({ id }) {
 
 	const pdfHTML = () => {
 		return (
-			<embed
-				height="1000"
-				width="100%"
-				src={"data:application/pdf;base64," + file.base64Value}
-			/>
+			<div style={{ textAlign: "center" }}>
+				<embed
+					height="700"
+					width="80%"
+					src={"data:application/pdf;base64," + file.base64Value}
+				/>
+			</div>
 		)
 	}
 
@@ -324,47 +330,82 @@ function Code({ id }) {
 		}
 	}
 
-	return id && id != -1 ? (
-		<Card border="light" className="row no-gutters">
-			<Card.Header>
-				<b>Code</b>
-			</Card.Header>
+	return (
+		<Card>
 			<Card.Body>
-				<Card.Title>{file.path}</Card.Title>
-				<Card.Text>
-					Created: {new Date(file.CreatedAt).toDateString()}
-				</Card.Text>
-				{renderFile()}
-				<br />
-				<Button
-					variant="dark"
-					onClick={
-						monacoRef.current
-							? monacoRef.current.editor._actions.Comment._run
-							: () => {
-									setShowComments(true)
-									setStartLine(defaultLine)
-									setEndLine(defaultLine)
-							  }
-					}>
-					Show comments
-				</Button>
-				<Comments
-					id={id}
-					comments={comments}
-					setComments={setComments}
-					startLine={startLine}
-					endLine={endLine}
-					show={showComments}
-					setShow={setShowComments}
-					refresh={getFile}></Comments>
+				<SwitchTransition>
+					<CSSTransition
+						key={show}
+						timeout={100}
+						classNames={{ ...FadeInTransition }}>
+						{show ? (
+							<div
+								style={{
+									display: "flex",
+									justifyContent: "space-between"
+								}}>
+								<h4>{file.path}</h4>
+								<Button
+									variant="dark"
+									onClick={
+										monacoRef.current
+											? monacoRef.current.editor._actions
+													.Comment._run
+											: () => {
+													setShowComments(true)
+													setStartLine(defaultLine)
+													setEndLine(defaultLine)
+											  }
+									}>
+									Show comments
+								</Button>
+							</div>
+						) : (
+							<h4>File Viewer</h4>
+						)}
+					</CSSTransition>
+				</SwitchTransition>
+				<Collapse in={show}>
+					<div>
+						{id && id != -1 ? (
+							<div>
+								<div
+									style={{
+										display: "flex",
+										justifyContent: "space-between"
+									}}>
+									<Card.Text>
+										Created:{"\t" + new Date(
+											file.CreatedAt
+										).toDateString()}
+										<br />
+										Updated:{"\t" + new Date(file.UpdatedAt).toDateString()}
+									</Card.Text>
+									<div className="text-muted">
+										Press Ctrl + m to display comments on
+										line...
+									</div>
+								</div>
+								{renderFile()}
+								<br />
+							</div>
+						) : (
+							<div>No file selected.</div>
+						)}
+					</div>
+				</Collapse>
 			</Card.Body>
-			<Card.Footer className="text-muted">
-				Last updated: {new Date(file.UpdatedAt).toDateString()}
-			</Card.Footer>
+			<Comments
+				id={id}
+				comments={comments}
+				setComments={setComments}
+				startLine={startLine}
+				endLine={endLine}
+				show={showComments}
+				setShow={setShowComments}
+				refresh={getFile}
+			/>
 		</Card>
-	) : (
-		<>No file selected.</>
 	)
 }
 
