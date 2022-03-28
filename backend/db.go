@@ -24,7 +24,7 @@ const (
 	USERTYPE_NIL                = 0
 	USERTYPE_PUBLISHER          = 1
 	USERTYPE_REVIEWER           = 2
-	USERTYPE_REVIEWER_PUBLISHER = 3
+	USERTYPE_REVIEWER_PUBLISHER = 3 
 	USERTYPE_EDITOR             = 4
 
 	// Password related
