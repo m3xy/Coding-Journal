@@ -228,7 +228,7 @@ func GetLocalUserID(credentials JournalLoginPostBody) (string, int, int) {
   Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
 */
 func GetToken(w http.ResponseWriter, r *http.Request) {
-	refreshToken := r.Header.Get("refresh_token")
+	refreshToken := r.Header.Get("RefreshToken")
 	var body interface{}
 
 	// Validate refresh token, and create new tokens.
