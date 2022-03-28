@@ -299,10 +299,12 @@ function Code({ id, show }) {
 
 	const imgHTML = (ext) => {
 		return (
-			<img
-				className="image"
-				src={"data:mage/" + ext + ";base64," + file.base64Value}
-			/>
+			<div style={{ textAlign: "center" }}>
+				<img
+					className="image"
+					src={"data:mage/" + ext + ";base64," + file.base64Value}
+				/>
+			</div>
 		)
 	}
 
@@ -316,7 +318,7 @@ function Code({ id, show }) {
 			case "md":
 				return (
 					<>
-						{codeHTML()} {mdHTML()}
+						{codeHTML()} <br /> {mdHTML()}
 					</>
 				)
 			case "pdf":
@@ -375,15 +377,21 @@ function Code({ id, show }) {
 										justifyContent: "space-between"
 									}}>
 									<Card.Text>
-										Created:{"\t" + new Date(
-											file.CreatedAt
-										).toDateString()}
+										Created:
+										{"\t" +
+											new Date(
+												file.CreatedAt
+											).toDateString()}
 										<br />
-										Updated:{"\t" + new Date(file.UpdatedAt).toDateString()}
+										Updated:
+										{"\t" +
+											new Date(
+												file.UpdatedAt
+											).toDateString()}
 									</Card.Text>
 									<div className="text-muted">
-										Press Ctrl + m to display comments on
-										line...
+										Press Ctrl + m to comment on selected
+										line
 									</div>
 								</div>
 								{renderFile()}
@@ -398,7 +406,6 @@ function Code({ id, show }) {
 			<Comments
 				id={id}
 				comments={comments}
-				setComments={setComments}
 				startLine={startLine}
 				endLine={endLine}
 				show={showComments}

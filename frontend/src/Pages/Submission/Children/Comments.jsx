@@ -17,7 +17,6 @@ const commentEndpoint = "/comment"
 function Comments({
 	id,
 	comments,
-	setComments,
 	startLine,
 	endLine,
 	show,
@@ -131,8 +130,16 @@ function Comments({
 						</Form.Text>
 					</Form.Group>
 					<br />
-					{commentsHTML}
 					<div className="d-grid gap-2">
+						{comments?.length > 0 ? (
+							commentsHTML
+						) : (
+							<small
+								className="text-muted"
+								style={{ textAlign: "center" }}>
+								No comments
+							</small>
+						)}
 						<Button
 							variant="light"
 							disabled={isLoading}

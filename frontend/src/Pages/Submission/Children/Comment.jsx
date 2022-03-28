@@ -32,7 +32,7 @@ function Comment({
 }) {
 	const [reply, setReply] = useState("")
 	const [showReplies, setShowReplies] = useState(false)
-	const [openReplies, setOpenReplies] = useState(false)
+	const [openReply, setOpenReply] = useState(false)
 	const [name, setName] = useState("")
 	const [edit, setEdit] = useState("")
 	const [openEdit, setOpenEdit] = useState(false)
@@ -171,7 +171,7 @@ function Comment({
 
 					<Button
 						variant="light"
-						onClick={() => setOpenReplies(!openReplies)}>
+						onClick={() => setOpenReply(!openReply)}>
 						↩
 					</Button>
 					{JwtService.getUserID() == comment.author && (
@@ -197,7 +197,7 @@ function Comment({
 						</Button>
 					)}
 
-					<Collapse in={openReplies}>
+					<Collapse in={openReply}>
 						<InputGroup className="mb-3" size="sm">
 							<FormControl
 								placeholder={"Enter a reply"}
@@ -209,6 +209,7 @@ function Comment({
 								onClick={(e) => {
 									postReply(e, comment.ID, reply)
 									setReply("")
+									setOpenReply(false)
 								}}>
 								Reply
 							</Button>
