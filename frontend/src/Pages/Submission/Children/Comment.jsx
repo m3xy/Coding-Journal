@@ -13,6 +13,7 @@ import {
 	InputGroup,
 	Toast
 } from "react-bootstrap"
+import { useNavigate } from "react-router-dom"
 import JwtService from "../../../Web/jwt.service"
 import axiosInstance from "../../../Web/axiosInstance"
 import ReactMarkdown from "react-markdown"
@@ -30,6 +31,9 @@ function Comment({
 	commentEndpoint,
 	refresh
 }) {
+
+	const navigate = useNavigate()
+
 	const [reply, setReply] = useState("")
 	const [showReplies, setShowReplies] = useState(false)
 	const [openReply, setOpenReply] = useState(false)
@@ -125,7 +129,9 @@ function Comment({
 				style={{ verticalAlign: "top", minWidth: "100%" }}
 				className="d-inline-block m-1">
 				<Toast.Header closeButton={false}>
-					<strong className="me-auto">{name}</strong>
+					<Button variant="light" className="me-auto" size="sm" onClick={() => navigate("/profile/" + comment.author)}>
+					{name}
+					</Button>
 					<small>
 						{comment.startLine == comment.endLine ? (
 							<>Line: {comment.startLine}</>
