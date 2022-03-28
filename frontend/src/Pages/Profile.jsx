@@ -6,21 +6,23 @@
  */
 
 import React, { useState, useEffect } from "react"
-import { Tabs, Tab, ListGroup, Badge } from "react-bootstrap"
-import { useNavigate } from "react-router-dom"
+import { Tabs, Tab, ListGroup, Badge, Dropdown } from "react-bootstrap"
+import { useNavigate, useParams } from "react-router-dom"
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
 
 const profileEndpoint = "/user"
-
-function getUserID() {
-	let user = JwtService.getUserID()
-	return user
-}
+const userTypeEndpoint = "/changepermissions"
 
 function Profile() {
+	const { id } = useParams()
 	const navigate = useNavigate()
 	const [user, setUser] = useState({})
+
+	const getUserID = () => {
+		let user = id ? id : JwtService.getUserID()
+		return user
+	}
 
 	if (getUserID() === null) {
 		navigate("/login")
@@ -98,11 +100,35 @@ function Profile() {
 		}
 	}
 
+	const editType = (type) => {
+		// axiosInstance.post()
+	}
+
+	const editTypeBtn = () => {
+		return (
+			<Dropdown>
+				<Dropdown.Toggle variant="light" bsPrefix="p-0">
+					✎
+				</Dropdown.Toggle>
+				<Dropdown.Menu>
+					{userTypes.map((type) => {
+						return (
+							<Dropdown.Item onClick={editType(type)}>
+								{type}
+							</Dropdown.Item>
+						)
+					})}
+				</Dropdown.Menu>
+			</Dropdown>
+		)
+	}
+
 	return (
 		<div className="col-md-6 offset-md-3" style={{ textAlign: "center" }}>
 			<br />
 			<h2>{user.firstName + " " + user.lastName}</h2>
 			<label>({userTypes[user.userType]})</label>
+			{JwtService.getUserType() == 4 && editTypeBtn()}
 			<br />
 			<br />
 			<Tabs
