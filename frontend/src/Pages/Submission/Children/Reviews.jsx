@@ -45,23 +45,24 @@ export default ({ reviewers, reviews }) => {
 			<ListGroup className="list-group-flush">
 				{reviews?.map((review, i) => {
 					const reviewer = reviewerMap[review.reviewerId]
-					return (
-						<ListGroupItem key={i}>
-							<h5 style={{ display: "flex" }}>
-								<Card.Link
-									style={{ flex: "1" }}
-									onClick={() => clickReview(review)}>
-									{getFullName(reviewer)}
-								</Card.Link>
-								<div
-									style={{
-										flex: "0.2",
-										textAlign: "right"
-									}}></div>
-								{getBadge(review.approved)}
-							</h5>
-						</ListGroupItem>
-					)
+					if (reviewer !== undefined)
+						return (
+							<ListGroupItem key={i}>
+								<h5 style={{ display: "flex" }}>
+									<Card.Link
+										style={{ flex: "1" }}
+										onClick={() => clickReview(review)}>
+										{getFullName(reviewer)}
+									</Card.Link>
+									<div
+										style={{
+											flex: "0.2",
+											textAlign: "right"
+										}}></div>
+									{getBadge(review.approved)}
+								</h5>
+							</ListGroupItem>
+						)
 				})}
 			</ListGroup>
 			<ReviewModal
