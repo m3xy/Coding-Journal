@@ -1,3 +1,10 @@
+/**
+ * Search.jsx
+ * author: 190019931
+ *
+ * Search page
+ */
+
 import React, { useState, useEffect } from "react"
 import {
 	Button,
@@ -108,7 +115,7 @@ function Search() {
 	})
 
 	const addUser = (user, users, setUsers, type) => {
-		if(!users.some((elem) => elem.userId == user.userId))
+		if (!users.some((elem) => elem.userId == user.userId))
 			return (
 				<Card.Link
 					size="sm"
