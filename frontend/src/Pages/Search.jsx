@@ -228,6 +228,7 @@ function Search() {
 				<option value={3}>Reviewer-Publisher</option>
 				<option value={4}>Editor</option>
 			</Form.Select>
+			<br />
 			<Row>
 				{users && users.length > 0 ? (
 					cardContainer(userCards)
@@ -266,14 +267,14 @@ function Search() {
 			{tagBtns}
 			<br />
 			{authors.length > 0 && (
-				<>
+				<div>
 					Authors: {userBtns(authors, setAuthors)} <br />
-				</>
+				</div>
 			)}
 			{reviewers.length > 0 && (
-				<>
+				<div>
 					Reviewers: {userBtns(reviewers, setReviewers)} <br />
-				</>
+				</div>
 			)}
 			<Row>
 				{submissions && submissions.length > 0 ? (
