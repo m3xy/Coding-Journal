@@ -8,7 +8,7 @@ import { Card, Badge, ListGroup, ListGroupItem } from "react-bootstrap"
 import ReviewModal from "./ReviewModal"
 
 export default ({ reviewers, reviews }) => {
-	const [showModal, setShowModal] = useState()
+	const [showModal, setShowModal] = useState(false)
 	const [reviewerMap, setReviewerMap] = useState({})
 	const [modalReview, setModalReview] = useState(<></>)
 
