@@ -19,10 +19,10 @@ export default ({ reviewers, reviews }) => {
 				return { ...reviewerMap, [reviewer.userId]: reviewer }
 			})
 		})
-	}, [reviewerMap])
+	}, [reviewers])
 
 	const getFullName = (reviewer) => {
-		reviewer.firstName + " " + reviewer.lastName
+		reviewer?.firstName + " " + reviewer?.lastName
 	}
 
 	const getBadge = (approval) => {
