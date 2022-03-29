@@ -76,15 +76,6 @@ function Search() {
 				.get(submissionEndpoint + "/" + submission.ID)
 				.then((response) => {
 					setSubmissions((submissions) => {
-						if (
-							submissions.some(
-								//Remove duplicates
-								(submission) =>
-									submission.ID == response.data.ID
-							)
-						) {
-							return submissions
-						}
 						return [...submissions, response.data]
 					})
 				})
