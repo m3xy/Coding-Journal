@@ -13,6 +13,7 @@ import JwtService from "../Web/jwt.service"
 
 const userEndpoint = "/user"
 const userTypeEndpoint = "/changepermissions"
+const profileURL = "/profile"
 
 function Profile() {
 	const navigate = useNavigate()
@@ -109,7 +110,8 @@ function Profile() {
 				permissions: type
 			})
 			.then((response) => {
-				console.log(response)
+				console.log(user)
+				setUser({ ...user, userType: type })
 			})
 			.catch((error) => {
 				console.log(error)
