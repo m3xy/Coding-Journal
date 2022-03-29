@@ -56,6 +56,7 @@ function Code({ id, show }) {
 					monacoRef?.current?.editor?.setSelection(
 						new monaco.Selection(0, 0, 0, 0)
 					) //Fixes line issue
+					monacoRef?.current?.editor?.layout() //Fixes Code height issue
 					setComments(response.data.file.comments)
 					getDecorations(response.data.file.comments)
 				})
@@ -136,7 +137,7 @@ function Code({ id, show }) {
 
 	const codeHTML = () => {
 		return (
-			<>
+			<div>
 				<div style={{ display: "flex" }}>
 					<div style={{ flex: "1", marginRight: "5px" }}>
 						<InputGroup size="sm" className="mb-3">
@@ -281,7 +282,7 @@ function Code({ id, show }) {
 					options={options}
 					editorDidMount={editorDidMount}
 				/>
-			</>
+			</div>
 		)
 	}
 
@@ -317,9 +318,9 @@ function Code({ id, show }) {
 		switch (extension) {
 			case "md":
 				return (
-					<>
+					<div>
 						{codeHTML()} <br /> {mdHTML()}
-					</>
+					</div>
 				)
 			case "pdf":
 				return pdfHTML()
