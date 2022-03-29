@@ -10,7 +10,6 @@
 package main
 
 import (
-	"archive/zip"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -21,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -34,7 +34,6 @@ const (
 	SUBROUTE_SUBMISSION  = "/submission"
 	SUBROUTE_SUBMISSIONS = "/submissions"
 
-	ENDPOINT_QUERY_SUBMISSIONS   = "/query"
 	ENDPOINT_UPLOAD_SUBMISSION   = "/create"
 	ENDPOINT_DOWNLOAD_SUBMISSION = "/download"
 	ENDPOINT_GET_TAGS            = "/tags"
@@ -70,8 +69,8 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 	// + /submissions/query - queries a list of submissions based upon parameters
 	// + /submissions/create - Create a submissions
 	submissions.HandleFunc(ENDPOINT_GET_TAGS, GetAvailableTags).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_QUERY_SUBMISSIONS, GetQuerySubmissions).Methods(http.MethodGet)
-	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmission).Methods(http.MethodPost, http.MethodOptions)
+	submissions.HandleFunc(ENDPOINT_QUERY, GetQuerySubmissions).Methods(http.MethodGet)
+	submissions.HandleFunc(ENDPOINT_UPLOAD_SUBMISSION, PostUploadSubmissionByZip).Methods(http.MethodPost, http.MethodOptions)
 }
 
 // ------
@@ -81,7 +80,6 @@ func getSubmissionsSubRoutes(r *mux.Router) {
 // function to send a list of all available tags to the frontend so that users know which tags allow filtering
 // GET /submissions/tags
 func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetAvailableTags request received from %v", r.RemoteAddr)
 	stdResp := StandardResponse{}
 
 	// queries the tags from the database
@@ -108,29 +106,30 @@ func GetAvailableTags(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] GetAvailableTags request successful\n")
 	}
 }
 
 // function to query a list of submissions with a set of query parameters to filter/order the list
 // GET /submissions/query
 func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetQuerySubmissions request received from %v", r.RemoteAddr)
 	var err error
 	var stdResp StandardResponse
 	var resp *QuerySubmissionsResponse
 	var submissions []Submission
 
-	// gets the ordered list of submissions
-	if submissions, err = ControllerQuerySubmissions(r.URL.Query()); err != nil {
+	// gets the request context if there is a user logged in
+	if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
+		stdResp = StandardResponse{Message: "Bad Request Context", Error: true}
+		w.WriteHeader(http.StatusBadRequest)
+
+	} else if submissions, err = ControllerQuerySubmissions(r.URL.Query(), ctx); err != nil {
 		switch err.(type) {
 		case *BadQueryParameterError:
 			stdResp = StandardResponse{Message: fmt.Sprintf("Bad Request - %s", err.Error()), Error: true}
 			w.WriteHeader(http.StatusBadRequest)
 		case *ResultSetEmptyError:
 			stdResp = StandardResponse{Message: "No submissions fit search queries", Error: false}
-			w.WriteHeader(http.StatusNoContent)
+			w.WriteHeader(http.StatusOK)
 		default:
 			log.Printf("[ERROR] could not query submissions: %v\n", err)
 			stdResp = StandardResponse{Message: "Internal Server Error - could not query submissions", Error: true}
@@ -149,90 +148,52 @@ func GetQuerySubmissions(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] GetSubmissionWithParams request successful\n")
 	}
 }
 
 // Controller to do the work of actually building a query to get submissions from
-// the database and order them
+// the database and order them. This function uses helper functions to add filtering
+// clauses to the final query
 //
 // Params:
 // 	queryParams (url.Values) : a mapping of query parameters to their values
+// 	userType (int) : the usertype of the currently logged in user (if there is one)
 // Returns:
 // 	([]Submission) : an array of submissions with ID and Name set ordered based upon the query
 // 	(error) : an error if one occurs
-func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
-	// parses the query parameters
-	tags := queryParams["tags"]
-	authors := queryParams["authors"]
-	reviewers := queryParams["reviewers"]
-	submissionName := ""
-	if len(queryParams["name"]) > 0 {
-		submissionName = queryParams["name"][0]
-	}
-	orderBy := ""
-	if len(queryParams["orderBy"]) > 0 {
-		orderBy = queryParams["orderBy"][0]
-		if orderBy != "newest" && orderBy != "oldest" && orderBy != "alphabetical" {
-			return nil, &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
-		}
-	}
-	approved := ""
-	if len(queryParams["approved"]) > 0 {
-		approved = queryParams["approved"][0]
-		if approved != "accepted" && approved != "unapproved" && approved != "rejected" {
-			return nil, &BadQueryParameterError{ParamName: "approved", Value: queryParams["approved"]}
-		}
-	}
-
-	// queries the database
+func ControllerQuerySubmissions(queryParams url.Values, ctx *RequestContext) ([]Submission, error) {
 	var submissions []Submission
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		tx = tx.Model(&Submission{})
 		// includes submissions with a given tag
-		if len(tags) > 0 {
+		if len(queryParams["tags"]) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
-				"categories_submissions").Select("submission_id").Where("category_tag IN ?", tags))
+				"categories_submissions").Select("submission_id").Where("category_tag IN ?", queryParams["tags"]))
 		}
-		// authors and reviewers
-		if len(authors) > 0 {
+		// filters submissions by author
+		if len(queryParams["authors"]) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
-				"authors_submission").Select("submission_id").Where("global_user_id IN ?", authors))
+				"authors_submission").Select("submission_id").Where("global_user_id IN ?", queryParams["authors"]))
 		}
-		if len(reviewers) > 0 {
+		// filters submissions by reviewer
+		if len(queryParams["reviewers"]) > 0 {
 			tx = tx.Where("id IN (?)", gormDb.Table(
-				"reviewers_submission").Select("submission_id").Where("global_user_id IN ?", reviewers))
+				"reviewers_submission").Select("submission_id").Where("global_user_id IN ?", queryParams["reviewers"]))
 		}
 		// RegEx filtering for submission name
-		if submissionName != "" {
-			params := map[string]interface{}{"full": submissionName}
-			whereString := "submissions.name REGEXP @full"
-			// only adds multiple regex conditions if the name given is multiple words
-			if wordList := strings.Fields(submissionName); len(wordList) > 1 {
-				for index, field := range wordList {
-					whereString = whereString + " OR submissions.name REGEXP @"+fmt.Sprint(index)
-					params[fmt.Sprint(index)] = field
-				}
+		if len(queryParams["name"]) > 0 {
+			tx = filterBySubmissionName(tx, regexp.QuoteMeta(queryParams["name"][0]))
+		}
+		// orders result set
+		if len(queryParams["orderBy"]) > 0 {
+			orderBy := queryParams["orderBy"][0]
+			if orderBy != "newest" && orderBy != "oldest" && orderBy != "alphabetical" {
+				return &BadQueryParameterError{ParamName: "orderBy", Value: queryParams["orderBy"]}
 			}
-			tx = tx.Where(whereString, params)
+			tx = orderSubmissionQuery(tx, orderBy)
 		}
-		// order of submissions
-		if orderBy == "newest" {
-			tx = tx.Order("submissions.created_at ASC")
-		} else if orderBy == "oldest" {
-			tx = tx.Order("submissions.created_at DESC")
-		} else if orderBy == "alphabetical" {
-			tx = tx.Order("submissions.Name")
-		}
-		// filtering based upon approval status
-		if approved == "accepted" {
-			tx = tx.Where("submissions.approved = ?", true)
-		} else if approved == "rejected" {
-			tx = tx.Where("submissions.approved = ?", false)
-		} else if approved == "unapproved" {
-			tx = tx.Where("submissions.approved IS NULL")
-		}
+		// filters by usertype. If usertype is nil, only show approved submissions
+		tx = filterByUserType(tx, ctx)
 
 		// selects fields and gets submissions
 		if res := tx.Select("id, name").Find(&submissions); res.Error != nil {
@@ -244,123 +205,55 @@ func ControllerQuerySubmissions(queryParams url.Values) ([]Submission, error) {
 	}); err != nil {
 		return nil, err
 	}
-
 	return submissions, nil
 }
 
-// Router function to get the names and id's of every submission of a given user
-// if no user id is given in the query parameters, return all valid submissions
-func GetAllAuthoredSubmissions(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetAllAuthoredSubmissions request received from %v", r.RemoteAddr)
-	// gets the userID from the URL
-	var userID string
-	params := r.URL.Query()
-	userIDs := params["authorID"]
-	if userIDs == nil {
-		userID = "*"
-	} else {
-		userID = userIDs[0]
-	}
-
-	// set content type for return
-	w.Header().Set("Content-Type", "application/json")
-	// uses getAuthoredSubmissions to get all user submissions by setting authorID = *
-	submissions, err := getAuthoredSubmissions(userID)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	// marshals and returns the map as JSON
-	jsonString, err := json.Marshal(submissions)
-	if err != nil {
-		log.Printf("[ERROR] JSON formatting failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	// writes json string
-	log.Printf("[INFO] GetAllSubmission request from %v successful", r.RemoteAddr)
-	w.Write(jsonString)
-}
-
-// Router function to upload new submissions to the db. The body of the
-// sent request should be a valid submission Json objects as specified
-// in backend/README.md
-// POST /submissions/upload
-func PostUploadSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] PostUploadSubmission request received from %v", r.RemoteAddr)
-	// parses the Json request body into a submission struct
-	resp := UploadSubmissionResponse{}
-	reqBody := UploadSubmissionBody{}
-
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		resp.Message = "Incorrect submission fields."
-		resp.Error = true
-		w.WriteHeader(http.StatusBadRequest)
-
-		// gets context struct
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
-		log.Printf("[ERROR] Could not validate request body")
-		resp.Message = "Request body could not be validated."
-		resp.Error = true
-		w.WriteHeader(http.StatusUnauthorized)
-
-	} else if ctx.UserType != USERTYPE_PUBLISHER && ctx.UserType != USERTYPE_REVIEWER_PUBLISHER {
-		// User is not validated - error out.
-		resp.Message = "The client is unauthorized from making this query."
-		resp.Error = true
-		w.WriteHeader(http.StatusUnauthorized)
-	} else if submissionID, err := ControllerUploadSubmission(reqBody); err != nil {
-
-		// Respond according to the error type returned.
-		switch err.(type) {
-		case validator.ValidationErrors:
-			resp.Message = fmt.Sprintf("Bad fields inserted - %v", err.(validator.ValidationErrors).Error())
-			w.WriteHeader(http.StatusBadRequest)
-		case *WrongPermissionsError:
-			resp.Message = fmt.Sprintf("User %s does not have valid permissions.", err.(*WrongPermissionsError).userID)
-			w.WriteHeader(http.StatusUnauthorized)
-		case *BadUserError:
-			resp.Message = fmt.Sprintf("User %s does not exist in the system.", err.(*BadUserError).userID)
-			w.WriteHeader(http.StatusUnauthorized)
-		default:
-			resp.Message = "Internal server error - Undisclosed."
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-		resp.Error = true
-	} else {
-		resp.Message = "Submission creation successful!"
-		resp.SubmissionID = submissionID
-	}
-
-	// Return response body after function successful.
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("[ERROR] error formatting response: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] PostUploadSubmission request successful\n")
-	}
-}
-
-// Controller for the upload submission POST request.
-func ControllerUploadSubmission(body UploadSubmissionBody) (uint, error) {
-	if err := validate.Struct(body); err != nil {
-		// Deal with validation errors - print all failed fields.
-		if errors, ok := err.(validator.ValidationErrors); ok {
-			log.Printf("[WARN] Given submission is invalid! ")
-			return 0, errors
-		} else {
-			// Validation process failed.
-			log.Printf("[ERROR] Validation failure! ")
-			return 0, err
+// uses SQL REGEX to filter the submissions returned based on their names
+func filterBySubmissionName(tx *gorm.DB, submissionName string) *gorm.DB {
+	params := map[string]interface{}{"full": submissionName}
+	whereString := "submissions.name REGEXP @full"
+	// only adds multiple regex conditions if the name given is multiple words
+	if wordList := strings.Fields(submissionName); len(wordList) > 1 {
+		for index, field := range wordList {
+			whereString = whereString + fmt.Sprintf(" OR submissions.name REGEXP @%d", index)
+			params[fmt.Sprint(index)] = field
 		}
 	}
-	submission := adaptBodyToSubmission(&body)
+	return tx.Where(whereString, params)
+}
 
-	if submissionID, err := addSubmission(submission); err != nil {
-		return 0, err
-	} else {
-		return submissionID, nil
+// adds a piece to an sql query to order the results
+func orderSubmissionQuery(tx *gorm.DB, orderBy string) *gorm.DB {
+	// order of submissions
+	if orderBy == "newest" {
+		tx = tx.Order("submissions.created_at ASC")
+	} else if orderBy == "oldest" {
+		tx = tx.Order("submissions.created_at DESC")
+	} else if orderBy == "alphabetical" {
+		tx = tx.Order("submissions.Name")
 	}
+	return tx
+}
+
+// adds usertype filters to a submission query
+func filterByUserType(tx *gorm.DB, ctx *RequestContext) *gorm.DB {
+	if ctx == nil {
+		tx = tx.Where("submissions.approved = ?", true)
+	} else {
+		if ctx.UserType == USERTYPE_PUBLISHER {
+			tx = tx.Where("approved = ? OR id IN (?)", true,
+				gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+		} else if ctx.UserType == USERTYPE_REVIEWER {
+			tx = tx.Where("approved = ? OR id IN (?)", true,
+				gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+		} else if ctx.UserType == USERTYPE_REVIEWER_PUBLISHER {
+			tx = tx.Where("submissions.approved = ? OR id IN (?) OR id IN (?)", true,
+				gormDb.Table("reviewers_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID),
+				gormDb.Table("authors_submission").Select("submission_id").Where("global_user_id = ?", ctx.ID))
+		}
+	}
+	// note editors can see all submissions and hence no filter is added for editors
+	return tx
 }
 
 // Adapt an upload submission body to a submission structure.
@@ -380,14 +273,14 @@ func adaptBodyToSubmission(b *UploadSubmissionBody) *Submission {
 		Files: b.Files, Categories: categories,
 		Authors: authors, Reviewers: reviewers,
 		MetaData: &SubmissionData{
-			Abstract: "test abstract",
+			Abstract: b.Abstract,
 		},
+		Runnable: b.Runnable,
 	}
 }
 
 // Router function to upload new submissions by a Zip file with the file contents.
 func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
-	log.Print("[INFO] POST Upload Submission started")
 	var resp UploadSubmissionResponse
 	var reqBody UploadSubmissionByZipBody
 
@@ -395,7 +288,7 @@ func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
 		resp.Message = "Could not decode body to correct format - " + err.Error()
 		resp.Error = true
 		w.WriteHeader(http.StatusBadRequest)
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok ||
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok ||
 		validate.Struct(ctx) != nil {
 		resp.Message = "The client is unauthorized from making such request - not logged in."
 		resp.Error = true
@@ -415,6 +308,9 @@ func PostUploadSubmissionByZip(w http.ResponseWriter, r *http.Request) {
 		case *BadUserError:
 			resp.Message = fmt.Sprintf("User %s does not exist in the system.", err.(*BadUserError).userID)
 			w.WriteHeader(http.StatusUnauthorized)
+		case *SubmissionNotRunnableError:
+			resp.Message = err.Error()
+			w.WriteHeader(http.StatusBadRequest)
 		default:
 			resp.Message = "Internal server error - Undisclosed."
 			w.WriteHeader(http.StatusInternalServerError)
@@ -444,14 +340,18 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 	if err != nil {
 		return 0, err
 	}
-
 	submission := adaptBodyToSubmission(&UploadSubmissionBody{
 		Name: r.Name, License: r.License,
 		Authors: r.Authors, Reviewers: r.Reviewers,
 		Abstract: r.Abstract, Tags: r.Tags,
-		Files: files,
+		Files: files, Runnable: r.Runnable,
 	})
-	if submissionID, err := addSubmission(submission); err != nil {
+	submissionID, err := addSubmission(submission)
+	if err != nil {
+		return 0, err
+	}
+	err = storeZip(r.ZipBase64Value, submissionID)
+	if err != nil {
 		return 0, err
 	} else {
 		return submissionID, nil
@@ -462,7 +362,6 @@ func ControllerUploadSubmissionByZip(r *UploadSubmissionByZipBody) (uint, error)
 // and comment queries.
 // GET /submission/{id}
 func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] getSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// gets the submission ID from the URL parameters
@@ -470,11 +369,13 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 	var encodable interface{}
 
 	// Check path, execute controller, check errors.
+	var err error
+	var submission *Submission
 	submissionID64, err := strconv.ParseUint(params["id"], 10, 32)
 	if err != nil {
 		encodable = StandardResponse{Message: "Given ID not a number.", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
-	} else if submission, err := getSubmission(uint(submissionID64)); err != nil {
+	} else if submission, err = getSubmission(uint(submissionID64)); err != nil {
 		switch err.(type) {
 		case *NoSubmissionError: // The given submission doesn't exist
 			encodable = StandardResponse{Message: err.(*NoSubmissionError).Error(), Error: true}
@@ -489,20 +390,49 @@ func RouteGetSubmission(w http.ResponseWriter, r *http.Request) {
 		encodable = submission
 	}
 
+	// submission not approved, can only be displayed for editors, authors or reviewers
+	if submission != nil && (submission.Approved == nil || !*submission.Approved) {
+		if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) != nil {
+			encodable = &StandardResponse{Message: "Error getting request context", Error: true}
+			w.WriteHeader(http.StatusBadRequest)
+		} else if ctx == nil {
+			encodable = &StandardResponse{Message: "Non-user cannot view unapproved submission", Error: true}
+			w.WriteHeader(http.StatusUnauthorized)
+		} else if ctx.UserType != USERTYPE_EDITOR {
+			// if the user is not an editor, check that they are either a reviewer or author for the given submission
+			var allowed = false
+			for _, author := range submission.Authors {
+				if author.ID == ctx.ID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				for _, reviewer := range submission.Reviewers {
+					if reviewer.ID == ctx.ID {
+						allowed = true
+						break
+					}
+				}
+			}
+			if !allowed {
+				encodable = &StandardResponse{Message: "Not authorized to access the given submission", Error: true}
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		}
+	}
+
 	// writes JSON data for the submission to the HTTP connection
 	if err := json.NewEncoder(w).Encode(encodable); err != nil {
 		log.Printf("[ERROR] error formatting response: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Print("[INFO] success\n")
-	return
 }
 
 // Compresses a given submission and returns it to the frontend to be downloaded
 // GET /submission/{id}/download
 func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] GetDownloadSubmission request received from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/zip")
 	var zipContent []byte
 
@@ -520,7 +450,6 @@ func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
-	log.Println("[INFO] GetDownloadSubmission request succeeded")
 	w.Write(zipContent)
 }
 
@@ -532,45 +461,16 @@ func GetDownloadSubmission(w http.ResponseWriter, r *http.Request) {
 // 	(string) : a string of the zip file's contents
 // 	(error) : an error if one occurs
 func ControllerDownloadSubmission(submissionID uint) ([]byte, error) {
-	submission, err := getSubmission(submissionID)
-	if err != nil {
-		return nil, err
+	var submission Submission
+	res := gormDb.Limit(1).Find(&submission, submissionID)
+	if res.Error != nil {
+		return nil, res.Error
+	} else if res.RowsAffected == 0 {
+		return nil, &NoSubmissionError{ID: submissionID}
 	}
 
 	// creates the zip archive if it doesn't exist, retrieves it otherwise
-	zipPath := filepath.Join(getSubmissionDirectoryPath(*submission), submission.Name+".zip")
-	if _, err := os.Stat(zipPath); errors.Is(err, os.ErrNotExist) {
-		zipArchive, err := os.Create(zipPath)
-		if err != nil {
-			return nil, err
-		}
-		defer zipArchive.Close()
-		writer := zip.NewWriter(zipArchive)
-		for _, file := range submission.Files {
-			// gets the file content from the filesystem
-			file.Base64Value, err = getFileContent(filepath.Join(getSubmissionDirectoryPath(*submission), fmt.Sprint(file.ID)))
-			if err != nil {
-				return nil, err
-			}
-			// decodes file content into a byte array to be made into a zip
-			fileBytes, err := base64.StdEncoding.DecodeString(file.Base64Value)
-			if err != nil {
-				return nil, err
-			}
-			// creates a new zip entry for the given file
-			zipEntryWriter, err := writer.Create(fmt.Sprintf("%s/%s", submission.Name, file.Path))
-			if err != nil {
-				return nil, err
-			} else if _, err := zipEntryWriter.Write(fileBytes); err != nil {
-				return nil, err
-			}
-		}
-		writer.Close() // flushes the contents of the buffer into the file
-
-		// any other error occurred
-	} else if err != nil {
-		return nil, err
-	}
+	zipPath := filepath.Join(getSubmissionDirectoryPath(submission), "project.zip")
 
 	// read byte-array from the zip file, encode it to base64 and return
 	zipContent, err := os.ReadFile(zipPath)
@@ -599,6 +499,21 @@ func addSubmission(submission *Submission) (uint, error) {
 	// adds the submission to the db, automatically setting submission.ID
 	if submission == nil {
 		return 0, errors.New("Submission is empty.")
+	}
+	// checks for run file if the submission is marked runnable
+	if submission.Runnable {
+		seenRunFile := false
+		for _, file := range submission.Files {
+			if match, err := regexp.MatchString("^run\\.sh", file.Path); err != nil {
+				return 0, err
+			} else if match {
+				seenRunFile = true
+				break
+			}
+		}
+		if !seenRunFile {
+			return 0, &SubmissionNotRunnableError{}
+		}
 	}
 	err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Database operations

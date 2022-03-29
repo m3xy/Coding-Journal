@@ -11,7 +11,7 @@ import JwtService from "./jwt.service"
 // Axios instance used for making needed requests.
 const axiosInstance = axios.create({
 	baseURL: process.env.BACKEND_ADDRESS,
-	timeout: 1000,
+	timeout: 4000,
 	headers: {
 		"Content-Type": "application/json"
 	}
@@ -34,7 +34,7 @@ axiosInstance.interceptors.response.use(
 						method: "get",
 						url: TOKEN_ROUTE,
 						headers: {
-							refresh_token:
+							RefreshToken:
 								"Refresh " + JwtService.getRefreshToken()
 						}
 					})
@@ -56,7 +56,7 @@ axiosInstance.interceptors.request.use(
 	(config) => {
 		const token = JwtService.getAccessToken()
 		if (token) {
-			config.headers["bearer_token"] = "Bearer " + token
+			config.headers["BearerToken"] = "Bearer " + token
 		}
 		return config
 	},

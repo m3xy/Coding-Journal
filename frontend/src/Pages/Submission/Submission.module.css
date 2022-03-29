@@ -1,0 +1,24 @@
+.SubmissionContainer {
+	width: 80%;
+	margin: 0 auto;
+	margin-top: 15px;
+}
+
+.LeftContainer {
+	flex: 1.5;
+	margin: 7px;
+}
+
+.RightContainer {
+	flex: 1;
+	margin: 7px;
+}
+
+.DisabledReviewButton {
+	margin-top: 15px;
+	margin-right: 7px;
+}
+
+.ButtonTextCenter {
+	margin-top: 5px;
+}

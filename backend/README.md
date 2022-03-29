@@ -202,7 +202,6 @@ User profile information query.
 ```typescript
 interface Content {
   UserID: string;
-  FullName: string;
   Profile: Profile;
 }
 
@@ -215,6 +214,63 @@ interface Profile {
   CreatedAt: DateTime; // Format -
 }
 ```
+
+### General user query
+
+returns a list of global users given a list of query parameters
+
+1.  Endpoint
+
+    The endpoint for the query is **GET** `/users/query`
+
+2.  Request
+
+    1.  Headers
+
+        No header or authentication is required for this query.
+
+    2. Parameters
+
+        - name - a user name to query by regex
+        - orderBy - order results alphabetically by firstName or lastName
+        - userType - only display users of the given userType
+        - organization - filter by user organization using regex
+
+3.  Response
+
+    1.  Status
+
+        - 200 - Query successful, requested information contained in content.
+        - 400 - if the request is badly formatted (i.e. bad context, bad query params etc)
+        - 500 - if something else goes wrong in the server
+
+    2.  Body
+
+        The \`Content\` value in the response is of type below
+
+```typescript
+interface Content {
+    message: string;
+    error: bool;
+    users: GlobalUser[];
+}
+
+interface GlobalUser {
+    id: string;
+    userType: int;
+    profile: Profile;
+}
+
+interface Profile {
+  Email: string;
+  FirstName: string;
+  LastName: string;
+  PhoneNumber: string;
+  Organization: string;
+  CreatedAt: DateTime; // Format -
+}
+```
+
 
 ## Submission
 
@@ -270,7 +326,6 @@ Querying an ordered list of submissions based upon query parameters
         - tags - any existant code tag (i.e. python, java, etc.)
         - authors - user ID of authors
         - reviewers - user ID of reviewers
-        - approved - accepted | rejected | unapproved
 
 3. Response
 
@@ -538,7 +593,7 @@ Uploads a user comment/comment reply to a given file
 
 1. Enpoint
 
-    The enpoint to upload submission is **POST** `/file/{id}/newcomment` where ID
+    The enpoint to upload submission is **POST** `/file/{id}/comment` where ID
     is the submission ID as a uint
 
 2. Request
@@ -549,7 +604,7 @@ Uploads a user comment/comment reply to a given file
 
 ```typescript
 interface NewCommentPostBody {
-	authorId: string
+	lineNumber: int
 	parentId: *uint // optionally set for replies
 	base64Value: string
 }
@@ -570,4 +625,43 @@ interface NewCommentResponse {
     id: uint
 }
 ```
+
+
+### Edit User Comment
+
+Edits an existing user comment
+
+1. Endpoint 
+
+    **POST** `/file/{id}/comment/edit`
+
+2. Request
+
+    1. Headers - request needs no headers
+
+    2. Body - Typescript object shown below
+
+```typescript
+interface EditCommentPostBody {
+    id: uint;
+    base64Value: string;
+}
+```
+
+3. Response
+
+    1. Status
+
+        - 200 - Comment added successfully
+        - 400 - Comment request badly formatted
+        - 401 - if the current user is not logged in and/or not an author
+        - 500 - if something else goes wrong
+
+    2. Body - Typescript object shown below
+
+```typescript
+interface StandardResponse {
+    message: string;
+    error: bool;
+}
 

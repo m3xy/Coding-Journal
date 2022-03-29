@@ -39,6 +39,13 @@ const (
 
 var JwtSecret string // JWT Secret variable.
 
+type JwtClaims struct {
+	ID       string `json:"userId"`
+	UserType int    `json:"userType" validate:"min=0,max=4"`
+	Scope    string
+	jwt.StandardClaims
+}
+
 // Subrouter
 func getAuthSubRoutes(r *mux.Router) {
 	auth := r.PathPrefix(SUBROUTE_AUTH).Subrouter()
@@ -48,7 +55,7 @@ func getAuthSubRoutes(r *mux.Router) {
 	// + POST /auth/register - Register.
 	// + GET /auth/token  - Get new access token from a refresh token.
 	auth.HandleFunc(ENDPOINT_LOGIN, PostAuthLogIn).Methods(http.MethodPost, http.MethodOptions)
-	auth.HandleFunc(ENDPOINT_SIGNUP, signUp).Methods(http.MethodPost, http.MethodOptions)
+	auth.HandleFunc(ENDPOINT_SIGNUP, PostSignUp).Methods(http.MethodPost, http.MethodOptions)
 	auth.HandleFunc(ENDPOINT_TOKEN, GetToken).Methods(http.MethodGet)
 
 	// Set up jwt secret
@@ -70,8 +77,6 @@ func getAuthSubRoutes(r *mux.Router) {
   		Returns: { message: string, error: bool }
 */
 func PostAuthLogIn(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received Auth Log-In request from %s.", r.RemoteAddr)
-
 	// Check if the body's correctly formed.
 	var credentials AuthLoginPostBody
 	var encodable interface{}
@@ -223,7 +228,7 @@ func GetLocalUserID(credentials JournalLoginPostBody) (string, int, int) {
   Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
 */
 func GetToken(w http.ResponseWriter, r *http.Request) {
-	refreshToken := r.Header.Get("refresh_token")
+	refreshToken := r.Header.Get("RefreshToken")
 	var body interface{}
 
 	// Validate refresh token, and create new tokens.
@@ -311,12 +316,11 @@ func createToken(ID string, userType int, scope string) (string, error) {
   Success: 200, OK
   Failure: 400, bad request
 */
-func signUp(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received sign up request from %s.", r.RemoteAddr)
+func PostSignUp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from JSON request and validate them.
-	user := &User{}
+	user := &SignUpPostBody{}
 	var resp FormResponse
 	if err := json.NewDecoder(r.Body).Decode(user); err != nil {
 		log.Printf("[ERROR] JSON decoding failed: %v", err)
@@ -330,7 +334,7 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 			Message: "Registration failed",
 			Error:   true,
 		}}
-	} else if _, err := registerUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
+	} else if _, err := ControllerRegisterUser(*user, USERTYPE_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		switch err.(type) {
 		case *RepeatEmailError:
@@ -365,33 +369,41 @@ func signUp(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// Register a user to the database. Returns user global ID.
-func registerUser(user User, UserType int) (string, error) {
-	// Hash password and store new credentials to database.
-	user.Password = string(hashPw(user.Password))
-
+// controller function to register a user, returns uuid of user and an error if one occurs
+func ControllerRegisterUser(user SignUpPostBody, UserType int) (string, error) {
 	registeredUser := GlobalUser{
-		UserType: UserType,
-		FullName: user.FirstName + " " + user.LastName,
-		User:     user,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		UserType:  UserType,
+		User: &User{
+			Email:        user.Email,
+			Password:     user.Password,
+			PhoneNumber:  user.PhoneNumber,
+			Organization: user.Organization,
+		},
 	}
+	// registers user returning uuid of the user and an error if one occurs
+	return registerUser(registeredUser)
+}
+
+// executes transaction to register a user in the database
+func registerUser(user GlobalUser) (string, error) {
+	// Hash password and store new credentials to database.
+	user.User.Password = string(hashPw(user.User.Password))
 	if err := gormDb.Transaction(func(tx *gorm.DB) error {
 		// Check constraints on user
-		if !isUnique(tx, User{}, "Email", user.Email) {
-			return &RepeatEmailError{email: user.Email}
+		if !isUnique(tx, User{}, "Email", user.User.Email) {
+			return &RepeatEmailError{email: user.User.Email}
 		}
-
 		// Make credentials insert transaction.
-		if err := gormDb.Create(&registeredUser).Error; err != nil {
+		if err := gormDb.Create(&user).Error; err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
 		return "", err
 	}
-
-	// Return user's primary key (the UUID)
-	return registeredUser.ID, nil
+	return user.ID, nil
 }
 
 // -- Password control --

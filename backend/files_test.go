@@ -1,14 +1,10 @@
-// ===================================================================
+// ====================================================
 // files_test.go
 // Authors: 190010425
 // Created: November 23, 2021
 //
-// test file for files.go
-// Note that the tests are written dependency wise from top to bottom.
-// Hence if a test breaks, fix the top one first and then re-run.
-//
 // This file depends heavily on submissions_test.go
-// ===================================================================
+// ====================================================
 
 package main
 
@@ -27,28 +23,8 @@ import (
 
 const (
 	// BE VERY CAREFUL WITH THIS PATH!! IT GETS RECURSIVELY REMOVED!!
-	TEST_FILES_DIR = "../filesystem/" // environment variable set to this value
+	TEST_FILES_DIR = "../filesystem_test/" // environment variable set to this value
 )
-
-// NOTE: ID gets set upon file insertion, so these should not be used as pointers in tests
-// as to prevent adding a file with the same SubmissionID twice
-var testFiles []File = []File{
-	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
-	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
-}
-
-var testComments []*Comment = []*Comment{
-	{
-		AuthorID:    "",
-		Base64Value: "Hello World",
-		Comments:    []Comment{},
-	},
-	{
-		AuthorID:    "",
-		Base64Value: "Goodbye World",
-		Comments:    []Comment{},
-	},
-}
 
 // -----------
 // Router Function Tests
@@ -56,76 +32,111 @@ var testComments []*Comment = []*Comment{
 
 // Tests the basic ability of the files.go code to load the data from a
 // valid file path passed to it via HTTP request
-//
-// TODO : test whether having / in file path query param breaks the function
-//
-// Test Depends On:
-// 	- TestAddSubmission (in submissions_test.go)
-// 	- TestAddFile
 func TestGetFile(t *testing.T) {
-	// Set up server and configures filesystem/db
 	testInit()
 	defer testEnd()
-	testFile := testFiles[0]             // the test file to be added to the db and filesystem (saved here so it can be easily changed)
-	testSubmission := testSubmissions[0] // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
+	testFile := testFiles[0]                        // the test file to be added to the db and filesystem (saved here so it can be easily changed)
+	testSubmission := *testSubmissions[0].getCopy() // the test submission to be added to the db and filesystem (saved here so it can be easily changed)
 
 	router := mux.NewRouter()
-	router.HandleFunc(SUBROUTE_FILE+"/{id}", getFile)
+	router.HandleFunc(SUBROUTE_FILE+"/{id}", GetFile)
 
-	// adds a submission to the database and filesystem
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
+	reviewerID := globalReviewers[0].ID
 
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
-
+	testSubmission.Files = []File{testFile}
 	submissionID, err := addSubmission(&testSubmission)
 	if !assert.NoErrorf(t, err, "Error adding submission %s: %v", testSubmission.Name, err) {
 		return
 	}
+	if !assert.NoError(t, gormDb.Model(&File{}).Find(&testFile).Error, "error occurred while getting file ID") {
+		return
+	}
+	fileID := testFile.ID
 
 	// tests getting a single valid file without comments
 	t.Run("Get One File no comments", func(t *testing.T) {
-		// adds a file to the database and filesystem
-		fileID, err := addFileTo(&testFile, submissionID)
-		if !assert.NoErrorf(t, err, "Error adding file %s: %v", testFile.Path, err) {
+		// builds the request url inserting query parameters
+		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
+		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+		if !assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode) {
 			return
 		}
+		// marshals the json response into a file struct
+		respData := &GetFileResponse{}
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&respData), "Error decoding JSON in server response") {
+			return
+		}
+		// tests that the file was retrieved with the correct information
+		switch {
+		case !assert.Equal(t, testFile.Path, respData.File.Path, "file paths do not match"),
+			!assert.Equal(t, submissionID, respData.File.SubmissionID, "Submission IDs do not match"),
+			!assert.Equal(t, testFile.Base64Value, respData.File.Base64Value, "File Content does not match"):
+			return
+		}
+	})
+
+	// tests getting a single valid file without comments
+	t.Run("Get One File nested comments", func(t *testing.T) {
+		// adds comments to the test file
+		commentID1, _ := addComment(&Comment{FileID: fileID,
+			AuthorID: reviewerID, StartLine: 0, EndLine: 0, Base64Value: "testComment1"})
+		commentID2, _ := addComment(&Comment{ParentID: &commentID1, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+		commentID3, _ := addComment(&Comment{ParentID: &commentID2, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
+		commentID4, _ := addComment(&Comment{ParentID: &commentID3, FileID: fileID,
+			AuthorID: reviewerID, Base64Value: "testComment1"})
 
 		// builds the request url inserting query parameters
 		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID)
 		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 		resp := w.Result()
-
-		if !assert.NoErrorf(t, err, "Error occurred in request: %v", err) {
-			return
-		}
 		defer resp.Body.Close()
 		if !assert.Equalf(t, resp.StatusCode, http.StatusOK, "Error: %d", resp.StatusCode) {
 			return
-		} // fails if status code is not 200
-
+		}
 		// marshals the json response into a file struct
-		file := &File{}
-		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&file), "Error decoding JSON in server response") {
+		respData := &GetFileResponse{}
+		if !assert.NoError(t, json.NewDecoder(resp.Body).Decode(&respData), "Error decoding JSON in server response") {
 			return
 		}
 
 		// tests that the file was retrieved with the correct information
 		switch {
-		case !assert.Equal(t, testFile.Path, file.Path, "file paths do not match"),
-			!assert.Equal(t, submissionID, file.SubmissionID, "Submission IDs do not match"),
-			!assert.Equal(t, testFile.Base64Value, file.Base64Value, "File Content does not match"):
+		case !assert.Equal(t, testFile.Path, respData.File.Path, "file paths do not match"),
+			!assert.Equal(t, submissionID, respData.File.SubmissionID, "Submission IDs do not match"),
+			!assert.Equal(t, testFile.Base64Value, respData.File.Base64Value, "File Content does not match"),
+			!assert.Equal(t, commentID1, respData.File.Comments[0].ID, "top level comment does not match"),
+			!assert.Equal(t, commentID2, respData.File.Comments[0].
+				Comments[0].ID, "second level comment does not match"),
+			!assert.Equal(t, commentID3, respData.File.Comments[0].
+				Comments[0].Comments[0].ID, "third level comment does not match"),
+			!assert.Equal(t, commentID4, respData.File.Comments[0].
+				Comments[0].Comments[0].Comments[0].ID, "fourth level comment does not match"):
 			return
 		}
+	})
 
+	t.Run("non-existant file ID", func(t *testing.T) {
+		// builds the request url inserting query parameters
+		urlString := fmt.Sprintf("%s/%d", SUBROUTE_FILE, fileID+1)
+		req, w := httptest.NewRequest("GET", urlString, nil), httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		resp := w.Result()
+		defer resp.Body.Close()
+		if !assert.Equalf(t, http.StatusBadRequest, resp.StatusCode, "returned incorrect status code") {
+			return
+		}
 	})
 }
 
@@ -141,17 +152,12 @@ func TestAddFile(t *testing.T) {
 	testSubmission := testSubmissions[0]
 	testFiles := testFiles[0:2]
 
-	authorID, err := registerUser(testAuthors[0], USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewers[0], USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	submissionID, err := addSubmission(&testSubmission) // adds a submission for the file to be uploaded to
 	if !assert.NoErrorf(t, err, "Error occurred while adding test submission: %v", err) {
@@ -221,23 +227,16 @@ func TestGetFileData(t *testing.T) {
 
 	testFile := testFiles[0]             // the test file to be added to the db and filesystem.
 	testSubmission := testSubmissions[0] // test submission to be added to db and filesystem.
-	testAuthor := testAuthors[0]
-	testReviewer := testReviewers[0]
 
 	// configures the test submission fields
 	testSubmission.Files = []File{testFile}
 
-	authorID, err := registerUser(testAuthor, USERTYPE_PUBLISHER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
+	globalAuthors, globalReviewers, err := initMockUsers(t)
+	if err != nil {
 		return
 	}
-	testSubmission.Authors = []GlobalUser{{ID: authorID}}
-
-	reviewerID, err := registerUser(testReviewer, USERTYPE_REVIEWER)
-	if !assert.NoErrorf(t, err, "Error occurred while registering user: %v", err) {
-		return
-	}
-	testSubmission.Reviewers = []GlobalUser{{ID: reviewerID}}
+	testSubmission.Authors = globalAuthors[:1]
+	testSubmission.Reviewers = globalReviewers[:1]
 
 	// adds a submission to the database and filesystem
 	submissionID, err := addSubmission(&testSubmission)
@@ -245,7 +244,7 @@ func TestGetFileData(t *testing.T) {
 		return
 	}
 
-	// getting single valid file TODO: add comments here
+	// getting single valid file
 	t.Run("Single Valid File", func(t *testing.T) {
 
 		// queries the file's data from it's ID

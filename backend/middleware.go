@@ -14,7 +14,7 @@ const (
 // request context object for logged in users
 type RequestContext struct {
 	ID       string `validate:"required"`
-	UserType int    `validate:"required"`
+	UserType int    `validate:"oneof=0 1 2 3 4"` // matches the 5 user types
 }
 
 // Middleware for user authentication and security key verification.
@@ -31,11 +31,12 @@ func journalMiddleWare(next http.Handler) http.Handler {
 // Middleware for strict access token validation.
 func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ok, id, userType := validateWebToken(r.Header.Get("bearer_token"), CLAIM_BEARER); !ok {
+		if ok, id, userType := validateWebToken(r.Header.Get("BearerToken"), CLAIM_BEARER); !ok {
+
 			next.ServeHTTP(w, r)
 		} else {
 			if !isUnique(gormDb, &GlobalUser{}, "id", id) {
-				ctx := context.WithValue(r.Context(), "data", RequestContext{
+				ctx := context.WithValue(r.Context(), "data", &RequestContext{
 					ID:       id,
 					UserType: userType,
 				})
@@ -65,7 +66,7 @@ func RequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		user, usertype := "-", "-"
-		if ctx, ok := r.Context().Value("data").(RequestContext); ok && validate.Struct(ctx) == nil {
+		if ctx, ok := r.Context().Value("data").(*RequestContext); ok && validate.Struct(ctx) == nil {
 			user = ctx.ID
 			userMap := map[int]string{0: "user", 1: "publisher", 2: "reviewer",
 				3: "reviewer-publisher", 4: "editor"}

@@ -39,7 +39,7 @@ function Navigation() {
 				.get("/user/" + JwtService.getUserID())
 				.then((response) => {
 					if (response.data.userId) {
-						setUser(response.data.profile)
+						setUser(response.data)
 						setLoading(false)
 					}
 				})

@@ -1,0 +1,23 @@
+volumes:
+  db_data:
+  file_sys:
+
+services:
+  db:
+    build: ./db
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ./Dockerfile.production
+
+    depends_on:
+      - backend
+    ports:
+      - "23409:23409"
+    volumes:
+      - ./frontend:/usr/src/app
