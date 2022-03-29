@@ -21,6 +21,7 @@ import ReactMarkdown from "react-markdown"
 const userEndpoint = "/user"
 const editEndpoint = "/edit"
 const deleteEndpoint = "/delete"
+const profileURL = "/profile"
 
 function Comment({
 	fileID,
@@ -129,7 +130,7 @@ function Comment({
 				style={{ verticalAlign: "top", minWidth: "100%" }}
 				className="d-inline-block m-1">
 				<Toast.Header closeButton={false}>
-					<Button variant="light" className="me-auto" size="sm" onClick={() => navigate("/profile/" + comment.author)}>
+					<Button variant="light" className="me-auto" size="sm" onClick={() => navigate(profileURL + "/" + comment.author)}>
 					{name}
 					</Button>
 					<small>

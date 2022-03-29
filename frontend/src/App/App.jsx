@@ -25,7 +25,8 @@ import {
 	Upload,
 	Profile,
 	Submissions,
-	Submission
+	Submission,
+    Search
 } from "../Pages"
 import Navigation from "../Components/Navbar"
 
@@ -45,6 +46,7 @@ function App() {
 					<Route path="/profile" element={<Profile />} />
 					<Route path="/submission/:id" element={<Submission />} />
 					<Route path="/submissions" element={<Submissions />} />
+                    <Route path="/search" element={<Search />} />
 				</Routes>
 				<Footer />
 			</Router>

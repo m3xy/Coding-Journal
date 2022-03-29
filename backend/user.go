@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	SUBROUTE_USERS      = "/users"
-	SUBROUTE_USER       = "/user"
+	SUBROUTE_USERS = "/users"
+	SUBROUTE_USER  = "/user"
 
-	ENDPOINT_GET        = "/get"
+	ENDPOINT_GET                = "/get"
 	ENDPOINT_CHANGE_PERMISSIONS = "/changepermissions"
 )
 
@@ -27,12 +27,12 @@ func getUserSubroutes(r *mux.Router) {
 	users := r.PathPrefix(SUBROUTE_USERS).Subrouter()
 
 	users.Use(jwtMiddleware)
-
+	user.Use(jwtMiddleware)
 	// User routes:
 	// + GET /user/{id} - Get given user profile.
 	// + POST /user/{id}/changepermissions - editor changing user permissions
-	// + POST /user/{id}/edit - edits a user profile 
-	// + POST /user/{id}/delete - deletes a user profile 
+	// + POST /user/{id}/edit - edits a user profile
+	// + POST /user/{id}/delete - deletes a user profile
 	user.HandleFunc("/{id}", getUserProfile).Methods(http.MethodGet)
 	user.HandleFunc("/{id}"+ENDPOINT_CHANGE_PERMISSIONS, PostChangePermissions).Methods(http.MethodOptions, http.MethodPost)
 	user.HandleFunc("/{id}"+ENDPOINT_EDIT, PostEditUser).Methods(http.MethodOptions, http.MethodPost)
@@ -92,8 +92,7 @@ func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 
 	} else if ctx.UserType != USERTYPE_EDITOR { // logged in user must be an editor to change another user's permissions
-		resp = &StandardResponse{Message: 
-			"The client must have editor permissions to change another user's permissions.", Error: true}
+		resp = &StandardResponse{Message: "The client must have editor permissions to change another user's permissions.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
 	} else if err := json.NewDecoder(r.Body).Decode(reqBody); err != nil || validate.Struct(reqBody) != nil {
@@ -104,7 +103,7 @@ func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
 	} else if err := ControllerUpdatePermissions(userID, reqBody.Permissions); err != nil {
 		switch err.(type) {
 		case *BadUserError:
-			resp = &StandardResponse{Message:"Cannot update permissions - user does not exist", Error:true}
+			resp = &StandardResponse{Message: "Cannot update permissions - user does not exist", Error: true}
 			w.WriteHeader(http.StatusBadRequest)
 
 		// Unexpected error - error out as server error.
@@ -126,7 +125,7 @@ func PostChangePermissions(w http.ResponseWriter, r *http.Request) {
 func ControllerUpdatePermissions(userID string, permissions int) error {
 	if res := gormDb.Model(&GlobalUser{ID: userID}).
 		Update("user_type", permissions); res.Error != nil {
-			return res.Error
+		return res.Error
 	} else if res.RowsAffected == 0 {
 		return &BadUserError{userID: userID}
 	}
@@ -137,33 +136,33 @@ func ControllerUpdatePermissions(userID string, permissions int) error {
 // POST /user/{id}/edit
 func PostEditUser(w http.ResponseWriter, r *http.Request) {
 	req := &EditUserPostBody{}
-	resp := StandardResponse{ Message: "profile edited successfully", Error: false }
+	resp := StandardResponse{Message: "profile edited successfully", Error: false}
 
 	// parse the userID from the url
 	params := mux.Vars(r)
 	userID := string(params["id"])
 
-	// validates request context 
+	// validates request context
 	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
-		resp = StandardResponse{ Message: "Bad Request Context"}
+		resp = StandardResponse{Message: "Bad Request Context"}
 		w.WriteHeader(http.StatusBadRequest)
-	
+
 	} else if userID != ctx.ID {
-		resp = StandardResponse{ Message: "Unauthorized - cannot edit an account which is not yours", Error: true}
+		resp = StandardResponse{Message: "Unauthorized - cannot edit an account which is not yours", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
 	} else if err := json.NewDecoder(r.Body).Decode(req); err != nil || validate.Struct(resp) != nil {
-		resp = StandardResponse{ Message: "Bad Request - unable to parse request body", Error: true }
+		resp = StandardResponse{Message: "Bad Request - unable to parse request body", Error: true}
 		w.WriteHeader(http.StatusBadRequest)
 
 	} else if err := ControllerEditUserProfile(req, ctx.ID); err != nil {
 		switch err.(type) {
 		case *BadUserError:
-			resp = StandardResponse{ Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
+			resp = StandardResponse{Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
 			w.WriteHeader(http.StatusBadRequest)
 		default:
 			log.Printf("[ERROR] could not delete user %s: %v", userID, err)
-			resp = StandardResponse{ Message: "Internal Server Error - could not edit profile", Error: true }
+			resp = StandardResponse{Message: "Internal Server Error - could not edit profile", Error: true}
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
@@ -185,7 +184,7 @@ func ControllerEditUserProfile(r *EditUserPostBody, userID string) error {
 	// converts request body struct into user and global user
 	globUser := GlobalUser{
 		FirstName: r.FirstName,
-		LastName: r.LastName,
+		LastName:  r.LastName,
 	}
 	user := User{
 		Password:     password,
@@ -197,13 +196,13 @@ func ControllerEditUserProfile(r *EditUserPostBody, userID string) error {
 		if res := gormDb.Model(&GlobalUser{}).Where("id = ?", userID).Updates(globUser); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected != 1 {
-			return &BadUserError{ userID: userID }
+			return &BadUserError{userID: userID}
 		}
 		// updates the local user table in accordance with the request body
 		if res := gormDb.Model(&User{}).Where("global_user_id = ?", userID).Updates(user); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected != 1 {
-			return &BadUserError{ userID: userID }
+			return &BadUserError{userID: userID}
 		}
 		return nil
 	}); err != nil {
@@ -215,29 +214,29 @@ func ControllerEditUserProfile(r *EditUserPostBody, userID string) error {
 // router function for users to delete their accounts
 // POST /user/{id}/delete
 func PostDeleteUser(w http.ResponseWriter, r *http.Request) {
-	resp := StandardResponse{ Message: "user deleted successfully", Error: false }
+	resp := StandardResponse{Message: "user deleted successfully", Error: false}
 
 	// parse the userID from the url
 	params := mux.Vars(r)
 	userID := string(params["id"])
 
-	// validates request context 
+	// validates request context
 	if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
-		resp = StandardResponse{ Message: "Bad Request Context - user not logged in"}
+		resp = StandardResponse{Message: "Bad Request Context - user not logged in"}
 		w.WriteHeader(http.StatusBadRequest)
-	
+
 	} else if userID != ctx.ID {
-		resp = StandardResponse{ Message: "Unauthorized - cannot delete an account which is not yours", Error: true}
+		resp = StandardResponse{Message: "Unauthorized - cannot delete an account which is not yours", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
 	} else if err := ControllerDeleteUser(ctx.ID); err != nil {
 		switch err.(type) {
 		case *BadUserError:
-			resp = StandardResponse{ Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
+			resp = StandardResponse{Message: fmt.Sprintf("Bad Request - User %s does not exist!", ctx.ID), Error: true}
 			w.WriteHeader(http.StatusBadRequest)
 		default:
 			log.Printf("[ERROR] could not delete user %s: %v", userID, err)
-			resp = StandardResponse{ Message: "Internal Server Error - could not delete user", Error: true }
+			resp = StandardResponse{Message: "Internal Server Error - could not delete user", Error: true}
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
@@ -257,13 +256,13 @@ func ControllerDeleteUser(userID string) error {
 		if res := gormDb.Delete(globUser); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected != 1 {
-			return &BadUserError{ userID: userID }
+			return &BadUserError{userID: userID}
 		}
 		// deletes local user
 		if res := gormDb.Delete(&User{}, "global_user_id = ?", userID); res.Error != nil {
 			return res.Error
 		} else if res.RowsAffected != 1 {
-			return &BadUserError{ userID: userID }
+			return &BadUserError{userID: userID}
 		}
 		return nil
 	}); err != nil {
