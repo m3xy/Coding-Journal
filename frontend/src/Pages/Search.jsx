@@ -133,7 +133,6 @@ function Search() {
 					<Card.Subtitle className="mb-2 text-muted">
 						{user.profile.email}
 					</Card.Subtitle>
-					<Card.Text>{user.userId}</Card.Text>
 					<br />
 					<Card.Link
 						size="sm"
