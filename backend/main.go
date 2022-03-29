@@ -27,7 +27,7 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
-	SUBROUTE_JOURNAL = "/journal"
+	SUBROUTE_JOURNAL = "/supergroup"
 
 	ENDPOINT_USERINFO = "/users"
 	ENDPOINT_VALIDATE = "/validate"
