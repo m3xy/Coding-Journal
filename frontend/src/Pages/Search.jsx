@@ -142,7 +142,9 @@ function Search() {
 						View
 					</Card.Link>
 
-					{!authors.some(author => (author.userId == user.userId)) && (
+					{!authors.some(
+						(author) => author.userId == user.userId
+					) && (
 						<Card.Link
 							size="sm"
 							onClick={() =>
@@ -152,7 +154,9 @@ function Search() {
 						</Card.Link>
 					)}
 
-					{!reviewers.some(reviewer => (reviewer.userId == user.userId)) && (
+					{!reviewers.some(
+						(reviewer) => reviewer.userId == user.userId
+					) && (
 						<Card.Link
 							size="sm"
 							onClick={() =>
@@ -290,7 +294,7 @@ function Search() {
 					value={tagInput}
 				/>
 				<Button
-					variant="outline-danger"
+					variant="outline-secondary"
 					onClick={() => {
 						!tags.includes(tagInput) &&
 							setTags((tags) => [...tags, tagInput])
@@ -301,8 +305,16 @@ function Search() {
 			</InputGroup>
 			{tagBtns}
 			<br />
-			{authors.length > 0 && <>Authors: {authorBtns} <br /></>}
-			{reviewers.length > 0 && <>Reviewers: {reviewerBtns} <br /></>}
+			{authors.length > 0 && (
+				<>
+					Authors: {authorBtns} <br />
+				</>
+			)}
+			{reviewers.length > 0 && (
+				<>
+					Reviewers: {reviewerBtns} <br />
+				</>
+			)}
 			<Row>
 				{submissions && submissions.length > 0 ? (
 					cardContainer(submissionCards)
