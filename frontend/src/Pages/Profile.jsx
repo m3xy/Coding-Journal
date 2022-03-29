@@ -60,7 +60,10 @@ function Profile() {
 							style={{ padding: "10px" }}
 							action
 							onClick={() => {
-								navigate("/submission/" + submission.ID)
+								;(!id ||
+									JwtService.getUserType() == 4 ||
+									submission.approved) &&
+									navigate("/submission/" + submission.ID)
 							}}>
 							<Badge
 								bg={
@@ -102,10 +105,13 @@ function Profile() {
 
 	const editType = (type) => {
 		axiosInstance
-			.post(userEndpoint + "/" + getUserID() + userTypeEndpoint, {permissions:type})
+			.post(userEndpoint + "/" + getUserID() + userTypeEndpoint, {
+				permissions: type
+			})
 			.then((response) => {
 				console.log(response)
-			}).catch((error) => {
+			})
+			.catch((error) => {
 				console.log(error)
 			})
 	}
@@ -119,7 +125,10 @@ function Profile() {
 				<Dropdown.Menu>
 					{userTypes.map((type) => {
 						return (
-							<Dropdown.Item onClick={() => editType(userTypes.indexOf(type))}>
+							<Dropdown.Item
+								onClick={() =>
+									editType(userTypes.indexOf(type))
+								}>
 								{type}
 							</Dropdown.Item>
 						)
@@ -134,7 +143,9 @@ function Profile() {
 			<br />
 			<h2>{user.firstName + " " + user.lastName}</h2>
 			<label>({userTypes[user.userType]})</label>
-			{JwtService.getUserType() == 4 && editTypeBtn()}
+			{JwtService.getUserType() == 4 &&
+				JwtService.getUserID() !== getUserID() &&
+				editTypeBtn()}
 			<br />
 			<br />
 			<Tabs

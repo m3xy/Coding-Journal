@@ -9,7 +9,8 @@ import {
 	Row,
 	Col,
 	Card,
-	CardGroup
+	CardGroup,
+	Form
 } from "react-bootstrap"
 import {
 	useNavigate,
@@ -32,6 +33,9 @@ const userTypes = [
 	"Editor"
 ]
 
+const defaultSubmissionOrder = "oldest"
+const defaultUserOrder = "firstName"
+
 function Search() {
 	const [search, setSearch] = useSearchParams()
 	const navigate = useNavigate()
@@ -39,28 +43,23 @@ function Search() {
 	const [users, setUsers] = useState([])
 	const [showSubmissions, setShowSubmissions] = useState(false)
 	const [showUsers, setShowUsers] = useState(false)
+	const [submissionOrder, setSubmissionOrder] = useState(
+		defaultSubmissionOrder
+	)
+	const [userOrder, setUserOrder] = useState(defaultUserOrder)
+	const [tags, setTags] = useState([])
+	const [tagInput, setTagInput] = useState([])
 
 	useEffect(() => {
 		searchSubmissions()
 		searchUsers()
-	}, [search])
+	}, [search, submissionOrder, userOrder, tags])
 
 	const searchSubmissions = () => {
 		setSubmissions([])
 		axiosInstance
 			.get(submissionsQueryEndpoint, {
-				params: search
-			})
-			.then((response) => {
-				if (response.data.hasOwnProperty("submissions"))
-					getSubmissions(response.data.submissions)
-			})
-			.catch((error) => {
-				console.log(error)
-			})
-		axiosInstance
-			.get(submissionsQueryEndpoint, {
-				params: { tags: search.get("name") }
+				params: { name: search.get("name"), tags: tags, orderBy: submissionOrder }
 			})
 			.then((response) => {
 				if (response.data.hasOwnProperty("submissions"))
@@ -78,7 +77,8 @@ function Search() {
 				.then((response) => {
 					setSubmissions((submissions) => {
 						if (
-							submissions.some(								//Remove duplicates
+							submissions.some(
+								//Remove duplicates
 								(submission) =>
 									submission.ID == response.data.ID
 							)
@@ -96,7 +96,9 @@ function Search() {
 	const searchUsers = () => {
 		setUsers([])
 		axiosInstance
-			.get(usersQueryEndpoint, { params: search })
+			.get(usersQueryEndpoint, {
+				params: { name: search.get("name"), orderBy: userOrder }
+			})
 			.then((response) => {
 				setUsers(response.data.users)
 			})
@@ -113,7 +115,7 @@ function Search() {
 		return (
 			<Card
 				key={i}
-				style={{ minWidth: "45%", maxWidth: "45%", margin: "8px" }}>
+				style={{ minWidth: "25rem", maxWidth: "25rem", margin: "8px" }}>
 				<Card.Header closeButton={false}>
 					{userTypes[user.userType]}
 				</Card.Header>
@@ -143,23 +145,94 @@ function Search() {
 		)
 	})
 
+	const tagButtons = tags.map((tag, i) => {
+		return (
+			<Button
+				key={i}
+				variant="outline-secondary"
+				size="sm"
+				onClick={() => setTags(tags.filter((value) => value !== tag))}>
+				{tag}
+			</Button>
+		)
+	})
+
 	return (
-		<Row>
-			<Col className="span-12">
+		<Container>
+			<h3>Users:</h3>
+			Sort By:
+			<Form.Select onChange={(e) => setUserOrder(e.target.value)}>
+				<option default value="firstName">
+					First Name
+				</option>
+				<option value="lastName">Last Name</option>
+			</Form.Select>
+			<Row>
 				{users && users.length > 0 ? (
-					<CardGroup>{userCards}</CardGroup>
+					<CardGroup>
+						{" "}
+						<div
+							style={{
+								display: "flex",
+								flexDirection: "row",
+								overflowX: "auto",
+								overflowY: "hidden"
+							}}>
+							{userCards}
+						</div>
+					</CardGroup>
 				) : (
 					<div>No Users found</div>
 				)}
-			</Col>
-			<Col className="span-12">
+			</Row>
+			<br />
+			<h3>Submissions:</h3>
+			Sort By:
+			<Form.Select onChange={(e) => setSubmissionOrder(e.target.value)}>
+				<option default value="oldest">
+					Newest
+				</option>
+				<option value="newest">Oldest</option>
+				<option value="alphabetical">Alphabetical</option>
+			</Form.Select>
+			Tags:
+			<InputGroup className="mb-3">
+				<FormControl
+					placeholder="Add tags here"
+					onChange={(e) => {
+						setTagInput(e.target.value)
+					}}
+					value={tagInput}
+				/>
+				<Button
+					variant="outline-secondary"
+					onClick={() => {
+						!tags.includes(tagInput) && setTags(tags => [...tags, tagInput])
+						setTagInput("")
+					}}>
+					Add
+				</Button>
+			</InputGroup>
+			{tagButtons}
+			<Row>
 				{submissions && submissions.length > 0 ? (
-					<CardGroup>{submissionCards}</CardGroup>
+					<CardGroup>
+						{" "}
+						<div
+							style={{
+								display: "flex",
+								flexDirection: "row",
+								overflowX: "auto",
+								overflowY: "hidden"
+							}}>
+							{submissionCards}
+						</div>
+					</CardGroup>
 				) : (
 					<div>No submissions found</div>
 				)}
-			</Col>
-		</Row>
+			</Row>
+		</Container>
 	)
 }
 
