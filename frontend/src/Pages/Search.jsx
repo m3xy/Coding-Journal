@@ -41,15 +41,27 @@ function Search() {
 	const [showUsers, setShowUsers] = useState(false)
 
 	useEffect(() => {
-		setSubmissions([])
-		setUsers([])
 		searchSubmissions()
 		searchUsers()
 	}, [search])
 
 	const searchSubmissions = () => {
+		setSubmissions([])
 		axiosInstance
-			.get(submissionsQueryEndpoint, { params: search })
+			.get(submissionsQueryEndpoint, {
+				params: search
+			})
+			.then((response) => {
+				if (response.data.hasOwnProperty("submissions"))
+					getSubmissions(response.data.submissions)
+			})
+			.catch((error) => {
+				console.log(error)
+			})
+		axiosInstance
+			.get(submissionsQueryEndpoint, {
+				params: { tags: search.get("name") }
+			})
 			.then((response) => {
 				if (response.data.hasOwnProperty("submissions"))
 					getSubmissions(response.data.submissions)
@@ -65,6 +77,14 @@ function Search() {
 				.get(submissionEndpoint + "/" + submission.ID)
 				.then((response) => {
 					setSubmissions((submissions) => {
+						if (
+							submissions.some(								//Remove duplicates
+								(submission) =>
+									submission.ID == response.data.ID
+							)
+						) {
+							return submissions
+						}
 						return [...submissions, response.data]
 					})
 				})
@@ -74,6 +94,7 @@ function Search() {
 		})
 
 	const searchUsers = () => {
+		setUsers([])
 		axiosInstance
 			.get(usersQueryEndpoint, { params: search })
 			.then((response) => {
