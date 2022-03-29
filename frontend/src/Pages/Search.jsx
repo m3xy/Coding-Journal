@@ -1,22 +1,15 @@
 import React, { useState, useEffect } from "react"
 import {
 	Button,
-	Collapse,
 	FormControl,
 	InputGroup,
-	Toast,
 	Container,
 	Row,
-	Col,
 	Card,
 	CardGroup,
 	Form
 } from "react-bootstrap"
-import {
-	useNavigate,
-	useSearchParams,
-	createSearchParams
-} from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import axiosInstance from "../Web/axiosInstance"
 import SubmissionCard from "../Components/SubmissionCard"
 
@@ -32,9 +25,6 @@ const userTypes = [
 	"Reviewer-Publisher",
 	"Editor"
 ]
-
-const defaultSubmissionOrder = "oldest"
-const defaultUserOrder = "firstName"
 
 function Search() {
 	const [search, setSearch] = useSearchParams()
@@ -117,6 +107,17 @@ function Search() {
 		return <SubmissionCard submission={submission} key={i} />
 	})
 
+	const addUser = (user, users, setUsers, type) => {
+		if(!users.some((elem) => elem.userId == user.userId))
+			return (
+				<Card.Link
+					size="sm"
+					onClick={() => setUsers((users) => [...users, user])}>
+					Add as {type}
+				</Card.Link>
+			)
+	}
+
 	const userCards = users?.map((user, i) => {
 		return (
 			<Card
@@ -141,33 +142,8 @@ function Search() {
 						}>
 						View
 					</Card.Link>
-
-					{!authors.some(
-						(author) => author.userId == user.userId
-					) && (
-						<Card.Link
-							size="sm"
-							onClick={() =>
-								setAuthors((authors) => [...authors, user])
-							}>
-							Add as author
-						</Card.Link>
-					)}
-
-					{!reviewers.some(
-						(reviewer) => reviewer.userId == user.userId
-					) && (
-						<Card.Link
-							size="sm"
-							onClick={() =>
-								setReviewers((reviewers) => [
-									...reviewers,
-									user
-								])
-							}>
-							Add as reviewer
-						</Card.Link>
-					)}
+					{addUser(user, authors, setAuthors, "author")}
+					{addUser(user, reviewers, setReviewers, "reviewer")}
 				</Card.Body>
 				<Card.Footer>
 					<small className="text-muted">
@@ -206,49 +182,27 @@ function Search() {
 		)
 	}
 
-	const authorBtns = authors.map((author) => {
-		return (
-			<Button
-				key={author.userId}
-				variant="outline-danger"
-				size="sm"
-				onClick={() =>
-					setAuthors(
-						authors.filter((elem) => elem.userId !== author.userId)
-					)
-				}>
-				{author.firstName +
-					" " +
-					author.lastName +
-					"(" +
-					author.profile.email +
-					")"}
-			</Button>
-		)
-	})
-
-	const reviewerBtns = reviewers.map((reviewer) => {
-		return (
-			<Button
-				key={reviewer.userId}
-				variant="outline-danger"
-				size="sm"
-				onClick={() =>
-					setReviewers(
-						reviewers.filter(
-							(elem) => elem.userId !== reviewer.userId
+	const userBtns = (users, setUsers) =>
+		users.map((user) => {
+			return (
+				<Button
+					key={user.userId}
+					variant="outline-danger"
+					size="sm"
+					onClick={() =>
+						setUsers(
+							users.filter((elem) => elem.userId !== user.userId)
 						)
-					)
-				}>
-				{reviewer.firstName +
-					" " +
-					reviewer.lastName +
-					" (" +
-					reviewer.profile.email +
-					")"}
-			</Button>
-		)
-	})
+					}>
+					{user.firstName +
+						" " +
+						user.lastName +
+						" (" +
+						user.profile.email +
+						")"}
+				</Button>
+			)
+		})
 
 	return (
 		<Container>
@@ -307,12 +261,12 @@ function Search() {
 			<br />
 			{authors.length > 0 && (
 				<>
-					Authors: {authorBtns} <br />
+					Authors: {userBtns(authors, setAuthors)} <br />
 				</>
 			)}
 			{reviewers.length > 0 && (
 				<>
-					Reviewers: {reviewerBtns} <br />
+					Reviewers: {userBtns(reviewers, setReviewers)} <br />
 				</>
 			)}
 			<Row>
