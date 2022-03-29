@@ -1,7 +1,7 @@
 {
   "license": "MIT",
   "scripts": {
-    "build": "webpack build --mode production --color --config webpack.production.js",
+    "build": "npx webpack-cli build --mode production --color --config webpack.production.js",
     "start": "npm run start:dev",
     "start:dev": "webpack serve --hot --color --open --config webpack.dev.js"
   },
@@ -53,22 +53,22 @@
     "redux-logger": "^3.0.6",
     "redux-thunk": "^2.4.1",
     "regenerator-runtime": "^0.13.9",
-    "webpack-merge": "^5.8.0"
-  },
-  "devDependencies": {
+    "webpack-merge": "^5.8.0",
+    "css-loader": "^6.7.1",
+    "html-webpack-plugin": "^5.5.0",
     "@babel/core": "^7.16.7",
     "@babel/preset-env": "^7.16.8",
     "@babel/preset-react": "^7.16.7",
-    "babel-loader": "^8.0.5",
     "babel-plugin-prismjs": "^2.1.0",
-    "css-loader": "^6.7.1",
-    "html-webpack-plugin": "^5.5.0",
     "path": "^0.12.7",
-    "prettier": "2.5.1",
-    "raw-loader": "^4.0.2",
     "style-loader": "^3.3.1",
+    "raw-loader": "^4.0.2",
+    "babel-loader": "^8.0.5"
+  },
+  "devDependencies": {
+    "prettier": "2.5.1",
     "webpack": "^5.65.0",
-    "webpack-cli": "^4.9.1",
+    "webpack-cli": "^4.9.2",
     "webpack-dev-server": "^4.7.2"
   }
 }

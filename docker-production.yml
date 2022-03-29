@@ -10,23 +10,10 @@ services:
     volumes:
       - db_data:/var/lib/mysql
 
-  backend:
-    build: ./backend
-    depends_on:
-      - db
-    ports:
-      - "3333:3333"
-    volumes:
-      - ./logs:/var/tmp/cs3099-log
-      - file_sys:/filesystem
-    environment:
-      LOG_PATH: "/var/tmp/cs3099-log/cs3099-backend.log"
-      DATABASE_URL: "myuser:mypass@tcp(db:3306)"
-
   frontend:
     build:
       context: ./frontend
-      dockerfile: ./frontend/Dockerfile.production
+      dockerfile: ./Dockerfile.production
 
     depends_on:
       - backend

@@ -228,7 +228,7 @@ func GetLocalUserID(credentials JournalLoginPostBody) (string, int, int) {
   Input: {"Refresh": { "type": "string", "description": "User's valid refresh token."}}
 */
 func GetToken(w http.ResponseWriter, r *http.Request) {
-	refreshToken := r.Header.Get("refresh_token")
+	refreshToken := r.Header.Get("RefreshToken")
 	var body interface{}
 
 	// Validate refresh token, and create new tokens.
@@ -334,7 +334,7 @@ func PostSignUp(w http.ResponseWriter, r *http.Request) {
 			Message: "Registration failed",
 			Error:   true,
 		}}
-	} else if _, err := ControllerRegisterUser(*user, USERTYPE_REVIEWER_PUBLISHER); err != nil {
+	} else if _, err := ControllerRegisterUser(*user, USERTYPE_PUBLISHER); err != nil {
 		log.Printf("[ERROR] User registration failed: %v", err)
 		switch err.(type) {
 		case *RepeatEmailError:

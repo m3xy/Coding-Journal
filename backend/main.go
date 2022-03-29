@@ -27,7 +27,7 @@ const (
 	ADDRESS_KEY     = "BACKEND_ADDRESS"
 
 	// end points for URLs
-	SUBROUTE_JOURNAL = "/journal"
+	SUBROUTE_JOURNAL = "/supergroup"
 
 	ENDPOINT_USERINFO = "/users"
 	ENDPOINT_VALIDATE = "/validate"
@@ -86,7 +86,7 @@ func setupCORSsrv() *http.Server {
 	// sets up handler for CORS
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://0.0.0.0:23409", "http://localhost:23409", "https://cs3099user11.host.cs.st-andrews.ac.uk"},
-		AllowedHeaders: []string{"content-type", SECURITY_TOKEN_KEY, "bearer_token", "refresh_token", "user"},
+		AllowedHeaders: []string{"content-type", SECURITY_TOKEN_KEY, "BearerToken", "RefreshToken", "user"},
 		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PUT"},
 	})
 

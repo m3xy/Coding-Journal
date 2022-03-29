@@ -31,7 +31,8 @@ func journalMiddleWare(next http.Handler) http.Handler {
 // Middleware for strict access token validation.
 func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ok, id, userType := validateWebToken(r.Header.Get("bearer_token"), CLAIM_BEARER); !ok {
+		if ok, id, userType := validateWebToken(r.Header.Get("BearerToken"), CLAIM_BEARER); !ok {
+
 			next.ServeHTTP(w, r)
 		} else {
 			if !isUnique(gormDb, &GlobalUser{}, "id", id) {
