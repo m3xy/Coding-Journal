@@ -24,7 +24,6 @@ const submissionsQueryEndpoint = "/submissions/query"
 const usersQueryEndpoint = "/users/query"
 const submissionEndpoint = "/submission"
 const profileURL = "/profile"
-
 const userTypes = [
 	"User",
 	"Publisher",
@@ -34,24 +33,46 @@ const userTypes = [
 ]
 
 function Search() {
+	//search parameters passed to the page (most notably, the "name" search parameter is used in both user and submission search)
 	const [search, setSearch] = useSearchParams()
+
+	//Hook returns a navigate function used to navigate between
 	const navigate = useNavigate()
 
+	//Result submissions from submissions query
 	const [submissions, setSubmissions] = useState([])
+
+	//Result users from users query
 	const [users, setUsers] = useState([])
+
+	//The display order of submissions
 	const [submissionOrder, setSubmissionOrder] = useState(null)
+
+	//User type for users query
 	const [userType, setUserType] = useState(null)
+
+	//The display order of users from users query
 	const [userOrder, setUserOrder] = useState(null)
+
+	//Tags for submissions query
 	const [tags, setTags] = useState([])
-	const [tagInput, setTagInput] = useState([])
+
+	//The tags input
+	const [tagInput, setTagInput] = useState("")
+
+	//The authors for submissions query
 	const [authors, setAuthors] = useState([])
+
+	//The reviewers for submissions query
 	const [reviewers, setReviewers] = useState([])
 
+	//Perform a submissions and users search - useEffect hook is invoked when the page (re)renders/dependency changes (query/options/filters)
 	useEffect(() => {
 		searchSubmissions()
 		searchUsers()
 	}, [search, submissionOrder, userOrder, tags, userType, authors, reviewers])
 
+	//Search for submissions with the specified options (query/options/filters)
 	const searchSubmissions = () => {
 		setSubmissions([])
 
@@ -79,6 +100,7 @@ function Search() {
 			})
 	}
 
+	//Get each submissions details by their submission ID returned from the submissions query
 	const getSubmissions = (response) =>
 		response?.map((submission) => {
 			axiosInstance
@@ -93,6 +115,7 @@ function Search() {
 				})
 		})
 
+	//Search users with the specified options (query/options/filters)
 	const searchUsers = () => {
 		setUsers([])
 		const userSearch = new URLSearchParams(search)
@@ -110,10 +133,12 @@ function Search() {
 			})
 	}
 
+	//Return all of the submission cards of the submissions query (Maps each submission to a SubmissionCard component to display)
 	const submissionCards = submissions?.map((submission, i) => {
 		return <SubmissionCard submission={submission} key={i} />
 	})
 
+	//Adds a user to the submissions search filter (as an author/reviewer)
 	const addUser = (user, users, setUsers, type) => {
 		if (!users.some((elem) => elem.userId == user.userId))
 			return (
@@ -125,6 +150,7 @@ function Search() {
 			)
 	}
 
+	//Return all of the user cards of the users query (Maps each user to a Card component to display)
 	const userCards = users?.map((user, i) => {
 		return (
 			<Card
@@ -160,6 +186,7 @@ function Search() {
 		)
 	})
 
+	//(Removable) Buttons displaying the tags of the submissions query
 	const tagBtns = tags.map((tag, i) => {
 		return (
 			<Button
@@ -172,6 +199,7 @@ function Search() {
 		)
 	})
 
+	//Container for (user and submission) cards (results of the users and submissions queries)
 	const cardContainer = (cards) => {
 		return (
 			<CardGroup>
@@ -188,6 +216,7 @@ function Search() {
 		)
 	}
 
+	//Authors and Reviewers can be added as filters to the submissions query, these are displayed as removable buttons, alike tags
 	const userBtns = (users, setUsers) =>
 		users.map((user) => {
 			return (
@@ -225,7 +254,6 @@ function Search() {
 				<option value={0}>User</option>
 				<option value={1}>Publisher</option>
 				<option value={2}>Reviewer</option>
-				<option value={3}>Reviewer-Publisher</option>
 				<option value={4}>Editor</option>
 			</Form.Select>
 			<br />
