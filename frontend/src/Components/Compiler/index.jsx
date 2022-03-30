@@ -6,7 +6,10 @@ import axios from "axios"
 import { CSSTransition } from 'react-transition-group';
 import axiosInstance from "../../Web/axiosInstance"
 import DragAndDrop from "../DragAndDrop/index"
+<<<<<<< HEAD
 import { createMemoryHistory } from "history"
+=======
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
 
 const baseURL = "https://judge0-ce.p.rapidapi.com/submissions" //use wait param to only use one tag!!!!
 
@@ -28,7 +31,11 @@ const singleFileData = {
 const multiFileData ={
     language_id: 89,
     additional_files: "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",
+<<<<<<< HEAD
     stdin: "MTA="//could also have cmlineargs and inputfile
+=======
+    stdin: "MTA="
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
 }
 
 const config = {
@@ -37,6 +44,7 @@ const config = {
 }
 
 
+<<<<<<< HEAD
 export default (id, submissionData) => {
     const [zipAsBase64, setZipAsBase64] = useState(null)
     const [executableSubmission, setExecutableSubmission] = useState({
@@ -48,6 +56,13 @@ export default (id, submissionData) => {
     const [languageID, setLanguageID] = useState(null) //probably a let somewhere else
     const [multifileProgram, setMultiFileProgram] = useState(null) //if this is a mutli file program (boolean)
     // const [submission, setSubmission] = useState(null) //source code if single file additional files if multi file
+=======
+export default () => {
+	const [submissionToken, setSubmissionToken] = useState(null)
+    const [languageID, setLanguageID] = useState(null) //probably a let somewhere else
+    const [multifileProgram, setMultiFileProgram] = useState(null) //if this is a mutli file program (boolean)
+    const [submission, setSubmission] = useState(null) //source code if single file additional files if multi file
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
     const [stdInput, setStdInput] = useState(null) //if this program accepts stdin (boolean)
     const [commandLineArgs, setArgs] = useState(null) //if this program accepts command line arguments (boolean)
     const [inputFile, setInputFile] = useState(null)
@@ -66,6 +81,7 @@ export default (id, submissionData) => {
 
     // }, []) 
 
+<<<<<<< HEAD
     //When no custom input file is allowed then we can just retrieve the zip as bas64 already
     const getZip = (id)  =>{
 		axiosInstance
@@ -125,6 +141,12 @@ export default (id, submissionData) => {
              console.log(atob(multiFileData.additional_files));
              console.log(multiFileData)
              setCompilerResponse(response)
+=======
+    const runCode = (submission) =>{
+        axios.post(baseURL, multiFileData, config)
+           .then(function (response) {
+             console.log(response);
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
              setSubmissionToken(response.data.token)
              setOutput(atob(response.data.stdout))
              setMemoryUsage(response.data.memory)
@@ -191,7 +213,11 @@ export default (id, submissionData) => {
                                     onClick={() => 
                                         { 
                                         isLoading
+<<<<<<< HEAD
                                             ? runCode(multiFileData)
+=======
+                                            ? runCode(submissionToken)
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
                                             : setShowMessage(true) 
                                         
                                         }}
@@ -241,7 +267,11 @@ export default (id, submissionData) => {
                                         onClick={() => 
                                             { 
                                             isLoading
+<<<<<<< HEAD
                                                 ? runCode(multiFileData)
+=======
+                                                ? runCode(submissionToken)
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
                                                 : setShowMessage(true) 
                                             
                                             }}
@@ -300,7 +330,11 @@ export default (id, submissionData) => {
                                         onClick={() => 
                                             { 
                                             isLoading
+<<<<<<< HEAD
                                                 ? runCode(multiFileData)
+=======
+                                                ? runCode(submissionToken)
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
                                                 : setShowMessage(true) 
                                             
                                             }}
@@ -373,7 +407,10 @@ export default (id, submissionData) => {
                
         }
     
+<<<<<<< HEAD
     
+=======
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
 
     return (
         <div>
@@ -385,4 +422,8 @@ export default (id, submissionData) => {
             </div>
         </div>
     )
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 6ce79006284d3bc69b1db9b0af896ae349c9b6b6
