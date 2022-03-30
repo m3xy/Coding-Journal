@@ -61,7 +61,11 @@ export default ({ reviewers, reviews }) => {
 											flex: "0.2",
 											textAlign: "right"
 										}}></div>
-									{getBadge(review.approved)}
+									{getBadge(
+										review.approved !== undefined
+											? review.approved
+											: false
+									)}
 								</h5>
 							</ListGroupItem>
 						)
