@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from "react"
-import { Tabs, Tab, ListGroup, Badge } from "react-bootstrap"
+import { Tabs, Tab, ListGroup, Badge, Card, Col, Row } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
@@ -84,6 +84,63 @@ function Profile() {
 		)
 	}
 
+	const getAnalytics = () => {
+		return (
+			<Card>
+			<Col>
+				<Card  border="primary"
+				style={{ width: 'flex', margin: '8px'}}>
+					<Card.Header>
+                        Total Submissions
+                    </Card.Header>
+                    <Card.Body>
+                        <Card.Title>10</Card.Title>
+                    </Card.Body>
+				</Card>
+			</Col>
+			<Col>
+			<Card
+                    border="success"
+                    style={{ width: 'flex', margin: '8px' }}
+                    >
+                    <Card.Header>
+                        Accepted Submissions
+                    </Card.Header>
+                    <Card.Body>
+                        <Card.Title>5</Card.Title>
+                    </Card.Body>
+                    </Card>
+			</Col>
+			<Col>
+			<Card
+                    border="warning"
+                    style={{ width: 'flex', margin: '8px' }}
+                    >
+                    <Card.Header>
+                        Submissions Under-Review
+                    </Card.Header>
+                    <Card.Body>
+                        <Card.Title>3</Card.Title>
+                    </Card.Body>
+                    </Card>
+			</Col>
+			<Col> 
+			<Card
+                    border="danger"
+                    style={{ width: 'flex', margin: '8px' }}
+                    >
+                    <Card.Header>
+                        Rejected Submissions
+                    </Card.Header>
+                    <Card.Body>
+                        <Card.Title>2</Card.Title>
+                    </Card.Body>
+                    </Card>
+			</Col>
+		</Card>
+		)
+	}
+
 	// Shorten a string if it is too long for given format.
 	const cutShort = (text, limit) => {
 		if (text.length > limit) {
@@ -124,12 +181,18 @@ function Profile() {
 						getSubmissionsList(user.reviewedSubmissions)
 					) : (
 						<div className="text-center" style={{ color: "grey" }}>
-							<i>No reviewed submissions</i>
+							<i>No reviewed Submission</i>
 						</div>
 					)}
 				</Tab>
-				<Tab eventKey="comments" title="Comments">
-					{}
+				<Tab eventKey="analytics" title="Analytics">
+					{user.authoredSubmissions?.length > 0 ? (
+						getAnalytics()
+					) : (
+						<div className="text-center" style={{ color: "grey" }}>
+							<i>No Data to Analyse</i>
+						</div>
+					)}
 				</Tab>
 				<Tab eventKey="contact" title="Contact">
 					Email: {user.profile?.email} <br />
