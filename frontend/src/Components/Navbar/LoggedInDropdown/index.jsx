@@ -43,13 +43,6 @@ const LoggedInDropdown = ({ user }) => {
 				</Dropdown.Item>
 				<Dropdown.Item
 					onClick={() => {
-						navigate("/submissions")
-					}}>
-					{" "}
-					Submissions{" "}
-				</Dropdown.Item>
-				<Dropdown.Item
-					onClick={() => {
 						JwtService.rmUser()
 						navigate("/")
 					}}>

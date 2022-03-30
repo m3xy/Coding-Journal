@@ -24,7 +24,6 @@ import {
 	Home,
 	Upload,
 	Profile,
-	Submissions,
 	Submission,
     Search
 } from "../Pages"
@@ -45,7 +44,6 @@ function App() {
 					<Route path="/profile/:id" element={<Profile />} />
 					<Route path="/profile" element={<Profile />} />
 					<Route path="/submission/:id" element={<Submission />} />
-					<Route path="/submissions" element={<Submissions />} />
                     <Route path="/search" element={<Search />} />
 				</Routes>
 				<Footer />
