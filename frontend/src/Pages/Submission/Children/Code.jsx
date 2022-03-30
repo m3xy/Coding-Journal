@@ -7,7 +7,15 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import axiosInstance from "../../../Web/axiosInstance"
-import { Form, InputGroup, Card, Button, Collapse, Tabs, Tab } from "react-bootstrap"
+import {
+	Form,
+	InputGroup,
+	Card,
+	Button,
+	Collapse,
+	Tabs,
+	Tab
+} from "react-bootstrap"
 import { SwitchTransition, CSSTransition } from "react-transition-group"
 import MonacoEditor, { monaco } from "react-monaco-editor"
 import FadeInTransition from "../../../Components/Transitions/FadeIn.module.css"
@@ -22,7 +30,6 @@ const defaultLine = 1
 const CODE_HEIGHT = "50vh"
 
 function Code({ id, show }) {
-
 	//File to be fetched
 	const [file, setFile] = useState({
 		ID: null,
@@ -43,7 +50,7 @@ function Code({ id, show }) {
 	const [endLine, setEndLine] = useState(defaultLine)
 	const [decorations, setDecorations] = useState([])
 
-
+	//File's comments
 	const [comments, setComments] = useState([])
 	const [showComments, setShowComments] = useState(false)
 
@@ -324,7 +331,7 @@ function Code({ id, show }) {
 		switch (extension) {
 			case "md":
 				return (
-					<Tabs defaultActiveKey="code"  style={{margin: "15px"}}>
+					<Tabs defaultActiveKey="code" style={{ margin: "15px" }}>
 						<Tab eventKey="code" title="Code">
 							{codeHTML()}
 						</Tab>
