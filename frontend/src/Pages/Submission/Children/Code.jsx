@@ -54,10 +54,12 @@ function Code({ id, show }) {
 	const [comments, setComments] = useState([])
 	const [showComments, setShowComments] = useState(false)
 
+	//Fetch file (content and comments) by file ID
 	useEffect(() => {
 		getFile()
-	}, [id])
+	}, [id]) //If the file ID is changed, new file is fetched and components re render
 
+	//Get the file as specified by the id prop passed
 	const getFile = () => {
 		if (id && id != -1) {
 			axiosInstance
@@ -89,6 +91,7 @@ function Code({ id, show }) {
 		}
 	}
 
+	//Gets the comment decorations for the monaco instance
 	const getDecorations = (comments) => {
 		let newDecorations = comments?.map((comment) => {
 			return {
@@ -121,6 +124,7 @@ function Code({ id, show }) {
 		)
 	}
 
+	//Invoked when the monaco component is mounted, add the in-line commenting functionality here
 	const editorDidMount = (editor, monaco) => {
 		editor.addAction({
 			id: "Comment", // An unique identifier of the contributed action.
@@ -142,12 +146,14 @@ function Code({ id, show }) {
 		editor.focus()
 	}
 
+	//Options for the Monaco editor component
 	const options = {
 		selectOnLineNumbers: true,
 		glyphMargin: true,
 		readOnly: true
 	}
 
+	//
 	const codeHTML = () => {
 		return (
 			<div>
@@ -163,49 +169,17 @@ function Code({ id, show }) {
 								onChange={(e) => {
 									setLanguage(e.target.value)
 								}}>
-								<option>abap</option>
-								<option>aes</option>
-								<option>apex</option>
-								<option>azcli</option>
-								<option>bat</option>
-								<option>bicep</option>
 								<option>c</option>
-								<option>cameligo</option>
 								<option>clojure</option>
-								<option>coffeescript</option>
 								<option>cpp</option>
 								<option>csharp</option>
-								<option>csp</option>
 								<option>css</option>
 								<option>dart</option>
 								<option>dockerfile</option>
-								<option>ecl</option>
 								<option>elixir</option>
-								<option>flow9</option>
-								<option>freemarker2</option>
-								<option>
-									freemarker2.tag-angle.interpolation-bracket
-								</option>
-								<option>
-									freemarker2.tag-angle.interpolation-dollar
-								</option>
-								<option>
-									freemarker2.tag-auto.interpolation-bracket
-								</option>
-								<option>
-									freemarker2.tag-auto.interpolation-dollar
-								</option>
-								<option>
-									freemarker2.tag-bracket.interpolation-bracket
-								</option>
-								<option>
-									freemarker2.tag-bracket.interpolation-dollar
-								</option>
 								<option>fsharp</option>
 								<option>go</option>
 								<option>graphql</option>
-								<option>handlebars</option>
-								<option>hcl</option>
 								<option>html</option>
 								<option>ini</option>
 								<option>java</option>
@@ -213,53 +187,34 @@ function Code({ id, show }) {
 								<option>json</option>
 								<option>julia</option>
 								<option>kotlin</option>
-								<option>less</option>
-								<option>lexon</option>
-								<option>liquid</option>
 								<option>lua</option>
-								<option>m3</option>
 								<option>markdown</option>
 								<option>mips</option>
-								<option>msdax</option>
 								<option>mysql</option>
 								<option>objective-c</option>
 								<option>pascal</option>
-								<option>pascaligo</option>
 								<option>perl</option>
 								<option>pgsql</option>
 								<option>php</option>
-								<option>pla</option>
 								<option>plaintext</option>
-								<option>postiats</option>
 								<option>powerquery</option>
 								<option>powershell</option>
-								<option>proto</option>
 								<option>pug</option>
 								<option>python</option>
 								<option>qsharp</option>
 								<option>r</option>
 								<option>razor</option>
 								<option>redis</option>
-								<option>redshift</option>
-								<option>restructuredtext</option>
 								<option>ruby</option>
 								<option>rust</option>
-								<option>sb</option>
 								<option>scala</option>
 								<option>scheme</option>
 								<option>scss</option>
 								<option>shell</option>
-								<option>sol</option>
-								<option>sparql</option>
 								<option>sql</option>
-								<option>st</option>
 								<option>swift</option>
-								<option>systemverilog</option>
-								<option>tcl</option>
-								<option>twig</option>
 								<option>typescript</option>
 								<option>vb</option>
-								<option>verilog</option>
 								<option>xml</option>
 								<option>yaml</option>
 							</Form.Select>
