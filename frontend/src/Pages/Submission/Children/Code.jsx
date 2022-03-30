@@ -54,13 +54,14 @@ function Code({ id, show }) {
 	const [comments, setComments] = useState([])
 	const [showComments, setShowComments] = useState(false)
 
-	//Fetch file (content and comments) by file ID
+	//Fetch file (content and comments) by file ID - useEffect hook is invoked when the page (re)renders/dependency changes (File ID in this case)
 	useEffect(() => {
 		getFile()
 	}, [id]) //If the file ID is changed, new file is fetched and components re render
 
 	//Get the file as specified by the id prop passed
 	const getFile = () => {
+		//Check ID is valid
 		if (id && id != -1) {
 			axiosInstance
 				.get(fileEndpoint + "/" + id)
@@ -79,6 +80,7 @@ function Code({ id, show }) {
 					console.log(error)
 				})
 		} else {
+			//Invalid ID, set defaults
 			setFile({
 				ID: null,
 				submissionId: null,
@@ -94,6 +96,7 @@ function Code({ id, show }) {
 	//Gets the comment decorations for the monaco instance
 	const getDecorations = (comments) => {
 		let newDecorations = comments?.map((comment) => {
+			//Returns array of decorations for each comment
 			return {
 				range: new monaco.Range(
 					comment.startLine,
@@ -115,6 +118,7 @@ function Code({ id, show }) {
 			}
 		})
 		setDecorations(
+			//Set the decorations
 			monacoRef.current
 				? monacoRef.current.editor.deltaDecorations(
 						decorations,
@@ -153,7 +157,7 @@ function Code({ id, show }) {
 		readOnly: true
 	}
 
-	//
+	//HTML to display code files
 	const codeHTML = () => {
 		return (
 			<div>
@@ -254,6 +258,7 @@ function Code({ id, show }) {
 		)
 	}
 
+	//HTML to display PDFs
 	const pdfHTML = () => {
 		return (
 			<div style={{ textAlign: "center" }}>
@@ -266,6 +271,7 @@ function Code({ id, show }) {
 		)
 	}
 
+	//HTML to display images
 	const imgHTML = (ext) => {
 		return (
 			<div style={{ textAlign: "center" }}>
@@ -277,10 +283,12 @@ function Code({ id, show }) {
 		)
 	}
 
+	//HTML to display Markdown files
 	const mdHTML = () => {
 		return <ReactMarkdown>{atob(file.base64Value)}</ReactMarkdown>
 	}
 
+	//Render the fetched file appropriately
 	const renderFile = () => {
 		const extension = file.path.split(".").pop()
 		switch (extension) {

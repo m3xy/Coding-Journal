@@ -32,20 +32,33 @@ function Comment({
 	commentEndpoint,
 	refresh
 }) {
-
+	//Used to navigate between routes of our react application
 	const navigate = useNavigate()
 
+	//State variable storing the reply text to the comment
 	const [reply, setReply] = useState("")
+
+	//State variable which determines whether replies for the comment are shown or not
 	const [showReplies, setShowReplies] = useState(false)
+
+	//State variable which determines whether the reply box is visible or not
 	const [openReply, setOpenReply] = useState(false)
+
+	//State variable, the author name of the comment
 	const [name, setName] = useState("")
+
+	//State variable storing the text of a comment edit
 	const [edit, setEdit] = useState("")
+
+	//State variable which determines whether the edit box is visible or not
 	const [openEdit, setOpenEdit] = useState(false)
 
+	//Fetch the comment author's name when the comment component has (re)rendered
 	useEffect(() => {
 		getName()
 	}, [name])
 
+	//Fetch the comment author's name
 	const getName = () => {
 		axiosInstance
 			.get(userEndpoint + "/" + comment.author)
@@ -57,6 +70,7 @@ function Comment({
 			})
 	}
 
+	//Makes a post request including the edits made to the comment
 	const postEdit = () => {
 		const b64Edit = btoa(edit)
 		if (b64Edit == comment.base64Value) {
@@ -88,6 +102,7 @@ function Comment({
 			})
 	}
 
+	//Makes a post request to delete the comment
 	const postDelete = () => {
 		axiosInstance
 			.post(
@@ -108,10 +123,12 @@ function Comment({
 			})
 	}
 
+	//Replies are represented as further comment components displayed under their parent comment
 	const repliesHTML = comment.comments
-		? comment.comments.map((reply) => {
+		? comment.comments.map((reply, i) => {
 				return (
 					<Comment
+						key={i}
 						fileID={fileID}
 						comment={reply}
 						show={showReplies}
@@ -130,8 +147,14 @@ function Comment({
 				style={{ verticalAlign: "top", minWidth: "100%" }}
 				className="d-inline-block m-1">
 				<Toast.Header closeButton={false}>
-					<Button variant="light" className="me-auto" size="sm" onClick={() => navigate(profileURL + "/" + comment.author)}>
-					{name}
+					<Button
+						variant="light"
+						className="me-auto"
+						size="sm"
+						onClick={() =>
+							navigate(profileURL + "/" + comment.author)
+						}>
+						{name}
 					</Button>
 					<small>
 						{comment.startLine == comment.endLine ? (
