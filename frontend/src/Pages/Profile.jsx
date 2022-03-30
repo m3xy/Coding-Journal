@@ -2,55 +2,67 @@
  * Profile.jsx
  * author: 190019931
  *
- * User's profile page
+ * A User's profile page
  */
 
 import React, { useState, useEffect } from "react"
 import { Tabs, Tab, ListGroup, Badge, Card, Col, Row } from "react-bootstrap"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
+
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
 
-const profileEndpoint = "/user"
+const userEndpoint = "/user"
+const userTypeEndpoint = "/changepermissions"
+const submissionEndpoint = "/submission"
 
-function getUserID() {
-	let user = JwtService.getUserID()
-	return user
-}
+//User Types
+const userTypes = [
+	"User",
+	"Publisher",
+	"Reviewer",
+	"Reviewer-Publisher", //Deprecated
+	"Editor"
+]
 
 function Profile() {
+	//Hook returns a navigate function used to navigate between
 	const navigate = useNavigate()
+
+	//If viewing another profile, ID of the user is fetched from the URL parameters
+	const { id } = useParams()
+
+	//The user the profile describes
 	const [user, setUser] = useState({})
 
+	//Returns the user's ID (to get their profile)
+	const getUserID = () => {
+		let user = id ? id : JwtService.getUserID()
+		return user
+	}
+
+	//If no user is not logged in, navigate back to the login page
 	if (getUserID() === null) {
 		navigate("/login")
 	}
 
+	//Fetch the User's details from their ID. useEffect hook is invoked when the page (re)renders/dependency changes (User ID in this case)
 	useEffect(() => {
 		axiosInstance
-			.get(profileEndpoint + "/" + getUserID())
+			.get(userEndpoint + "/" + getUserID())
 			.then((response) => {
 				setUser(response.data)
 			})
 			.catch(() => {
 				return <div></div>
 			})
-	}, [])
+	}, [id])
 
-	//Get user comments
-	const comments = []
-	const userTypes = [
-		"User",
-		"Publisher",
-		"Reviewer",
-		"Reviewer-Publisher",
-		"Editor"
-	]
-
+	//Returns a list of submissions (used in displaying authored and reviewed submissions)
 	const getSubmissionsList = (submissions) => {
 		return (
 			<ListGroup>
-				{user.authoredSubmissions?.map((submission) => {
+				{submissions?.map((submission) => {
 					return (
 						<ListGroup.Item
 							as="li"
@@ -58,7 +70,12 @@ function Profile() {
 							style={{ padding: "10px" }}
 							action
 							onClick={() => {
-								navigate("/submission/" + submission.ID)
+								;(!id ||
+									JwtService.getUserType() == 4 ||
+									submission.approved) &&
+									navigate(
+										submissionEndpoint + "/" + submission.ID
+									)
 							}}>
 							<Badge
 								bg={
@@ -155,11 +172,52 @@ function Profile() {
 		}
 	}
 
+	//Sends a request to the backend to edit the user type of the user (Only editors can make this request)
+	const editType = (type) => {
+		axiosInstance
+			.post(userEndpoint + "/" + getUserID() + userTypeEndpoint, {
+				permissions: type
+			})
+			.then((response) => {
+				setUser({ ...user, userType: type })
+			})
+			.catch((error) => {
+				console.log(error)
+			})
+	}
+
+	//A button which allows an Editor to modify another User's type
+	const editTypeBtn = () => {
+		return (
+			<Dropdown>
+				<Dropdown.Toggle variant="light" bsPrefix="p-0">
+					✎
+				</Dropdown.Toggle>
+				<Dropdown.Menu>
+					{userTypes.map((type) => {
+						if (userTypes.indexOf(type) == 3) return
+						return (
+							<Dropdown.Item
+								onClick={() =>
+									editType(userTypes.indexOf(type))
+								}>
+								{type}
+							</Dropdown.Item>
+						)
+					})}
+				</Dropdown.Menu>
+			</Dropdown>
+		)
+	}
+
 	return (
 		<div className="col-md-6 offset-md-3" style={{ textAlign: "center" }}>
 			<br />
 			<h2>{user.firstName + " " + user.lastName}</h2>
 			<label>({userTypes[user.userType]})</label>
+			{JwtService.getUserType() == 4 &&
+				JwtService.getUserID() !== getUserID() &&
+				editTypeBtn()}
 			<br />
 			<br />
 			<Tabs
@@ -176,7 +234,7 @@ function Profile() {
 						</div>
 					)}
 				</Tab>
-				<Tab eventKey="reviewed" title="Reviewer Submissions">
+				<Tab eventKey="reviewed" title="Reviewed Submissions">
 					{user.reviewedSubmissions?.length > 0 ? (
 						getSubmissionsList(user.reviewedSubmissions)
 					) : (
