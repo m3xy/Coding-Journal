@@ -21,10 +21,6 @@ export default ({ reviewers, reviews }) => {
 		})
 	}, [reviewers])
 
-	const getFullName = (reviewer) => {
-		return reviewer.firstName + " " + reviewer.lastName
-	}
-
 	const getBadge = (approval) => {
 		const [bg, text] = approval
 			? ["primary", "Approves"]
@@ -51,9 +47,14 @@ export default ({ reviewers, reviews }) => {
 									<Card.Link
 										style={{ flex: "1" }}
 										onClick={() => clickReview(review)}>
-										{getFullName(
+										{
 											reviewerMap[review.reviewerId]
-										)}
+												?.firstName
+										}{" "}
+										{
+											reviewerMap[review.reviewerId]
+												?.lastName
+										}
 									</Card.Link>
 									<div
 										style={{
