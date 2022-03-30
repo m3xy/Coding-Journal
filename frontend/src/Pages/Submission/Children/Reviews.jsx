@@ -22,7 +22,7 @@ export default ({ reviewers, reviews }) => {
 	}, [reviewers])
 
 	const getFullName = (reviewer) => {
-		reviewer?.firstName + " " + reviewer?.lastName
+		return reviewer.firstName + " " + reviewer.lastName
 	}
 
 	const getBadge = (approval) => {
@@ -44,15 +44,16 @@ export default ({ reviewers, reviews }) => {
 			</Card.Body>
 			<ListGroup className="list-group-flush">
 				{reviews?.map((review, i) => {
-					const reviewer = reviewerMap[review.reviewerId]
-					if (reviewer !== undefined)
+					if (reviewerMap[review.reviewerId] !== undefined)
 						return (
 							<ListGroupItem key={i}>
 								<h5 style={{ display: "flex" }}>
 									<Card.Link
 										style={{ flex: "1" }}
 										onClick={() => clickReview(review)}>
-										{getFullName(reviewer)}
+										{getFullName(
+											reviewerMap[review.reviewerId]
+										)}
 									</Card.Link>
 									<div
 										style={{
