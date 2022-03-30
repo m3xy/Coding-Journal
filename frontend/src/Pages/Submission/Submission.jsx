@@ -97,7 +97,7 @@ function Submission() {
 
 	// Get an author's full name.
 	const getUserFullName = (author) => {
-		return author.firstName + " " + author.lastName
+		return author?.firstName + " " + author?.lastName
 	}
 
 	// Get status badge from submission status
