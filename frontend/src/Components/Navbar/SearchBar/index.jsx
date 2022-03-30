@@ -5,7 +5,7 @@
  * Navbar search bar modal for small screens.
  */
 
-import React, {useState} from "react"
+import React, { useState } from "react"
 import {
 	Nav,
 	Modal,
@@ -14,18 +14,38 @@ import {
 	Button
 } from "react-bootstrap"
 import { BsSearch } from "react-icons/bs"
+import { createSearchParams, useNavigate } from "react-router-dom"
+
+const searchURL = "/search"
 
 // Modal used for small screen searches
 const SearchForm = () => {
+
+	const [term, setTerm] = useState("")
+	const navigate = useNavigate()
+
 	return(
-		<Form className="d-flex">
+		<Form className="d-flex" onSubmit={(e) => {
+			e.preventDefault()
+
+			navigate({
+				pathname: searchURL,
+				search: createSearchParams({
+					name: term
+				}).toString()
+			})
+		}}>
 			<FormControl
 				type="search"
 				placeholder="Submissions, authors, tags..."
 				className="me-2 "
 				aria-label="Search"
+				onChange={(e) => {
+					setTerm(e.target.value)
+				}}
+				value={term}
 			/>
-			<Button className="" variant="outline-secondary">
+			<Button className="" variant="outline-secondary" type="submit">
 				<BsSearch />
 			</Button>
 		</Form>

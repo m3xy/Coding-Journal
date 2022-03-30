@@ -17,17 +17,22 @@ const commentEndpoint = "/comment"
 function Comments({
 	id,
 	comments,
-	setComments,
 	startLine,
 	endLine,
 	show,
 	setShow,
 	refresh
 }) {
+	//State variable storing the text content of the comments box
 	const [text, setText] = useState("")
+
+	//State variable describing whether or not comments are shown
 	const [showComment, setShowComment] = useState(true)
+
+	//State variable storing whether the comments are loading (being fetched)
 	const [isLoading, setLoading] = useState(false)
 
+	//Function for posting a comment - parameters include the parent comment ID, content of the comment, and the start/end lines, span of the comment
 	const postComment = (e, parentID, content, startLine, endLine) => {
 		e.preventDefault()
 
@@ -36,7 +41,7 @@ function Comments({
 			return
 		}
 
-		let userId = JwtService.getUserID() //Preparing to get userId from session cookie
+		let userId = JwtService.getUserID()
 		if (!userId) {
 			//If user has not logged in, disallow submit
 			console.log("Not logged in")
@@ -61,17 +66,20 @@ function Comments({
 			})
 	}
 
+	//load more comments (if available) by refetching the file
 	const loadMore = () => {
 		setLoading(true)
 		refresh()
 		setLoading(false)
 	}
 
+	//HTML for each of the (parent) comments (Map each comment to a comment component to display)
 	const commentsHTML =
 		comments !== undefined
-			? comments.map((comment) => {
+			? comments.map((comment, i) => {
 					return (
 						<Comment
+							key={i}
 							fileID={id}
 							comment={comment}
 							show={showComment}
@@ -131,8 +139,16 @@ function Comments({
 						</Form.Text>
 					</Form.Group>
 					<br />
-					{commentsHTML}
 					<div className="d-grid gap-2">
+						{comments?.length > 0 ? (
+							commentsHTML
+						) : (
+							<small
+								className="text-muted"
+								style={{ textAlign: "center" }}>
+								No comments
+							</small>
+						)}
 						<Button
 							variant="light"
 							disabled={isLoading}
