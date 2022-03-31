@@ -26,28 +26,26 @@ import (
 // ------------
 
 func TestPostAssignReviewers(t *testing.T) {
-	// wipes the database and filesystem
 	testInit()
 	defer testEnd()
 
-	// Create mux router
+	// Create mux router and add assign reviewers endpoint
 	router := mux.NewRouter()
 	route := SUBROUTE_SUBMISSIONS + "/{id}" + ENDPOINT_ASSIGN_REVIEWERS
 	router.HandleFunc(route, PostAssignReviewers)
 
 	// adds a submission to the db with authors and reviewers
 	globalAuthors, globalReviewers, err := initMockUsers(t)
-	if err != nil {
+	if !assert.NoError(t, err, "could not init mock users") {
 		return
 	}
 
 	// adds a test editor
-	editorID, err := registerUser(User{Email: "editor@test.net",
-		Password: "dlbjDs2!", FirstName: "Paul", LastName: "Editman"}, USERTYPE_EDITOR)
+	globEditor := *testEditors[0].getCopy()
+	editorID, err := registerUser(globEditor)
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}
-
 	submission := Submission{
 		Name:      "Test",
 		Authors:   []GlobalUser{globalAuthors[0]},
@@ -56,7 +54,6 @@ func TestPostAssignReviewers(t *testing.T) {
 			Abstract: "Test",
 		},
 	}
-
 	submissionID, err := addSubmission(&submission)
 	if !assert.NoError(t, err, "Submission creation shouldn't error!") {
 		return
@@ -81,7 +78,7 @@ func TestPostAssignReviewers(t *testing.T) {
 			submissionID, ENDPOINT_ASSIGN_REVIEWERS), bytes.NewBuffer(reqBody))
 		w := httptest.NewRecorder()
 
-		ctx := context.WithValue(req.Context(), "data", *ctxStruct)
+		ctx := context.WithValue(req.Context(), "data", ctxStruct)
 		router.ServeHTTP(w, req.WithContext(ctx))
 		resp := w.Result()
 
@@ -99,6 +96,44 @@ func TestPostAssignReviewers(t *testing.T) {
 		// makes sure the request succeeded
 		status := testAssignReviewers(reqStruct, submissionID, ctx)
 		if !assert.Equalf(t, http.StatusOK, status, "request did not succeed!") {
+			return
+		}
+
+		// makes sure the reviewer association was added
+		sub := &Submission{}
+		err := gormDb.Model(&Submission{}).Preload("Reviewers").Find(sub, submissionID).Error
+		switch {
+		case !assert.NoError(t, err, "error querying db"),
+			!assert.Equal(t, globalReviewers[0].ID, sub.Reviewers[0].ID, "reviewer not added"):
+			return
+		}
+	})
+
+	t.Run("Add Multiple Reviewers Valid", func(t *testing.T) {
+		reqStruct := &AssignReviewersBody{
+			Reviewers: []string{globalReviewers[0].ID, globalReviewers[1].ID},
+		}
+		ctx := &RequestContext{
+			ID:       editorID,
+			UserType: USERTYPE_EDITOR,
+		}
+		// makes sure the request succeeded
+		status := testAssignReviewers(reqStruct, submissionID, ctx)
+		if !assert.Equalf(t, http.StatusOK, status, "request did not succeed!") {
+			return
+		}
+
+		// makes sure the reviewer association was added
+		sub := &Submission{}
+		err := gormDb.Model(&Submission{}).Preload("Reviewers").Find(sub, submissionID).Error
+		reviewerIDs := []string{}
+		for _, reviewer := range sub.Reviewers {
+			reviewerIDs = append(reviewerIDs, reviewer.ID)
+		}
+		switch {
+		case !assert.NoError(t, err, "error querying db"),
+			!assert.Contains(t, reviewerIDs, globalReviewers[0].ID, "first reviewer not added"),
+			!assert.Contains(t, reviewerIDs, globalReviewers[1].ID, "second reviewer not added"):
 			return
 		}
 	})
@@ -164,14 +199,13 @@ func TestPostAssignReviewers(t *testing.T) {
 		}
 		// makes sure the request did not succeed
 		status := testAssignReviewers(reqStruct, submissionID, ctx)
-		if !assert.Equalf(t, http.StatusConflict, status, "request did not succeed!") {
+		if !assert.Equalf(t, http.StatusUnauthorized, status, "request did not succeed!") {
 			return
 		}
 	})
 }
 
 func TestUploadReview(t *testing.T) {
-	// wipes the database and filesystem
 	testInit()
 	defer testEnd()
 
@@ -182,7 +216,7 @@ func TestUploadReview(t *testing.T) {
 
 	// adds a submission to the db with authors and reviewers
 	globalAuthors, globalReviewers, err := initMockUsers(t)
-	if err != nil {
+	if !assert.NoError(t, err, "could not init mock users") {
 		return
 	}
 
@@ -200,12 +234,11 @@ func TestUploadReview(t *testing.T) {
 		return
 	}
 
-	// uses globalReviewers[0]
-	t.Run("Single Approving Review", func(t *testing.T) {
+	t.Run("Valid Review", func(t *testing.T) {
 		// passes on no error
-		t.Run("Adds Review", func(t *testing.T) {
+		t.Run("Valid approving", func(t *testing.T) {
 			reqStruct := &UploadReviewBody{
-				Approved:    true,
+				Approved:    false,
 				Base64Value: "test",
 			}
 			reqBody, err := json.Marshal(reqStruct)
@@ -214,10 +247,11 @@ func TestUploadReview(t *testing.T) {
 			}
 
 			// sends the request to upload a review
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS,
+				submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       globalReviewers[0].ID,
 				UserType: globalReviewers[0].UserType,
 			})
@@ -246,7 +280,7 @@ func TestUploadReview(t *testing.T) {
 		})
 
 		// uploads the same review as above, should error -> test passes on err
-		t.Run("Adds duplicate review", func(t *testing.T) {
+		t.Run("Duplicate review", func(t *testing.T) {
 			reqStruct := &UploadReviewBody{
 				Approved:    true,
 				Base64Value: "test",
@@ -257,10 +291,11 @@ func TestUploadReview(t *testing.T) {
 			}
 
 			// sends the request to upload a review
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS,
+				submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       globalReviewers[0].ID,
 				UserType: globalReviewers[0].UserType,
 			})
@@ -268,9 +303,8 @@ func TestUploadReview(t *testing.T) {
 			resp := w.Result()
 
 			// makes sure the request succeeded
-			if !assert.Equalf(t, http.StatusBadRequest, resp.StatusCode, "duplicate review added without proper error code!") {
-				return
-			}
+			assert.Equalf(t, http.StatusBadRequest, resp.StatusCode,
+				"duplicate review added without proper error code!")
 		})
 	})
 
@@ -283,10 +317,11 @@ func TestUploadReview(t *testing.T) {
 				return -1
 			}
 			// sends the request to upload a review
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS,
+				submissionID, ENPOINT_REVIEW), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			ctx := context.WithValue(req.Context(), "data", RequestContext{
+			ctx := context.WithValue(req.Context(), "data", &RequestContext{
 				ID:       reviewerID,
 				UserType: userType,
 			})
@@ -313,7 +348,8 @@ func TestUploadReview(t *testing.T) {
 				Approved: true,
 			}
 			// makes sure the request failed StatusBadRequest
-			if !assert.Equalf(t, http.StatusBadRequest, PostUploadReview(reqStruct, globalReviewers[1].ID, globalReviewers[1].UserType, submissionID),
+			if !assert.Equalf(t, http.StatusBadRequest, PostUploadReview(reqStruct, globalReviewers[1].ID,
+				globalReviewers[1].UserType, submissionID),
 				"empty review added without proper error code!") {
 				return
 			}
@@ -322,7 +358,6 @@ func TestUploadReview(t *testing.T) {
 }
 
 func TestPostUpdateSubmissionStatus(t *testing.T) {
-	// wipes the database and filesystem
 	testInit()
 	defer testEnd()
 
@@ -333,12 +368,12 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 
 	// adds a submission to the db with authors and reviewers
 	globalAuthors, globalReviewers, err := initMockUsers(t)
-	if err != nil {
+	if !assert.NoError(t, err, "could not init mock users") {
 		return
 	}
 	// adds a test editor
-	editorID, err := registerUser(User{Email: "editor@test.net",
-		Password: "dlbjDs2!", FirstName: "Paul", LastName: "Editman"}, USERTYPE_EDITOR)
+	globEditor := *testEditors[0].getCopy()
+	editorID, err := registerUser(globEditor)
 	if !assert.NoError(t, err, "Error adding test editor") {
 		return
 	}
@@ -357,17 +392,24 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 		return
 	}
 
+	// resets the submission status to null
+	resetSubmissionStatus := func(submissionID uint) {
+		assert.NoError(t, gormDb.Model(&Submission{}).Where("id = ?", submissionID).
+			Update("approved", nil).Error, "submission approval not reset")
+	}
+
 	// function to format and send test requests
 	changeStatus := func(submissionID uint, editorID string, userType int, reqStruct *UpdateSubmissionStatusBody) int {
 		reqBody, err := json.Marshal(reqStruct)
 		if !assert.NoError(t, err, "Error while marshalling request body!") {
 			return -1
 		}
-		// sends the request to upload a review
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
+		// sends the request to change submission status
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS,
+			submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 		w := httptest.NewRecorder()
 
-		ctx := context.WithValue(req.Context(), "data", RequestContext{
+		ctx := context.WithValue(req.Context(), "data", &RequestContext{
 			ID:       editorID,
 			UserType: userType,
 		})
@@ -378,9 +420,26 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 
 	// cases where the helper function gets called
 	t.Run("Change Status", func(t *testing.T) {
-		t.Run("Review not added", func(t *testing.T) {
+		defer resetSubmissionStatus(submissionID)
+		t.Run("review not added accept", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusConflict, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 409 Conflict")
+			assert.Equal(t, http.StatusUnauthorized,
+				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct),
+				"Wrong error code, was expecting 401 Unauthorized")
+		})
+
+		t.Run("review not added reject", func(t *testing.T) {
+			defer resetSubmissionStatus(submissionID)
+			reqStruct := &UpdateSubmissionStatusBody{Status: false}
+			assert.Equal(t, http.StatusOK,
+				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct),
+				"Wrong error code, was expecting 200")
+			submission := &Submission{}
+			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").
+				Find(submission, submissionID).Error, "unable to find submission") {
+				return
+			}
+			assert.Equal(t, false, *submission.Approved, "Submission status not updated properly")
 		})
 
 		// adds a review from the one reviewer to allow for submission approval
@@ -395,9 +454,12 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 
 		t.Run("Valid approval", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusOK, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 200")
+			assert.Equal(t, http.StatusOK,
+				changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct),
+				"Wrong error code, was expecting 200")
 			submission := &Submission{}
-			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").Find(submission, submissionID).Error, "unable to find submission") {
+			if !assert.NoError(t, gormDb.Model(&Submission{}).Select("submissions.approved").
+				Find(submission, submissionID).Error, "unable to find submission") {
 				return
 			}
 			assert.Equal(t, true, *submission.Approved, "Submission status not updated properly")
@@ -416,8 +478,9 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 			if !assert.NoError(t, err, "Error while marshalling request body!") {
 				return
 			}
-			// sends the request to upload a review
-			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS, submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
+			// sends the request to change submission status
+			req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("%s/%d%s", SUBROUTE_SUBMISSIONS,
+				submissionID, ENDPOINT_CHANGE_STATUS), bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 			assert.Equal(t, http.StatusUnauthorized, w.Result().StatusCode, "Wrong error code, was expecting 401")
@@ -425,14 +488,25 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 
 		t.Run("Non-editor user type", func(t *testing.T) {
 			reqStruct := &UpdateSubmissionStatusBody{Status: true}
-			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID, globalReviewers[0].ID, USERTYPE_REVIEWER, reqStruct), "Wrong error code, was expecting 401")
+			assert.Equal(t, http.StatusUnauthorized, changeStatus(submissionID,
+				globalReviewers[0].ID, USERTYPE_REVIEWER, reqStruct), "Wrong error code, was expecting 401")
 		})
+	})
 
-		t.Run("Bad Request body", func(t *testing.T) {
-			reqStruct := &UpdateSubmissionStatusBody{}
-			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID, editorID, USERTYPE_EDITOR, reqStruct), "Wrong error code, was expecting 400")
-			assert.Equal(t, http.StatusBadRequest, changeStatus(submissionID, editorID, USERTYPE_EDITOR, nil), "Wrong error code, was expecting 400")
-		})
+	t.Run("approve no reviewers assigned", func(t *testing.T) {
+		// adds a new submission without reviewers
+		submission := Submission{
+			Name:     "Test",
+			Authors:  []GlobalUser{globalAuthors[0]},
+			MetaData: &SubmissionData{Abstract: "Test"},
+		}
+		subID, err := addSubmission(&submission)
+		if !assert.NoError(t, err, "Submission creation shouldn't error!") {
+			return
+		}
+		reqStruct := &UpdateSubmissionStatusBody{Status: true}
+		respCode := changeStatus(subID, editorID, USERTYPE_EDITOR, reqStruct)
+		assert.Equal(t, http.StatusUnauthorized, respCode, "incorrect status code returned")
 	})
 }
 
@@ -441,13 +515,12 @@ func TestPostUpdateSubmissionStatus(t *testing.T) {
 // ------------
 
 func TestAddReview(t *testing.T) {
-	// configures main test environment
 	testInit()
 	defer testEnd()
 
 	// adds a submission to the db with authors and reviewers
 	globalAuthors, globalReviewers, err := initMockUsers(t)
-	if err != nil {
+	if !assert.NoError(t, err, "could not init mock users") {
 		return
 	}
 
@@ -477,14 +550,12 @@ func TestAddReview(t *testing.T) {
 			if !assert.NoError(t, addReview(validReview, submissionID), "Review Addition shouldn't error!") {
 				return
 			}
-
 			// gets the submission metadata and checks that it matches that which was sent
 			queriedMetaData, err := getSubmissionMetaData(submissionID)
 			if !assert.NoError(t, err, "Error while getting submission metadata!") {
 				return
 			}
 			queriedReview := queriedMetaData.Reviews[0]
-
 			// compares reviews in queried metadata with that which was added
 			switch {
 			case !assert.Equal(t, validReview.ReviewerID, queriedReview.ReviewerID, "Reviewer IDs do not match"),
@@ -549,7 +620,7 @@ func TestUpdateSubmissionStatus(t *testing.T) {
 
 	// adds a submission to the db with authors and reviewers
 	globalAuthors, globalReviewers, err := initMockUsers(t)
-	if err != nil {
+	if !assert.NoError(t, err, "could not init mock users") {
 		return
 	}
 

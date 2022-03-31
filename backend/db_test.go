@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"gorm.io/gorm/logger"
+	"path/filepath"
 
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -25,28 +25,101 @@ const (
 // -------------
 
 var testUsers []User = []User{
-	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", FirstName: "test",
-		LastName: "test", PhoneNumber: "0574349206"},
-	{Email: "john.doe@hello.com", Password: "dlbjDs2!", FirstName: "John",
-		LastName: "Doe", Organization: "TestOrg"},
-	{Email: "jane.doe@test.net", Password: "dlbjDs2!", FirstName: "Jane",
-		LastName: "Doe"},
-}
-
-var testObjects []GlobalUser = []GlobalUser{
-	{ID: "1", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "2", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "3", UserType: USERTYPE_REVIEWER_PUBLISHER},
-	{ID: "4", UserType: USERTYPE_REVIEWER_PUBLISHER},
+	{Email: "test.test@st-andrews.ac.uk", Password: "123456aB$", PhoneNumber: "0574349206"},
+	{Email: "john.doe@hello.com", Password: "dlbjDs2!", Organization: "TestOrg"},
+	{Email: "jane.doe@test.net", Password: "dlbjDs2!"},
 }
 
 var wrongCredsUsers []User = []User{
-	{Email: "test.nospec@hello.com", Password: "badN0Special", FirstName: "test", LastName: "nospec"},
-	{Email: "test.nonum@hello.com", Password: "testNoNum!", FirstName: "test", LastName: "nonum"},
-	{Email: "test.toosmall@hello.com", Password: "g0.Ku", FirstName: "test", LastName: "toosmall"},
-	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal", FirstName: "test", LastName: "wrongchars"},
-	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!", FirstName: "test", LastName: "nolower"},
-	{Email: "test.nouppercase@hello.com", Password: "nocap5!!", FirstName: "test", LastName: "noupper"},
+	{Email: "test.nospec@hello.com", Password: "badN0Special"},
+	{Email: "test.nonum@hello.com", Password: "testNoNum!"},
+	{Email: "test.toosmall@hello.com", Password: "g0.Ku"},
+	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal"},
+	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!"},
+	{Email: "test.nouppercase@hello.com", Password: "nocap5!!"},
+}
+
+var testEditors = []GlobalUser{
+	{FirstName: "Paul", LastName: "EditMan", UserType: USERTYPE_EDITOR,
+		User: &User{Email: "editor@test.net", Password: "dlbjDs2"}},
+}
+
+var testAuthors = []GlobalUser{
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "paula@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
+	{FirstName: "Joe", LastName: "Foe", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "john.doea@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
+	{FirstName: "Saul", LastName: "Moe", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "saula@test.net", Password: "dlbjDs2!"}},
+	{FirstName: "Pat", LastName: "Dill", UserType: USERTYPE_PUBLISHER,
+		User: &User{Email: "pata@test.net", Password: "dlbjDs2!"}},
+}
+
+var testReviewers = []GlobalUser{
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "daver@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "Geoffr@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "paulr@test.net", Password: "dlbjDs2!"}},
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_REVIEWER,
+		User: &User{Email: "paulrr@test.net", Password: "dlbjDs2!"}},
+}
+
+var testGlobUsers = []GlobalUser{
+	{FirstName: "Paul", LastName: "Doe", UserType: USERTYPE_NIL,
+		User: &User{Email: "paulu@test.com", Password: "123456aB$", PhoneNumber: "0574349206"}},
+	{FirstName: "Joe", LastName: "Foe", UserType: USERTYPE_NIL,
+		User: &User{Email: "john.doeu@test.com", Password: "dlbjDs2!", Organization: "TestOrg"}},
+	{FirstName: "Saul", LastName: "Moe", UserType: USERTYPE_NIL,
+		User: &User{Email: "saulu@test.net", Password: "dlbjDs2!"}},
+	{FirstName: "Pat", LastName: "Dill", UserType: USERTYPE_NIL,
+		User: &User{Email: "patu@test.net", Password: "dlbjDs2!"}},
+}
+
+var testSubmissions []Submission = []Submission{
+	{Name: "TestSubmission1", License: "MIT", Authors: []GlobalUser{}, Reviewers: []GlobalUser{},
+		Files: []File{}, Categories: []Category{{Tag: "testtag"}}, MetaData: &SubmissionData{
+			Abstract: "test abstract", Reviews: []*Review{}}},
+	{Name: "TestSubmission2", License: "MIT", Authors: []GlobalUser{}, Reviewers: []GlobalUser{},
+		Files: []File{}, Categories: []Category{{Tag: "testtag"}}, MetaData: &SubmissionData{
+			Abstract: "test abstract", Reviews: []*Review{}}},
+}
+
+var testSignUpBodies = []SignUpPostBody{
+	{Email: "paul@test.com", Password: "123456aB$", PhoneNumber: "0574349206",
+		FirstName: "paul", LastName: "test"},
+	{Email: "john.doe@test.com", Password: "dlbjDs2!", FirstName: "John",
+		LastName: "Doe", Organization: "TestOrg"},
+	{Email: "author2@test.net", Password: "dlbjDs2!", FirstName: "Jane",
+		LastName: "Doe"},
+	{Email: "author3@test.net", Password: "dlbjDs2!", FirstName: "Adam",
+		LastName: "Doe"},
+}
+
+var wrongCredsSignupBodies = []SignUpPostBody{
+	{Email: "test.nospec@hello.com", Password: "badN0Special",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.nonum@hello.com", Password: "testNoNum!",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.toosmall@hello.com", Password: "g0.Ku",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.wrongchars@hello.com", Password: "Tho/se]chars|ille\"gal",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.nolowercase@hello.com", Password: "ALLCAP5!",
+		FirstName: "test", LastName: "nospec"},
+	{Email: "test.nouppercase@hello.com", Password: "nocap5!!",
+		FirstName: "test", LastName: "nospec"},
+}
+
+var testFiles []File = []File{
+	{SubmissionID: 0, Path: "testFile1.txt", Base64Value: "hello world"},
+	{SubmissionID: 0, Path: "testFile2.txt", Base64Value: "hello world"},
+}
+
+var testComments []*Comment = []*Comment{
+	{AuthorID: "", Base64Value: "Hello World", Comments: []Comment{}, StartLine: 0, EndLine: 0},
+	{AuthorID: "", Base64Value: "Goodbye World", Comments: []Comment{}, StartLine: 0, EndLine: 1},
 }
 
 var testLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
@@ -60,9 +133,14 @@ var testLogger logger.Interface = logger.New(log.New(os.Stdout, "\r\n", log.Lstd
 // Utils
 // -----------
 
+var getTestSubmissionDirectoryPath = func(s Submission) string {
+	return filepath.Join(TEST_FILES_DIR, fmt.Sprintf("%d-%d", s.ID, s.CreatedAt.Unix()))
+}
+
 // Initialise the database for testing.
 func testInit() {
 	gormDb, _ = gormInit(TEST_DB, testLogger)
+	getSubmissionDirectoryPath = getTestSubmissionDirectoryPath
 	setup(gormDb, TEST_LOG_PATH)
 	if err := gormDb.Transaction(gormClear); err != nil {
 		fmt.Printf("Error occurred while clearing Db: %v", err)
@@ -76,20 +154,70 @@ func testInit() {
 	}
 }
 
+// Close database at the end of test.
+func testEnd() {
+	if err := gormDb.Transaction(gormClear); err != nil {
+		fmt.Printf("Error occurred while clearing Db: %v", err)
+	}
+	getDB, _ := gormDb.DB()
+	getDB.Close()
+}
+
+// Initialise mock data in the database for use later on in the testing.
+func initMockUsers(t *testing.T) ([]GlobalUser, []GlobalUser, error) {
+	var err error
+	globalAuthors := make([]GlobalUser, len(testAuthors))
+	for i, user := range testAuthors {
+		if globalAuthors[i].ID, err = registerUser(user); err != nil {
+			t.Errorf("User registration failed: %v", err)
+			return nil, nil, err
+		}
+		globalAuthors[i].UserType = USERTYPE_PUBLISHER
+	}
+	globalReviewers := make([]GlobalUser, len(testReviewers))
+	for i, user := range testReviewers {
+		if globalReviewers[i].ID, err = registerUser(user); err != nil {
+			t.Errorf("User registration failed: %v", err)
+			return nil, nil, err
+		}
+		globalReviewers[i].UserType = USERTYPE_REVIEWER
+	}
+	return globalAuthors, globalReviewers, nil
+}
+
+// Set up authentication on a test server.
+func testAuth(t *testing.T) {
+	// Set up database.
+	var err error
+	gormDb, err = gormInit(TEST_DB, testLogger)
+	if err != nil {
+		fmt.Printf("Error opening database :%v", err)
+	}
+	if err := gormDb.Transaction(gormClear); err != nil {
+		fmt.Printf("Error occured while clearing Db: %v", err)
+	}
+
+	// Set up logging to a local testing file.
+	file, err := os.OpenFile(TEST_LOG_PATH, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		fmt.Printf("Log file creation failure: %v! Exiting...", err)
+	}
+	log.SetOutput(file)
+}
+
 // Get a copy of a user object.
 func (u *User) getCopy() *User {
 	if u != nil {
-		return &User{Email: u.Email, Password: u.Password, FirstName: u.FirstName,
-			LastName: u.LastName, PhoneNumber: u.PhoneNumber, Organization: u.Organization}
+		return &User{Email: u.Email, Password: u.Password,
+			PhoneNumber: u.PhoneNumber, Organization: u.Organization}
 	} else {
 		return nil
 	}
 }
 func (g *GlobalUser) getCopy() *GlobalUser {
 	if g != nil {
-		return &GlobalUser{
-			ID: g.ID, FullName: g.ID, User: *g.User.getCopy(), UserType: g.UserType,
-		}
+		return &GlobalUser{ID: g.ID, FirstName: g.FirstName,
+			LastName: g.LastName, User: g.User.getCopy(), UserType: g.UserType}
 	} else {
 		return nil
 	}
@@ -181,34 +309,20 @@ func (s *SupergroupSubmission) getCopy() *SupergroupSubmission {
 		return nil
 	}
 }
-
-// Close database at the end of test.
-func testEnd() {
-	if err := gormDb.Transaction(gormClear); err != nil {
-		fmt.Printf("Error occurred while clearing Db: %v", err)
+func (c *Comment) getCopy() (*Comment) {
+	commentArray := make([]Comment, len(c.Comments))
+	for i, comment := range c.Comments {
+		commentArray[i] = *comment.getCopy()
 	}
-	getDB, _ := gormDb.DB()
-	getDB.Close()
-}
-
-// Set up authentication on a test server.
-func testAuth(t *testing.T) {
-	// Set up database.
-	var err error
-	gormDb, err = gormInit(TEST_DB, testLogger)
-	if err != nil {
-		fmt.Printf("Error opening database :%v", err)
+	return &Comment{
+		AuthorID: c.AuthorID,
+		FileID: c.FileID,
+		Base64Value: c.Base64Value,
+		StartLine: c.StartLine,
+		EndLine: c.EndLine,
+		ParentID: c.ParentID,
+		Comments: c.Comments,
 	}
-	if err := gormDb.Transaction(gormClear); err != nil {
-		fmt.Printf("Error occured while clearing Db: %v", err)
-	}
-
-	// Set up logging to a local testing file.
-	file, err := os.OpenFile(TEST_LOG_PATH, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	if err != nil {
-		fmt.Printf("Log file creation failure: %v! Exiting...", err)
-	}
-	log.SetOutput(file)
 }
 
 // -------------
@@ -229,6 +343,13 @@ func TestDbInit(t *testing.T) {
 func TestIsUnique(t *testing.T) {
 	testInit()
 
+	// copies testGlobUsers array and assigns unique IDs
+	testObjects := make([]GlobalUser, len(testGlobUsers))
+	for i, u := range testGlobUsers {
+		testObjects[i] = *u.getCopy()
+		testObjects[i].ID = fmt.Sprint(i)
+	}
+
 	// Test uniqueness in empty table
 	t.Run("Unique elements", func(t *testing.T) {
 		for i := 0; i < len(testObjects); i++ {
@@ -241,7 +362,7 @@ func TestIsUnique(t *testing.T) {
 	// Add test users to database
 	trialObjects := make([]GlobalUser, len(testObjects))
 	for i, u := range testObjects {
-		trialObjects[i] = GlobalUser{ID: u.ID, FullName: u.FullName}
+		trialObjects[i] = GlobalUser{ID: u.ID}
 	}
 	if err := gormDb.Create(&trialObjects).Error; err != nil {
 		t.Errorf("Batch user creation error: %v", err)

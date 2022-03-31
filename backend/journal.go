@@ -16,6 +16,7 @@ import (
 const (
 	ENDPOINT_EXPORT_SUBMISSION = "/export"     // on submissions sub-router
 	ENDPOINT_IMPORT_SUBMISSION = "/submission" // on the journal sub-router
+	ENDPOINT_USER              = "/user"       // on the journal sub-router
 )
 
 var journalURLs map[int]string = map[int]string{
@@ -36,6 +37,8 @@ func getJournalSubroute(r *mux.Router) {
 	journal.Use(journalMiddleWare)
 	journal.HandleFunc(ENDPOINT_LOGIN, logIn).Methods(http.MethodPost, http.MethodOptions)
 	journal.HandleFunc(ENDPOINT_IMPORT_SUBMISSION, PostImportSubmission).Methods(http.MethodPost, http.MethodOptions)
+	journal.HandleFunc(ENDPOINT_USER, GetUsers).Methods(http.MethodGet)
+	journal.HandleFunc(ENDPOINT_USER+"/{id}", GetUser).Methods(http.MethodGet)
 }
 
 // ----------
@@ -49,7 +52,6 @@ func getJournalSubroute(r *mux.Router) {
 //  200: Success - security token valid.
 //  401: Failure - security token invalid.
 func tokenValidation(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Token validation from %v successful.", r.RemoteAddr)
 }
 
 /*
@@ -60,7 +62,6 @@ func tokenValidation(w http.ResponseWriter, r *http.Request) {
  Returns: userId
 */
 func logIn(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] Received log in request from %v", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get credentials from log in request.
@@ -83,13 +84,71 @@ func logIn(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[ERROR] JSON Response Encoding failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	log.Printf("[INFO] log in from %s at email %s successful.", r.RemoteAddr, user.Email)
+}
+
+// gets all users from our Journal as a list
+// GET /user
+func GetUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// gets an array of users using GORM smart select fields
+	users := []GlobalUser{}
+	if err := gormDb.Model(&GlobalUser{}).Where("id REGEXP ?", "^11").Preload("User").Find(&users).Error; err != nil {
+		log.Printf("[ERROR] SQL Query Error: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// parses users into global format
+	globUsers := make([]SupergroupUser, len(users))
+	for i, u := range users {
+		globUsers[i] = SupergroupUser{
+			ID: u.ID, FirstName: u.FirstName, LastName: u.LastName,
+			Email: u.User.Email, PhoneNumber: u.User.PhoneNumber,
+			Organization: u.User.Organization,
+		}
+	}
+	// sends response
+	if err := json.NewEncoder(w).Encode(globUsers); err != nil {
+		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// gets user profile by ID
+// GET /user/{id}
+func GetUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// queries user using URL parameters
+	vars := mux.Vars(r)
+	user := GlobalUser{}
+	if res := gormDb.Model(&GlobalUser{}).Preload("User").
+		Where("id = ?", vars["id"]).Limit(1).Find(&user); res.Error != nil {
+		log.Printf("[ERROR] SQL query error: %v", res.Error)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else if res.RowsAffected == 0 {
+		log.Printf("[WARN] No user linked to %s", vars["id"])
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// adapts local user to supergroup-compliant format
+	globUser := SupergroupUser{
+		ID: user.ID, FirstName: user.FirstName, LastName: user.LastName,
+		Email: user.User.Email, PhoneNumber: user.User.PhoneNumber,
+		Organization: user.User.Organization,
+	}
+
+	// sends response
+	if err := json.NewEncoder(w).Encode(globUser); err != nil {
+		log.Printf("[ERROR] JSON response encoding failed: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 // router function to export submissions
 // POST /submission/{id}/export/{groupNumber}
 func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] ExportSubmission request received from %v\n", r.RemoteAddr)
 	resp := &StandardResponse{}
 
 	// gets submission ID and group number from URL
@@ -107,7 +166,7 @@ func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 
 		// gets context struct and validates it
-	} else if ctx, ok := r.Context().Value("data").(RequestContext); !ok || validate.Struct(ctx) != nil {
+	} else if ctx, ok := r.Context().Value("data").(*RequestContext); !ok || validate.Struct(ctx) != nil {
 		resp = &StandardResponse{Message: "Request Context not set, user not logged in.", Error: true}
 		w.WriteHeader(http.StatusUnauthorized)
 
@@ -151,6 +210,11 @@ func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
 		w.WriteHeader(http.StatusInternalServerError)
 	SUCCESS:
+		if globalResp.StatusCode != http.StatusOK {
+			resp = &StandardResponse{Message: "Export Failed - error communicating with external server", Error: true}
+		} else {
+			resp = &StandardResponse{Message: "Export Success", Error: false}
+		}
 		w.WriteHeader(globalResp.StatusCode)
 	}
 
@@ -158,16 +222,13 @@ func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] ExportSubmission request successful\n")
 	}
 }
 
 // router function to import submissions from another Journal
 // POST /journal/submission
 func PostImportSubmission(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] ImportSubmission request received from %v\n", r.RemoteAddr)
-	resp := &StandardResponse{}
+	var resp interface{}
 	reqBody := &SupergroupSubmission{}
 
 	if r.Body == nil {
@@ -205,7 +266,10 @@ func PostImportSubmission(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			}
 		} else {
-			log.Printf("[INFO] Submission imported has ID: %d", submissionID)
+			resp = &UploadSubmissionResponse{
+				StandardResponse: StandardResponse{Message: "Submission import successful!", Error: false},
+				SubmissionID:     submissionID,
+			}
 		}
 	}
 
@@ -213,8 +277,6 @@ func PostImportSubmission(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("[ERROR] error formatting response: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-	} else if !resp.Error {
-		log.Print("[INFO] ImportSubmission request successful\n")
 	}
 }
 

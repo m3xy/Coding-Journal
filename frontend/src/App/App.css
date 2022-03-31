@@ -1,22 +1,26 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap");
+@import "../../node_modules/react-keyed-file-browser/dist/react-keyed-file-browser.css";
+body {
+	font-family: "Montserrat", sans-serif !important;
+}
+
 :root {
 	--white: #ffffff;
-	--red: #E53935;
+	--red: #e53935;
 }
 
-.myInlineDecoration {
-	color: var(--red) !important;
-	cursor: pointer;
-	text-decoration: underline;
-	font-weight: bold;
-	font-style: oblique;
+.myContentClass {
+	/* background: lightblue; */
 }
 
-.myLineDecoration {
-	background: lightblue;
-	width: 5px !important;
-	margin-left: 3px;
+.myGlyphMarginClass::before {
+	content: "💬";
 }
 
-.myGlyphMarginClass {
-	background: var(--red);
-}
+.image {
+	display: block;
+	max-width:850px;
+	max-height:1000px;
+	width: auto;
+	height: auto;
+  }

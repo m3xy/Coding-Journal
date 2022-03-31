@@ -1,3 +1,18 @@
+/*
+ * FormAdder.jsx
+ * Form component to add simple strings into an array.
+ * Author: 190014935
+ *
+ * @param display The field's display name
+ * @param elemName Single element name for validation function
+ * @param arrName Array name for validation function
+ * @param placeholder Placeholder text on form control
+ * @param required Whether this field is required or not
+ * @param onChange function to call on array change, for use on the form
+ * CAUTION: array returned as {target: {name: arrName, value: array}}
+ * @param validate The validation function
+ */
+
 import React, { useState, useRef } from "react"
 import { useEffect } from "react"
 import { Form, Button, InputGroup, Row, Col } from "react-bootstrap"
@@ -17,11 +32,10 @@ const FormAdder = ({
 	const val = useRef()
 	const [array, setArray] = useState([])
 	const [input, setInput] = useState("")
-	const [modded, setModded] = useState(false)
 
 	useEffect(() => {
-		if (modded) onChange({ target: { name: arrName, value: array } })
-	}, [array, modded])
+		onChange({ target: { name: arrName, value: array } })
+	}, [array])
 
 	const valid = (required, val) => {
 		return (
@@ -40,7 +54,6 @@ const FormAdder = ({
 				className={styles.isolatedArrayButton}
 				onClick={() => {
 					setArray((array) => {
-						setModded(true)
 						return array.filter((value) => value !== elem)
 					})
 				}}>

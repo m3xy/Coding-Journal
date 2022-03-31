@@ -1,0 +1,18 @@
+@startuml
+actor Client
+participant Server
+database Database
+Client -> Server: Request with expired token
+
+Server --> Server: Validate token
+note over Server
+  Validation fails as the access token is expired.
+end note
+Server --> Client: Return unauthorized access
+Client -> Server: /auth/token
+Server --> Server: Validate refresh token
+Server -> Database: Request updated user data
+Database --> Server: Return user data
+Server --> Client: Return new access token
+
+@enduml

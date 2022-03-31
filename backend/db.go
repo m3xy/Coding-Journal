@@ -24,7 +24,7 @@ const (
 	USERTYPE_NIL                = 0
 	USERTYPE_PUBLISHER          = 1
 	USERTYPE_REVIEWER           = 2
-	USERTYPE_REVIEWER_PUBLISHER = 3
+	USERTYPE_REVIEWER_PUBLISHER = 3 
 	USERTYPE_EDITOR             = 4
 
 	// Password related
@@ -44,8 +44,6 @@ type User struct {
 	GlobalUserID string `json:"-"`
 	Email        string `gorm:"uniqueIndex;unique;not null" json:"email" validate:"email,required"`
 	Password     string `gorm:"not null" json:"password,omitempty" validate:"min=8,max=64,ispw,required"`
-	FirstName    string `json:"firstName" validate:"required,max=32"`
-	LastName     string `json:"lastName" validate:"required,max=32"`
 	PhoneNumber  string `json:"phoneNumber,omitempty"`
 	Organization string `json:"organization,omitempty"`
 
@@ -56,13 +54,14 @@ type User struct {
 
 // User global identification.
 type GlobalUser struct {
-	ID       string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
-	FullName string `json:"fullName,omitempty" validate:"required,max=118"`
-	UserType int    `gorm:"default:4" json:"userType"`
-	User     User   `json:"profile,omitempty"`
+	ID        string `gorm:"not null;primaryKey;type:varchar(191)" json:"userId" validate:"required"`
+	UserType  int    `gorm:"default:0" json:"userType"`
+	FirstName string `json:"firstName" validate:"required,max=32"`
+	LastName  string `json:"lastName" validate:"required,max=32"`
+	User      *User  `json:"profile,omitempty"`
 
-	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"-" validate:"dive"`
-	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"-" validate:"dive"`
+	AuthoredSubmissions []Submission `gorm:"many2many:authors_submission" json:"authoredSubmissions" validate:"dive"`
+	ReviewedSubmissions []Submission `gorm:"many2many:reviewers_submission" json:"reviewedSubmissions" validate:"dive"`
 
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"-"`
@@ -85,6 +84,13 @@ type Submission struct {
 	Name     string `gorm:"not null;size:128;index" json:"name" validate:"max=118"`
 	License  string `gorm:"size:64" json:"license" validate:"max=118"`
 	Approved *bool  `json:"approved" gorm:"default:NULL"` // pointer to allow nil values as neither approved nor dissaproved
+	
+	// booleans for running code using Judge0. All fields in this section only get used if Runnable = true
+	Runnable bool   `json:"runnable" gorm:"default:false"`
+	TakesStdIn bool `json:"takesStdIn" gorm:"default:false"`
+	TakesCmdLn bool `json:"takseCmdLn" gorm:"default:false"`
+	TakesInputFile bool `json:"takesInputFile" gorm:"default:false"`
+	ReqNetworkAccess bool `json:"reqNetworkAccess" gorm:"default:false"`
 
 	// associations to other tables
 	Files      []File       `json:"files,omitempty" validate:"dive"`
@@ -109,9 +115,8 @@ type File struct {
 	gorm.Model
 	SubmissionID uint   `json:"submissionId"` // foreign key linking files and submissions tables
 	Path         string `json:"path"`         // this path is relative from submission root
-	// Name string `json:"name"`
 
-	// association to other tables
+	// association to comments table
 	Comments []Comment `json:"comments,omitempty"`
 
 	// stored in filesystem
@@ -131,7 +136,8 @@ type Comment struct {
 	AuthorID    string `json:"author"`
 	FileID      uint   `json:"fileId"` // foreign key linking comments to files table
 	Base64Value string `gorm:"type:mediumtext" json:"base64Value"`
-	LineNumber  int    `json:"lineNumber"`
+	StartLine   int    `json:"startLine"`
+	EndLine     int    `json:"endLine"`
 
 	// self association for replies to user comments
 	ParentID *uint     `gorm:"default:NULL" json:"parentId,omitempty"` // pointer so it can be nil
@@ -145,42 +151,6 @@ type Category struct {
 
 	CreatedAt time.Time `json:"-"`
 	DeletedAt time.Time `json:"-"`
-}
-
-// ---- Supergroup Data Structures ----
-
-// Supergroup compliant code submissions (never stored in db)
-type SupergroupSubmission struct {
-	Name         string                   `json:"name"`
-	MetaData     SupergroupSubmissionData `json:"metadata"`
-	CodeVersions []SupergroupCodeVersion  `json:"codeVersions"`
-}
-
-// supergroup compliant structure for meta-data of the submission
-type SupergroupSubmissionData struct {
-	CreationDate time.Time `json:"creationDate"`
-	Abstract     string    `json:"abstract"`
-	License      string    `json:"license"`
-
-	Categories []string           `json:"categories"`
-	Authors    []SuperGroupAuthor `json:"authors"`
-}
-
-type SuperGroupAuthor struct {
-	ID      string `json:"userId"`
-	Journal string `json:"journal"`
-}
-
-// struct to store a supergroup compliant version of a submission
-type SupergroupCodeVersion struct {
-	TimeStamp time.Time        `json:"timestamp"`
-	Files     []SupergroupFile `json:"files"`
-}
-
-// Supergroup compliant file structure (never stored in db)
-type SupergroupFile struct {
-	Name        string `json:"filename"` // actually a file path not basename
-	Base64Value string `json:"base64Value"`
 }
 
 // ---- Database and reflect utilities ----
@@ -223,6 +193,10 @@ func (u *GlobalUser) BeforeCreate(tx *gorm.DB) (err error) {
 // Clear every table rows in the database.
 func gormClear(db *gorm.DB) error {
 	// deletes comments w/ associations
+	if err := db.Session(&gorm.Session{AllowGlobalUpdate: true}).
+		Model(&Comment{}).Update("parent_id", nil).Error; err != nil {
+		return err
+	}
 	var comments []Comment
 	if err := db.Find(&comments).Error; err != nil {
 		return err

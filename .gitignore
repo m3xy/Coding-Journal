@@ -11,7 +11,8 @@ backend/main
 # Files/directories created by backend
 filesystem
 cs3099-backend.log
-package-lock.json
+.log
+cs3099-backend
 
 # testing
 /coverage
