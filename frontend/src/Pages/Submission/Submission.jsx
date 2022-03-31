@@ -24,6 +24,7 @@ import {
 import {
 	Alert,
 	Badge,
+	Card,
 	Collapse,
 	Button,
 	ButtonGroup,
@@ -108,12 +109,11 @@ function Submission() {
 	// Get an author's full name.
 	const getUserFullName = (author) => {
 		return (
-			<Button
-				variant="light"
+			<Card.Link
 				className="me-auto"
 				onClick={() => navigate("/profile/" + author?.userId)}>
 				{author?.firstName + " " + author?.lastName}
-			</Button>
+			</Card.Link>
 		)
 	}
 
