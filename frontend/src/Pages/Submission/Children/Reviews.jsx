@@ -8,7 +8,7 @@ import { Card, Badge, ListGroup, ListGroupItem } from "react-bootstrap"
 import ReviewModal from "./ReviewModal"
 
 export default ({ reviewers, reviews }) => {
-	const [showModal, setShowModal] = useState()
+	const [showModal, setShowModal] = useState(false)
 	const [reviewerMap, setReviewerMap] = useState({})
 	const [modalReview, setModalReview] = useState(<></>)
 
@@ -19,11 +19,7 @@ export default ({ reviewers, reviews }) => {
 				return { ...reviewerMap, [reviewer.userId]: reviewer }
 			})
 		})
-	}, [reviewerMap])
-
-	const getFullName = (reviewer) => {
-		reviewer.firstName + " " + reviewer.lastName
-	}
+	}, [reviewers])
 
 	const getBadge = (approval) => {
 		const [bg, text] = approval
@@ -44,24 +40,35 @@ export default ({ reviewers, reviews }) => {
 			</Card.Body>
 			<ListGroup className="list-group-flush">
 				{reviews?.map((review, i) => {
-					const reviewer = reviewerMap[review.reviewerId]
-					return (
-						<ListGroupItem key={i}>
-							<h5 style={{ display: "flex" }}>
-								<Card.Link
-									style={{ flex: "1" }}
-									onClick={() => clickReview(review)}>
-									{getFullName(reviewer)}
-								</Card.Link>
-								<div
-									style={{
-										flex: "0.2",
-										textAlign: "right"
-									}}></div>
-								{getBadge(review.approved)}
-							</h5>
-						</ListGroupItem>
-					)
+					if (reviewerMap[review.reviewerId] !== undefined)
+						return (
+							<ListGroupItem key={i}>
+								<h5 style={{ display: "flex" }}>
+									<Card.Link
+										style={{ flex: "1" }}
+										onClick={() => clickReview(review)}>
+										{
+											reviewerMap[review.reviewerId]
+												?.firstName
+										}{" "}
+										{
+											reviewerMap[review.reviewerId]
+												?.lastName
+										}
+									</Card.Link>
+									<div
+										style={{
+											flex: "0.2",
+											textAlign: "right"
+										}}></div>
+									{getBadge(
+										review.approved !== undefined
+											? review.approved
+											: false
+									)}
+								</h5>
+							</ListGroupItem>
+						)
 				})}
 			</ListGroup>
 			<ReviewModal

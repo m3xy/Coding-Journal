@@ -32,7 +32,7 @@ type AuthLoginPostBody struct {
 
 // POST /user/{id}/changepermissions
 type ChangePermissionsPostBody struct {
-	Permissions int `json:"permissions" validate:"min=0,max=4,required"`
+	Permissions int `json:"permissions" validate:"min=0,max=4"`
 }
 
 // ----------

@@ -9,7 +9,7 @@ import ReactMarkdown from "react-markdown"
 
 export default ({ review, reviewer, show, setShow }) => {
 	const getFullName = (target) => {
-		return target.profile.firstName + " " + target.profile.lastName
+		return target?.firstName + " " + target?.lastName
 	}
 
 	const getBadge = (approval) => {

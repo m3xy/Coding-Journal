@@ -210,6 +210,11 @@ func PostExportSubmission(w http.ResponseWriter, r *http.Request) {
 		resp = &StandardResponse{Message: "Internal Server Error - could not export submission", Error: true}
 		w.WriteHeader(http.StatusInternalServerError)
 	SUCCESS:
+		if globalResp.StatusCode != http.StatusOK {
+			resp = &StandardResponse{Message: "Export Failed - error communicating with external server", Error: true}
+		} else {
+			resp = &StandardResponse{Message: "Export Success", Error: false}
+		}
 		w.WriteHeader(globalResp.StatusCode)
 	}
 
