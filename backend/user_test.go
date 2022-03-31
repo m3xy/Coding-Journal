@@ -1,13 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"bytes"
 	"testing"
-	"context"
 
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -104,15 +104,15 @@ func TestChangeUserPermissions(t *testing.T) {
 
 	t.Run("valid request", func(t *testing.T) {
 		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_CHANGE_PERMISSIONS)
-		reqBody := ChangePermissionsPostBody{ Permissions: USERTYPE_PUBLISHER }
-		ctx := &RequestContext{ ID: editorID, UserType: USERTYPE_EDITOR }
+		reqBody := ChangePermissionsPostBody{Permissions: USERTYPE_PUBLISHER}
+		ctx := &RequestContext{ID: editorID, UserType: USERTYPE_EDITOR}
 		resp := handleQuery(queryRoute, reqBody, ctx)
 		queriedUser := &GlobalUser{}
 		switch {
-			case !assert.Equalf(t, http.StatusOK, resp.StatusCode, "incorrect status code"),
-				!assert.NoError(t, gormDb.Select("user_type").Find(queriedUser, "id = ?", userID).Error, "user could not be retrieved"),
-				!assert.Equal(t, USERTYPE_PUBLISHER, queriedUser.UserType, "permissions not changed"):
-				return
+		case !assert.Equalf(t, http.StatusOK, resp.StatusCode, "incorrect status code"),
+			!assert.NoError(t, gormDb.Select("user_type").Find(queriedUser, "id = ?", userID).Error, "user could not be retrieved"),
+			!assert.Equal(t, USERTYPE_PUBLISHER, queriedUser.UserType, "permissions not changed"):
+			return
 		}
 	})
 
@@ -132,11 +132,15 @@ func TestDeleteUser(t *testing.T) {
 	// registers a test users
 	testUser := *testGlobUsers[0].getCopy()
 	userID, err := registerUser(testUser)
-	if !assert.NoError(t, err, "error registering user") { return }
+	if !assert.NoError(t, err, "error registering user") {
+		return
+	}
 
 	otherUser := *testGlobUsers[1].getCopy()
 	otherUserID, err := registerUser(otherUser)
-	if !assert.NoError(t, err, "error registering user") { return }
+	if !assert.NoError(t, err, "error registering user") {
+		return
+	}
 
 	handleQuery := func(queryRoute string, ctx *RequestContext) *http.Response {
 		req, w := httptest.NewRequest(http.MethodGet, queryRoute, nil), httptest.NewRecorder()
@@ -147,32 +151,46 @@ func TestDeleteUser(t *testing.T) {
 
 	t.Run("delete non-logged in user", func(t *testing.T) {
 		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE)
-		ctx := &RequestContext{ ID: otherUserID, UserType: otherUser.UserType }
+		ctx := &RequestContext{ID: otherUserID, UserType: otherUser.UserType}
 		resp := handleQuery(queryRoute, ctx)
-		if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") { return }
+		if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") {
+			return
+		}
 	})
 
 	t.Run("delete non-existant user", func(t *testing.T) {
 		fakeID := "afeigrbnrilfdalkja-88ra9rakrb"
 		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, fakeID, ENDPOINT_DELETE)
-		ctx := &RequestContext{ ID: fakeID, UserType: USERTYPE_NIL }
+		ctx := &RequestContext{ID: fakeID, UserType: USERTYPE_NIL}
 		resp := handleQuery(queryRoute, ctx)
-		if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") { return }
+		if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") {
+			return
+		}
 	})
 
 	t.Run("delete valid", func(t *testing.T) {
 		queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_DELETE)
-		ctx := &RequestContext{ ID: userID, UserType: testUser.UserType }
+		ctx := &RequestContext{ID: userID, UserType: testUser.UserType}
 		resp := handleQuery(queryRoute, ctx)
 
 		// checks that the user was deleted properly
-		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "incorrect status code returned") { return }
+		if !assert.Equal(t, http.StatusOK, resp.StatusCode, "incorrect status code returned") {
+			return
+		}
 		res := gormDb.Find(&User{}, "global_user_id = ?", userID)
-		if !assert.NoError(t, res.Error, "error querying db") { return }
-		if !assert.Equal(t, int64(0), res.RowsAffected, "user not deleted!") { return }
+		if !assert.NoError(t, res.Error, "error querying db") {
+			return
+		}
+		if !assert.Equal(t, int64(0), res.RowsAffected, "user not deleted!") {
+			return
+		}
 		res = gormDb.Find(&GlobalUser{}, "id = ?", userID)
-		if !assert.NoError(t, res.Error, "error querying db") { return }
-		if !assert.Equal(t, int64(0), res.RowsAffected, "global user not deleted!") { return }
+		if !assert.NoError(t, res.Error, "error querying db") {
+			return
+		}
+		if !assert.Equal(t, int64(0), res.RowsAffected, "global user not deleted!") {
+			return
+		}
 	})
 }
 
@@ -187,11 +205,15 @@ func TestEditUser(t *testing.T) {
 	// registers a test users
 	testUser := *testGlobUsers[0].getCopy()
 	userID, err := registerUser(testUser)
-	if !assert.NoError(t, err, "error registering user") { return }
+	if !assert.NoError(t, err, "error registering user") {
+		return
+	}
 
 	otherUser := *testGlobUsers[1].getCopy()
 	otherUserID, err := registerUser(otherUser)
-	if !assert.NoError(t, err, "error registering user") { return }
+	if !assert.NoError(t, err, "error registering user") {
+		return
+	}
 
 	handleQuery := func(queryRoute string, ctx *RequestContext, reqStruct *EditUserPostBody) *http.Response {
 		reqBody, err := json.Marshal(reqStruct)
@@ -209,7 +231,7 @@ func TestEditUser(t *testing.T) {
 	testEdit := func(newProfile *EditUserPostBody, userID string) {
 		// gets the user objects
 		globUser := &GlobalUser{}
-		if !assert.NoError(t, gormDb.Model(globUser).Preload("User").Find(globUser, "id = ?", userID).Error, 
+		if !assert.NoError(t, gormDb.Model(globUser).Preload("User").Find(globUser, "id = ?", userID).Error,
 			"could not retrieve user") {
 			return
 		}
@@ -230,18 +252,20 @@ func TestEditUser(t *testing.T) {
 			!assert.Equal(t, newProfile.Organization, globUser.User.Organization, "organizations do not match") {
 			return
 		}
-	} 
+	}
 
 	t.Run("valid cases", func(t *testing.T) {
 		handleValidEdit := func(reqStruct *EditUserPostBody) {
 			queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_EDIT)
-			ctx := &RequestContext{ ID: userID, UserType: otherUser.UserType }
+			ctx := &RequestContext{ID: userID, UserType: otherUser.UserType}
 			resp := handleQuery(queryRoute, ctx, reqStruct)
-			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "incorrect status code returned") { return }
+			if !assert.Equal(t, http.StatusOK, resp.StatusCode, "incorrect status code returned") {
+				return
+			}
 			testEdit(reqStruct, userID)
 		}
 		t.Run("edit password", func(t *testing.T) {
-			handleValidEdit(&EditUserPostBody{Password: VALID_PW+"a"})
+			handleValidEdit(&EditUserPostBody{Password: VALID_PW + "a"})
 		})
 		t.Run("edit first name", func(t *testing.T) {
 			handleValidEdit(&EditUserPostBody{FirstName: "newName"})
@@ -260,19 +284,23 @@ func TestEditUser(t *testing.T) {
 	t.Run("request validation", func(t *testing.T) {
 		t.Run("edit non-logged in user", func(t *testing.T) {
 			queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, userID, ENDPOINT_EDIT)
-			ctx := &RequestContext{ ID: otherUserID, UserType: otherUser.UserType }
+			ctx := &RequestContext{ID: otherUserID, UserType: otherUser.UserType}
 			reqStruct := &EditUserPostBody{}
 			resp := handleQuery(queryRoute, ctx, reqStruct)
-			if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") { return }
+			if !assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "incorrect status code returned") {
+				return
+			}
 		})
 
 		t.Run("delete non-existant user", func(t *testing.T) {
 			fakeID := "afeigrbnrilfdalkja-88ra9rakrb"
 			queryRoute := fmt.Sprintf("%s/%s%s", SUBROUTE_USER, fakeID, ENDPOINT_EDIT)
-			ctx := &RequestContext{ ID: fakeID, UserType: USERTYPE_NIL }
+			ctx := &RequestContext{ID: fakeID, UserType: USERTYPE_NIL}
 			reqStruct := &EditUserPostBody{}
 			resp := handleQuery(queryRoute, ctx, reqStruct)
-			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") { return }
+			if !assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "incorrect status code returned") {
+				return
+			}
 		})
 	})
 }
