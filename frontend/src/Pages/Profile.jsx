@@ -70,7 +70,7 @@ function Profile() {
 							action
 							onClick={() => {
 								;(!id ||
-									userTypes(JwtService.getUserType()) ==
+									userTypes[JwtService.getUserType()] ==
 										"Editor" ||
 									submission.approved) &&
 									navigate(
