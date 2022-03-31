@@ -11,6 +11,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { CSSTransition, SwitchTransition } from "react-transition-group"
 import FadeInTransition from "../../Components/Transitions/FadeIn.module.css"
 import JwtService from "../../Web/jwt.service"
+import Compiler from "../../Components/Compiler"
 import {
 	Abstract,
 	FileViewer,
@@ -246,6 +247,7 @@ function Submission() {
 					}}
 				/>
 				<TagsList tags={submission.categories} />
+				<Compiler id={params.id} submission={submission} />
 				{submission.metaData.hasOwnProperty("reviews") && (
 					<Reviews
 						reviews={submission.metaData.reviews}
@@ -256,6 +258,7 @@ function Submission() {
 						}
 					/>
 				)}
+				
 			</div>
 		)
 	}
