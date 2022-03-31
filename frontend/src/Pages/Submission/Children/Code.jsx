@@ -173,54 +173,9 @@ function Code({ id, show }) {
 								onChange={(e) => {
 									setLanguage(e.target.value)
 								}}>
-								<option>c</option>
-								<option>clojure</option>
-								<option>cpp</option>
-								<option>csharp</option>
-								<option>css</option>
-								<option>dart</option>
-								<option>dockerfile</option>
-								<option>elixir</option>
-								<option>fsharp</option>
-								<option>go</option>
-								<option>graphql</option>
-								<option>html</option>
-								<option>ini</option>
-								<option>java</option>
-								<option>javascript</option>
-								<option>json</option>
-								<option>julia</option>
-								<option>kotlin</option>
-								<option>lua</option>
-								<option>markdown</option>
-								<option>mips</option>
-								<option>mysql</option>
-								<option>objective-c</option>
-								<option>pascal</option>
-								<option>perl</option>
-								<option>pgsql</option>
-								<option>php</option>
-								<option>plaintext</option>
-								<option>powerquery</option>
-								<option>powershell</option>
-								<option>pug</option>
-								<option>python</option>
-								<option>qsharp</option>
-								<option>r</option>
-								<option>razor</option>
-								<option>redis</option>
-								<option>ruby</option>
-								<option>rust</option>
-								<option>scala</option>
-								<option>scheme</option>
-								<option>scss</option>
-								<option>shell</option>
-								<option>sql</option>
-								<option>swift</option>
-								<option>typescript</option>
-								<option>vb</option>
-								<option>xml</option>
-								<option>yaml</option>
+								{MONACO_SUPPORTED_LANGUAGES.map((lang) => (
+									<option>lang</option>
+								))}
 							</Form.Select>
 						</InputGroup>
 					</div>

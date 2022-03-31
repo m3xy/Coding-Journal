@@ -1,0 +1,6 @@
+@startuml
+Client -> Server: /auth/login
+Server -> Database: validate data
+Database --> Server: return data
+Server -> Client: token
+@enduml

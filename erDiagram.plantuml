@@ -1,0 +1,70 @@
+@startuml
+skinparam linetype ortho
+
+entity "GlobalUser" as gu {
+	   *userId: uuid <<generated>>
+	   --
+	   *firstName: string
+	   *lastName: string
+}
+
+entity "User" as uu {
+	   *ID: number <<generated>>
+	   --
+	   *email: string
+	   *password: string
+	   phoneNumber: string
+	   organization: string
+}
+
+entity "Server" as se {
+	   *groupNumber: number
+	   --
+	   *token: string
+	   *url: string
+}
+
+entity "Submission" as sub {
+	   *ID: number <<generated>>
+	   --
+	   *name: string
+	   license: string
+	   approved: boolean
+	   *runnable: boolean
+	   *takesStdIn: boolean
+	   *takesInputFile: boolean
+	   *reqNetworkAccess: boolean
+}
+
+entity "File" as fi {
+	   *ID: number <<generated>>
+	   --
+	   path: string
+	   --
+	   *submissionID: number <<FK>>
+}
+
+entity "Comment" as com {
+	   *ID: number <<generated>>
+	   --
+	   startLine: number
+	   endLine: number
+	   --
+	   parentID: number <<FK>>
+}
+
+entity "Category" as cat {
+	   *tag: string
+	   --
+	   createdAt: date
+}
+
+uu |o--right--|| gu : User
+gu }o--|{ sub : Authors
+gu }o--|{ sub : Reviewers
+sub }o--o{ cat : Categories
+sub }|--left--|| fi : Files
+fi }o--|| com : Comments
+com |o--o{ com : Replies
+
+@enduml
