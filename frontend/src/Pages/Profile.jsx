@@ -65,7 +65,7 @@ function Profile() {
 
 	useEffect(() => {
 		updateUser()
-	}, [])
+	}, [id])
 
 	useEffect(() => {
 		user.authoredSubmissions?.map((submission) => {
