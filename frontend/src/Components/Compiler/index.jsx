@@ -9,13 +9,9 @@ import {
 	Tabs,
 	Form
 } from "react-bootstrap"
-import styles from "./Compiler.module.css"
-import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import { CSSTransition } from "react-transition-group"
 import axiosInstance from "../../Web/axiosInstance"
-import DragAndDrop from "../DragAndDrop/index"
-
 
 const baseURL = "https://judge0-ce.p.rapidapi.com/submissions" //use wait param to only use one tag!!!!
 
@@ -25,7 +21,6 @@ const headers = {
 	"Content-Type": "application/json",
 	"X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
 	"X-RapidAPI-Key": "488c3c10c9msh8121e54c23bb036p1afd03jsn6192663efef7"
-
 }
 
 const config = {
@@ -41,13 +36,13 @@ export default ({ id }) => {
 	const [memoryUsage, setMemoryUsage] = useState(null)
 	const [isLoading, setLoading] = useState(true)
 	const [error, setError] = useState(null)
-    const [submission, setSubmission] = useState({
-        runnable: false,
-        takesStdIn: false,
-        takesCmdLn: false,
-        takesInputFile: false,
-        reqNetworkAccess: false,
-    })
+	const [submission, setSubmission] = useState({
+		runnable: false,
+		takesStdIn: false,
+		takesCmdLn: false,
+		takesInputFile: false,
+		reqNetworkAccess: false
+	})
 
 	useEffect(() => {
 		getConfig(id)
@@ -72,8 +67,8 @@ export default ({ id }) => {
 		axiosInstance
 			.get("/submission/" + id)
 			.then((response) => {
-				//Set file, code and comments  
-                setSubmission(response.data)
+				//Set file, code and comments
+				setSubmission(response.data)
 			})
 			.catch((error) => {
 				console.log(error)
@@ -108,31 +103,29 @@ export default ({ id }) => {
 			)
 	}
 
-    const argsForm = () => {
-        if(submission.takesCmdLn)
-        return (
-            <div> 
-                <Form.Group className="mb-3" controlId="args">
-							<Form.Label>Command Line Arguments</Form.Label>
-							<Form.Control as="textarea" rows={3} />
-						</Form.Group>
-            </div>
-        )
-    }
+	const argsForm = () => {
+		if (submission.takesCmdLn)
+			return (
+				<div>
+					<Form.Group className="mb-3" controlId="args">
+						<Form.Label>Command Line Arguments</Form.Label>
+						<Form.Control as="textarea" rows={3} />
+					</Form.Group>
+				</div>
+			)
+	}
 
-    const inputFileForm = () => {
-        if(submission.takesInputFile)
-        return(
-            <div>
-                <Form.Group
-							controlId="formFileMultiple"
-							className="mb-3">
-							<Form.Label>Files</Form.Label>
-							<Form.Control type="file" multiple />
-						</Form.Group>
-            </div>
-        )
-    }
+	const inputFileForm = () => {
+		if (submission.takesInputFile)
+			return (
+				<div>
+					<Form.Group controlId="formFileMultiple" className="mb-3">
+						<Form.Label>Files</Form.Label>
+						<Form.Control type="file" multiple />
+					</Form.Group>
+				</div>
+			)
+	}
 
 	const customInput = (showButton) => {
 		return (
@@ -153,7 +146,7 @@ export default ({ id }) => {
 					<Form>
 						{stdInputForm()}
 						{argsForm()}
-                        {inputFileForm()}
+						{inputFileForm()}
 					</Form>
 				</Card.Body>
 
@@ -180,7 +173,6 @@ export default ({ id }) => {
 		axios
 			.post(baseURL, data, config)
 			.then(function (response) {
-
 				setCompilerResponse(response)
 				setSubmissionToken(response.data.token)
 				setOutput(window.atob(response.data.stdout))

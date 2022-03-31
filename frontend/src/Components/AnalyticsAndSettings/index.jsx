@@ -21,6 +21,7 @@ export default ({ updateUser }) => {
 		password: "",
 		repeatPassword: ""
 	})
+	const navigate = useNavigate()
 	const [errors, setErrors] = useState({})
 	const [error, setError] = useState(null)
 	const [moddedFields, setModdedFields] = useState([])

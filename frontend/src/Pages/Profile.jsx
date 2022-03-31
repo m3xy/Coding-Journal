@@ -6,7 +6,15 @@
  */
 
 import React, { useState, useEffect } from "react"
-import { Tabs, Tab, ListGroup, Badge, Card, Col, Row } from "react-bootstrap"
+import {
+	Tabs,
+	Tab,
+	ListGroup,
+	Badge,
+	Card,
+	Col,
+	Dropdown
+} from "react-bootstrap"
 import { useNavigate, useParams } from "react-router-dom"
 
 import axiosInstance from "../Web/axiosInstance"
@@ -79,13 +87,6 @@ function Profile() {
 
 	//Get user comments
 	const comments = []
-	const userTypes = [
-		"User",
-		"Publisher",
-		"Reviewer",
-		"Reviewer-Publisher",
-		"Editor"
-	]
 
 	const getBadge = (approved) => {
 		const [bg, text] = approved
