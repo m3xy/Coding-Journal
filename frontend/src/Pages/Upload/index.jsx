@@ -27,7 +27,12 @@ const Upload = () => {
 	})
 	const [optionals, setOptionals] = useState({
 		submissionAbstract: "",
-		tags: []
+		tags: [],
+		runnable: false,
+		takesCmdLn: false,
+		takesStdIn: false,
+		takesInputFile: false,
+		reqNetworkAccess: false
 	})
 	const [errors, setErrors] = useState({})
 	const [moddedFields, setModdedFields] = useState([])
@@ -78,7 +83,7 @@ const Upload = () => {
 			case "tag":
 				return val.length > 0
 			default:
-				return false
+				return true
 		}
 	}
 
@@ -143,6 +148,11 @@ const Upload = () => {
 				return author.userId
 			}),
 			abstract: optionals.submissionAbstract,
+			runnable: optionals.runnable,
+			takesStdIn: optionals.takesStdIn,
+			takesCmdLn: optionals.takesCmdLn,
+			takesInputFile: optionals.takesInputFile,
+			reqNetworkAccess: optionals.reqNetworkAccess,
 			tags: optionals.tags
 		}
 
@@ -242,6 +252,81 @@ const Upload = () => {
 				validate={validate}
 				onChange={handleRequired}
 			/>
+			<div style={{ display: "flex", justifyContent: "space-between" }}>
+				{[
+					["runnable", "Runnable"],
+					["takesStdIn", "Takes Standard Input?"],
+					["takesCmdLn", "Takes Command Line?"],
+					["takesInputFile", "Takes input file?"],
+					["reqNetworkAccess", "Requires Network Access?"]
+				].map(([name, display], i) => {
+					return (
+						<div key={i}>
+							<Form.Check
+								type="switch"
+								name={name}
+								onChange={() => {
+									handleOptional({
+										target: {
+											name: name,
+											value: !optionals[name]
+										}
+									})
+								}}
+							/>
+							{display}
+						</div>
+					)
+				})}
+			</div>
+		</Tab>
+	)
+
+	let codeTab = (
+		<Tab eventKey="help" title="Help">
+			<Card.Body>
+				<Card.Title>{"How To Run Submission"}</Card.Title>
+			</Card.Body>
+
+			<Card.Body
+				style={{
+					height: "60%",
+					whiteSpace: "normal",
+					textAlign: "left"
+				}}>
+				<p>
+					If Your Submission Contains a Single Code File: There is
+					nothing more you need to do!
+				</p>
+				<p>
+					{" "}
+					If your program supports standard input, command line
+					arguments and/or input files we ensure users can use these
+					features without affecting your submission. Just make sure
+					to select the correct configuration when uploading to allow
+					for the greatest amount of reproducability!
+				</p>
+				<p>
+					If Your Submission Contains Multiple Code Files: All you
+					need to do for us to know how to compile and execute your
+					multi-file program is provide two special Bash scripts,
+					named compile and run, that know how to compile and execute
+					your multi-file program. It is essential that these files
+					are available in the root of the .zip archive you are
+					uploading.
+				</p>
+				<p>
+					If your multi-file program does not need the compilation
+					step, then you don’t need to provide compile script.
+					Additionally, please ensure your zip upload is a zip
+					archive, not a zip of a directory, meaning there is no
+					parent directory to the zip archive.
+				</p>
+				<p>Examples of Runnable Submission:</p>
+				<a href="https://github.com/judge0/examples/tree/master/cpp-project-01">
+					https://github.com/judge0/examples/tree/master/cpp-project-01
+				</a>
+			</Card.Body>
 		</Tab>
 	)
 
@@ -259,6 +344,7 @@ const Upload = () => {
 							{detailsTab}
 							{usersTab}
 							{filesTab}
+							{codeTab}
 						</Tabs>
 					</Card.Body>
 					<Card.Footer className="text-center">
