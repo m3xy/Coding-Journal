@@ -10,6 +10,7 @@ import { Tabs, Tab, ListGroup, Badge, Card, Col, Row } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
+import AnalyticsAndSettings from "../Components/AnalyticsAndSettings"
 
 const userEndpoint = "/user"
 const userTypeEndpoint = "/changepermissions"
@@ -27,12 +28,16 @@ const userTypes = [
 function Profile() {
 	//Hook returns a navigate function used to navigate between
 	const navigate = useNavigate()
-
-	//If viewing another profile, ID of the user is fetched from the URL parameters
-	const { id } = useParams()
-
-	//The user the profile describes
-	const [user, setUser] = useState({})
+	const [user, setUser] = useState({
+		userId: "",
+		firstName: "",
+		lastName: "",
+		profile: {},
+		authoredSubmissions: []
+	})
+	let [numAccepted, setNumAccepted] = useState(0)
+	let [numUnderReview, setNumUnderReview] = useState(0)
+	let [numRejected, setNumRejected] = useState(0)
 
 	//Returns the user's ID (to get their profile)
 	const getUserID = () => {
@@ -45,8 +50,7 @@ function Profile() {
 		navigate("/login")
 	}
 
-	//Fetch the User's details from their ID. useEffect hook is invoked when the page (re)renders/dependency changes (User ID in this case)
-	useEffect(() => {
+	const updateUser = () => {
 		axiosInstance
 			.get(userEndpoint + "/" + getUserID())
 			.then((response) => {
@@ -55,9 +59,42 @@ function Profile() {
 			.catch(() => {
 				return <div></div>
 			})
-	}, [id])
+	}
 
-	//Returns a list of submissions (used in displaying authored and reviewed submissions)
+	useEffect(() => {
+		updateUser()
+	}, [])
+
+	useEffect(() => {
+		user.authoredSubmissions?.map((submission) => {
+			submission?.approved
+				? setNumAccepted((numAccepted) => ++numAccepted)
+				: submission?.approved === null
+				? setNumUnderReview((numUnderReview) => ++numUnderReview)
+				: setNumRejected((numRejected) => ++numRejected)
+		})
+	}, [user])
+
+	//Get user comments
+	const comments = []
+	const userTypes = [
+		"User",
+		"Publisher",
+		"Reviewer",
+		"Reviewer-Publisher",
+		"Editor"
+	]
+
+	const getBadge = (approved) => {
+		const [bg, text] = approved
+			? ["primary", "Approved"]
+			: approved === null
+			? ["secondary", "In Review"]
+			: ["danger", "Rejected"]
+
+		return <Badge bg={bg}>{text}</Badge>
+	}
+
 	const getSubmissionsList = (submissions) => {
 		return (
 			<ListGroup>
@@ -77,22 +114,7 @@ function Profile() {
 										submissionEndpoint + "/" + submission.ID
 									)
 							}}>
-							<Badge
-								bg={
-									submission.approved
-										? "primary"
-										: submission.approved === null
-										? "secondary"
-										: "danger"
-								}
-								style={{ marginRight: "15px" }}
-								pill>
-								{submission.approved
-									? "Approved"
-									: submission.approved === null
-									? "In review"
-									: "Rejected"}
-							</Badge>
+							{getBadge(submission.approved)}
 							<label>{cutShort(submission.name, 50)}</label>
 						</ListGroup.Item>
 					)
@@ -104,57 +126,49 @@ function Profile() {
 	const getAnalytics = () => {
 		return (
 			<Card>
-			<Col>
-				<Card  border="primary"
-				style={{ width: 'flex', margin: '8px'}}>
-					<Card.Header>
-                        Total Submissions
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>10</Card.Title>
-                    </Card.Body>
-				</Card>
-			</Col>
-			<Col>
-			<Card
-                    border="success"
-                    style={{ width: 'flex', margin: '8px' }}
-                    >
-                    <Card.Header>
-                        Accepted Submissions
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>5</Card.Title>
-                    </Card.Body>
-                    </Card>
-			</Col>
-			<Col>
-			<Card
-                    border="warning"
-                    style={{ width: 'flex', margin: '8px' }}
-                    >
-                    <Card.Header>
-                        Submissions Under-Review
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>3</Card.Title>
-                    </Card.Body>
-                    </Card>
-			</Col>
-			<Col> 
-			<Card
-                    border="danger"
-                    style={{ width: 'flex', margin: '8px' }}
-                    >
-                    <Card.Header>
-                        Rejected Submissions
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>2</Card.Title>
-                    </Card.Body>
-                    </Card>
-			</Col>
-		</Card>
+				<Col>
+					<Card
+						border="primary"
+						style={{ width: "flex", margin: "8px" }}>
+						<Card.Header>Total Submissions</Card.Header>
+						<Card.Body>
+							<Card.Title>
+								{numAccepted + numUnderReview + numRejected}
+							</Card.Title>
+						</Card.Body>
+					</Card>
+				</Col>
+				<Col>
+					<Card
+						border="success"
+						style={{ width: "flex", margin: "8px" }}>
+						<Card.Header>Accepted Submissions</Card.Header>
+						<Card.Body>
+							<Card.Title>{numAccepted}</Card.Title>
+						</Card.Body>
+					</Card>
+				</Col>
+				<Col>
+					<Card
+						border="warning"
+						style={{ width: "flex", margin: "8px" }}>
+						<Card.Header>Submissions Under-Review</Card.Header>
+						<Card.Body>
+							<Card.Title>{numUnderReview}</Card.Title>
+						</Card.Body>
+					</Card>
+				</Col>
+				<Col>
+					<Card
+						border="danger"
+						style={{ width: "flex", margin: "8px" }}>
+						<Card.Header>Rejected Submissions</Card.Header>
+						<Card.Body>
+							<Card.Title>{numRejected}</Card.Title>
+						</Card.Body>
+					</Card>
+				</Col>
+			</Card>
 		)
 	}
 
@@ -245,7 +259,7 @@ function Profile() {
 						getAnalytics()
 					) : (
 						<div className="text-center" style={{ color: "grey" }}>
-							<i>No Data to Analyse</i>
+							<i>No Data to Analyze</i>
 						</div>
 					)}
 				</Tab>
@@ -253,6 +267,9 @@ function Profile() {
 					Email: {user.profile?.email} <br />
 					Phone Number: {user.profile?.phoneNumber} <br />
 					Organization: {user.profile?.organization} <br />
+				</Tab>
+				<Tab eventKey="edit" title="Edit Profile">
+					<AnalyticsAndSettings updateUser={updateUser} />
 				</Tab>
 			</Tabs>
 		</div>

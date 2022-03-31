@@ -1,83 +1,132 @@
 import React, { useState, useEffect } from "react"
-import { Card, Button, Badge, Container, Alert, Tab, Tabs, Form, Row, Col} from "react-bootstrap"
+import { Card, Button, Container, Alert, Form, Row, Col } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
-import axios from "axios"
-import { CSSTransition } from 'react-transition-group';
+import { CSSTransition } from "react-transition-group"
 import axiosInstance from "../../Web/axiosInstance"
-import DragAndDrop from "../DragAndDrop/index"
-import { createMemoryHistory } from "history"
+import FormText from "../FormComponents/FormText"
+import JwtService from "../../Web/jwt.service"
 
-export default(id) => {
-    const [form, setForm] = useState({
-        firstName: null,
-        lastName: null,
-        phoneNumber: null,
-        organization: null,
-        password: null,
-        repeatPassword: null
+const defaultMessages = {
+	password: "A valid password is required",
+	repeatPassword: "Passwords do not match"
+}
 
-    })
-    const [errors, setErrors] = useState({})
-    const [show, setShow] = useState(false)
-	const [alertMsg, setAlertMsg] = useState("")
-    const [error, setError] = useState(null)
-    // useEffect(() => {
-            
+export default ({ updateUser }) => {
+	const [optionals, setOptionals] = useState({
+		firstName: "",
+		lastName: "",
+		organization: ""
+	})
+	const [form, setForm] = useState({
+		password: "",
+		repeatPassword: ""
+	})
+	const [errors, setErrors] = useState({})
+	const [error, setError] = useState(null)
+	const [moddedFields, setModdedFields] = useState([])
 
-            
+	useEffect(() => {
+		let userID = JwtService.getUserID()
+		if (!userID) {
+			navigate("/login")
+		}
+	}, [])
 
-        // }, []) 
+	// Handle form data change
+	const handleChange = (e) => {
+		// Add the value to the form.
+		setForm((form) => {
+			return { ...form, [e.target.name]: e.target.value }
+		})
 
-    const fetchAnalytics = (id) => {
-
-    }
-
-    const deleteProfile = (id) => {
-        axiosInstance
-			.post("/user/" + id + "/delete")
-			.then((response) => {
-				console.log(response)
+		// Add the field to the modifed fields if not done yet.
+		if (!moddedFields.includes(e.target.name)) {
+			setModdedFields((fields) => {
+				return [...fields, e.target.name]
 			})
-			.catch((error) => {
-				console.log(error)
+		}
+
+		// Validate field's errors
+		const validated = validate(e.target.name, e.target.value)
+		if (validated && errors.hasOwnProperty(e.target.name)) {
+			setErrors((errors) => {
+				const newErrs = { ...errors }
+				delete newErrs[e.target.name]
+				return newErrs
 			})
-    }
-
-    const updateProfile = (firstName, lastName, phoneNumber, organization, password) => {
-        let data = {
-            firstName: firstName,
-            lastName: lastName,
-            phoneNumber: phoneNumber,
-            organization: organization,
-            password: password
-        }
-        axiosInstance
-        .post("/user/" + id + "/edit", data)
-        .then((response) => {
-            console.log(response)
-        })
-        .catch((error) => {
-            console.log(error)
-        })
-    }
-
-    const validate = (target, value) => {
-		switch (target) {
-			case "firstName":
-                return value.length >= 0
-			case "lastName":
-				return value.length >= 0
-			case "email":
-				if (value.length == 0) {
-					return true
-				} else {
-					return String(value)
-						.toLowerCase()
-						.match(
-							/^(([^<>()\\[\]\\.,;:\s@"]+(\.[^<>()\\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-						) // From https://emailregex.com/
+		} else if (!validated && !errors.hasOwnProperty(e.target.name)) {
+			setErrors((errors) => {
+				return {
+					...errors,
+					[e.target.name]: defaultMessages[e.target.name]
 				}
-			case "password":
+			})
+		}
+	}
+
+	// Show an error alert
+	const showError = (err) => {
+		setMsg(
+			<>
+				<b>Edit Failed</b> - {err}
+			</>
+		)
+		setShowAlert(true)
+	}
+
+	const handleOptional = (e) => {
+		setOptionals((optionals) => {
+			return { ...optionals, [e.target.name]: e.target.value }
+		})
+		return handleChange(e)
+	}
+
+	const updateProfile = () => {
+		let data = {
+			firstName: optionals.changeFirstName,
+			lastName: optionals.changeLastName,
+			phoneNumber: optionals.changePhoneNum,
+			organization: optionals.changeOrg,
+			password: form.changePassword
+		}
+
+		let submit = (data) => {
+			axiosInstance
+				.post("/user/" + JwtService.getUserID() + "/edit", data)
+				.catch((error) => {
+					console.log(error)
+					if (error.hasOwnProperty("response")) {
+						showError(
+							error.response?.data?.message +
+								" - " +
+								error.response?.status
+						)
+					} else {
+						showError("Please try again later")
+					}
+				})
+		}
+
+		submit(data)
+		updateUser()
+	}
+
+	const validate = (target, value) => {
+		switch (target) {
+			case "changeLastName":
+				return true
+			case "changeFirstName":
+				return true
+			case "changeOrg":
+				return true
+			case "changePhoneNum":
+				return (
+					value.length > 0 &&
+					String(value).match(
+						/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/
+					)
+				)
+			case "changePassword":
 				return (
 					value.length > 0 &&
 					String(value).match(
@@ -88,185 +137,122 @@ export default(id) => {
 				return value === form.password
 		}
 	}
-    
-    const createAnalyticsAndSettings = (id) => {
-        const [showButton, setShowButton] = useState(true);
-        const [showMessage, setShowMessage] = useState(false);
-        const [key, setKey] = useState('analytics');
-            return (
-                <Container style={{ paddingTop: '2rem' }}>
-                <Card style={{ width: '40rem' }}>
-            <Card.Body>
-            <Card.Title>John Smith</Card.Title>
-            <Card.Subtitle>jsmith@gmail.com</Card.Subtitle>
-            <Card.Body>
-                <Tabs
-                id="controlled-tab-example"
-                activeKey={key}
-                onSelect={(k) => setKey(k)}
-                className="mb-3"
-                >
-                <Tab eventKey="analytics" title="Analytics">
-                    <Card
-                    border="primary"
-                    style={{ width: '18rem' }}
-                    >
-                    <Card.Header>
-                        Total Submissions
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>10</Card.Title>
-                    </Card.Body>
-                    </Card>
-                    <br />
-                    <Card
-                    border="success"
-                    style={{ width: '18rem' }}
-                    >
-                    <Card.Header>
-                        Accepted Submissions
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>5</Card.Title>
-                    </Card.Body>
-                    </Card>
-                    <br />
 
-                    <Card
-                    border="warning"
-                    style={{ width: '18rem' }}
-                    >
-                    <Card.Header>
-                        Submissions Under-Review
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>3</Card.Title>
-                    </Card.Body>
-                    </Card>
-                    <br />
-                    <Card
-                    border="danger"
-                    style={{ width: '18rem' }}
-                    >
-                    <Card.Header>
-                        Rejected Submissions
-                    </Card.Header>
-                    <Card.Body>
-                        <Card.Title>2</Card.Title>
-                    </Card.Body>
-                    </Card>
-                    <br />
-                </Tab>
-                <Tab eventKey="edit" title="Edit Profile">
-                    <Card.Body>
-                    <Form>
-                        <Row>
-                        <Form.Group
-                            as={Col}
-                            controlId="formGridEmail"
-                        >
-                            <Form.Label>First Name</Form.Label>
-                            <Form.Control
-                            type="email"
-                            placeholder="Change First Name"
-                            />
-                        </Form.Group>
+	const deleteProfile = () => {
+		axiosInstance
+			.post("/user/" + JwtService.getUserID() + "/delete")
+			.then((response) => {
+				JwtService.rmUser()
+				navigate("/login")
+			})
+			.catch((error) => {
+				console.log(error)
+			})
+	}
 
-                        <Form.Group
-                            as={Col}
-                            controlId="formGridPassword"
-                        >
-                            <Form.Label>Last Name</Form.Label>
-                            <Form.Control
-                            type="text"
-                            placeholder="Change Last Name"
-                            />
-                        </Form.Group>
-                        </Row>
-                        <Row>
-                        <Form.Group
-                            as={Col}
-                            controlId="formGridEmail"
-                        >
-                            <Form.Label>
-                            Organization
-                            </Form.Label>
-                            <Form.Control
-                            type="text"
-                            placeholder="Change Organization"
-                            />
-                        </Form.Group>
+	const createAnalyticsAndSettings = (id) => {
+		const [showButton, setShowButton] = useState(true)
+		const [showMessage, setShowMessage] = useState(false)
+		const [key, setKey] = useState("edit")
+		return (
+			<Container style={{ paddingTop: "2rem" }}>
+				<Card style={{ width: "flex" }}>
+					<Card.Body>
+						<Form>
+							<Row>
+								<FormText
+									display="First Name"
+									name="changeFirstName"
+									onChange={handleOptional}
+									isInvalid={errors.hasOwnProperty(
+										"changeFirstName"
+									)}
+								/>
+								<FormText
+									display="Last Name"
+									name="changeLastName"
+									onChange={handleOptional}
+									isInvalid={errors.hasOwnProperty(
+										"changeLastName"
+									)}
+								/>
+							</Row>
+							<Row>
+								<FormText
+									display="Organization"
+									name="changeOrg"
+									onChange={handleOptional}
+									isInvalid={errors.hasOwnProperty(
+										"changeOrg"
+									)}
+								/>
+								<FormText
+									display="Phone Number"
+									name="changePhoneNum"
+									onChange={handleOptional}
+									isInvalid={errors.hasOwnProperty(
+										"changePhoneNum"
+									)}
+								/>
+							</Row>
+							<Row>
+								<Col>
+									<Button
+										variant="danger"
+										onClick={() => {
+											deleteProfile(
+												JwtService.getUserID()
+											)
+										}}
+										style={{ margin: "8px" }}>
+										Delete Account
+									</Button>
+								</Col>{" "}
+								<Col>
+									<Button
+										variant="primary"
+										onClick={updateProfile}
+										style={{ margin: "8px" }}>
+										Save Changes
+									</Button>{" "}
+								</Col>{" "}
+							</Row>
+						</Form>
+					</Card.Body>
+				</Card>
 
-                        <Form.Group
-                            as={Col}
-                            controlId="formGridPassword"
-                        >
-                            <Form.Label>
-                            Phone Number
-                            </Form.Label>
-                            <Form.Control
-                            type="text"
-                            placeholder="Change Phone Number"
-                            />
-                        </Form.Group>
-                        </Row>
-                        <Row>
-                        <Col>
-                            <Button variant="danger">
-                            Delete Account
-                            </Button>
-                        </Col>{' '}
-                        <Col>
-                            <Button variant="primary">
-                            Save Changes
-                            </Button>{' '}
-                        </Col>{' '}
-                        </Row>
-                    </Form>
-                    </Card.Body>
-                </Tab>
-                </Tabs>
-            </Card.Body>
-            </Card.Body>
-        </Card>
+				<CSSTransition
+					in={showMessage}
+					timeout={300}
+					classNames="alert"
+					unmountOnExit
+					onEnter={() => setShowButton(false)}
+					onExited={() => setShowButton(true)}>
+					<Alert
+						variant="primary"
+						dismissible
+						onClose={() => setShowMessage(false)}>
+						<Alert.Heading>Animated alert message</Alert.Heading>
+						<p>
+							This alert message is being transitioned in and out
+							of the DOM.
+						</p>
+						<Button onClick={() => setShowMessage(false)}>
+							Close
+						</Button>
+					</Alert>
+				</CSSTransition>
+			</Container>
+		)
+	}
 
-        <CSSTransition
-            in={showMessage}
-            timeout={300}
-            classNames="alert"
-            unmountOnExit
-            onEnter={() => setShowButton(false)}
-            onExited={() => setShowButton(true)}
-        >
-            <Alert
-            variant="primary"
-            dismissible
-            onClose={() => setShowMessage(false)}
-            >
-            <Alert.Heading>
-                Animated alert message
-            </Alert.Heading>
-            <p>
-                This alert message is being transitioned in and
-                out of the DOM.
-            </p>
-            <Button onClick={() => setShowMessage(false)}>
-                Close
-                </Button>
-                </Alert>
-            </CSSTransition>
-            </Container>
-        )
-    }
-
-    return (
-         <div>
-             <div>   
-                {error 
-                ? "Something went wrong, please try again later..."
-                :createAnalyticsAndSettings(0)
-                }
-            </div>
-        </div>
-    )
+	return (
+		<div>
+			<div>
+				{error
+					? "Something went wrong, please try again later..."
+					: createAnalyticsAndSettings(0)}
+			</div>
+		</div>
+	)
 }
