@@ -241,6 +241,7 @@ function Submission() {
 			<div className={styles.RightContainer}>
 				<FileExplorer
 					files={submission.files}
+					id={submission.ID}
 					onClick={(id) => {
 						setShowFile(true)
 						setFileId(id)
@@ -258,7 +259,6 @@ function Submission() {
 						}
 					/>
 				)}
-				
 			</div>
 		)
 	}

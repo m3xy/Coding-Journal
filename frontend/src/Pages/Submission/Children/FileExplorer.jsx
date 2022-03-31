@@ -8,12 +8,13 @@
  */
 import React, { useEffect, useState } from "react"
 import FileBrowser, { Icons } from "react-keyed-file-browser"
-import { Card } from "react-bootstrap"
+import { Card, Button } from "react-bootstrap"
 import "font-awesome/css/font-awesome.min.css"
 import styles from "./Submission.module.css"
 import moment from "moment"
+import axiosInstance from "../../../Web/axiosInstance"
 
-export default ({ files, onClick }) => {
+export default ({ id, files, onClick }) => {
 	const [fileArray, setFiles] = useState([])
 
 	useEffect(() => {
@@ -45,9 +46,28 @@ export default ({ files, onClick }) => {
 		if (file.key.slice(-1) !== "/") onClick(file.fileId)
 	}
 
+	const onClickDownload = () => {
+		axiosInstance
+			.get("/submission/" + id + "/download")
+			.then((response) => {
+				const url = `data:application/zip;base64,${response.data}`
+				const link = document.createElement("a")
+				link.href = url
+				link.setAttribute("download", "project-" + id + ".zip")
+				document.body.appendChild(link)
+				link.click()
+			})
+			.catch((error) => {
+				console.log(error)
+			})
+	}
+
 	return (
 		<Card body>
-			<h4>File Explorer</h4>
+			<div style={{ display: "flex", justifyContent: "space-between" }}>
+				<h4>File Explorer</h4>
+				<Button onClick={onClickDownload}>Download as ZIP</Button>
+			</div>
 			<div className={styles.fileBrowser}>
 				<FileBrowser
 					files={fileArray}
