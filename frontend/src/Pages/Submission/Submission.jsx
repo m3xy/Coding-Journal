@@ -107,7 +107,14 @@ function Submission() {
 
 	// Get an author's full name.
 	const getUserFullName = (author) => {
-		return author?.firstName + " " + author?.lastName
+		return (
+			<Button
+				variant="light"
+				className="me-auto"
+				onClick={() => navigate("/profile/" + author?.userId)}>
+				{author?.firstName + " " + author?.lastName}
+			</Button>
+		)
 	}
 
 	// Get status badge from submission status
@@ -128,8 +135,9 @@ function Submission() {
 				{users?.length > 1 ? "s: " : ": "}
 				{users?.length > 0
 					? users?.map(
-							(user, i) =>
-								(i === 0 ? " " : ", ") + getUserFullName(user)
+							(user, i) => <>
+								{(i === 0 ? " " : ", ")} {getUserFullName(user)}
+							</>
 					  )
 					: "No " + role + "s..."}
 			</h5>
