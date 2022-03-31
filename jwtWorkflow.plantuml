@@ -1,6 +1,17 @@
 @startuml
+actor Client
+participant Server
+database Database
 Client -> Server: /auth/login
-Server -> Database: validate data
-Database --> Server: return data
-Server -> Client: token
+Server -> Database: Validate data
+Database --> Server: Return data
+Server --> Client: authentication token
+Client -> Server: token authenticated request
+Server --> Server: Validate token
+note over Server
+	The token is valid therefore authentication is successful.
+end note
+Server -> Database: Request restricted data
+Database --> Server: Return data
+Server --> Client: Return successful response
 @enduml
