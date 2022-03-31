@@ -134,11 +134,11 @@ function Submission() {
 				{role}
 				{users?.length > 1 ? "s: " : ": "}
 				{users?.length > 0
-					? users?.map(
-							(user, i) => <>
-								{(i === 0 ? " " : ", ")} {getUserFullName(user)}
+					? users?.map((user, i) => (
+							<>
+								{i === 0 ? " " : ", "} {getUserFullName(user)}
 							</>
-					  )
+					  ))
 					: "No " + role + "s..."}
 			</h5>
 		)
