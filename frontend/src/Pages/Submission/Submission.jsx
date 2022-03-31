@@ -24,6 +24,7 @@ import {
 import {
 	Alert,
 	Badge,
+	Card,
 	Collapse,
 	Button,
 	ButtonGroup,
@@ -107,7 +108,13 @@ function Submission() {
 
 	// Get an author's full name.
 	const getUserFullName = (author) => {
-		return author?.firstName + " " + author?.lastName
+		return (
+			<Card.Link
+				className="me-auto"
+				onClick={() => navigate("/profile/" + author?.userId)}>
+				{author?.firstName + " " + author?.lastName}
+			</Card.Link>
+		)
 	}
 
 	// Get status badge from submission status
@@ -127,10 +134,11 @@ function Submission() {
 				{role}
 				{users?.length > 1 ? "s: " : ": "}
 				{users?.length > 0
-					? users?.map(
-							(user, i) =>
-								(i === 0 ? " " : ", ") + getUserFullName(user)
-					  )
+					? users?.map((user, i) => (
+							<>
+								{i === 0 ? " " : ", "} {getUserFullName(user)}
+							</>
+					  ))
 					: "No " + role + "s..."}
 			</h5>
 		)
