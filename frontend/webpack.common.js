@@ -1,5 +1,6 @@
 var HtmlWebpackPlugin = require("html-webpack-plugin")
 const Dotenv = require("dotenv-webpack")
+const { DefinePlugin } = require("webpack")
 const MonacoWebpackPlugin = require("monaco-editor-webpack-plugin")
 
 module.exports = {
@@ -36,6 +37,58 @@ module.exports = {
 		}),
 		new MonacoWebpackPlugin({
 			// available options are documented at https://github.com/Microsoft/monaco-editor-webpack-plugin#options
+		}),
+		new DefinePlugin({
+			MONACO_SUPPORTED_LANGUAGES: [
+				"c",
+				"'clojure'",
+				"'cpp'",
+				"csharp",
+				"css",
+				"dart",
+				"dockerfile",
+				"elixir",
+				"fsharp",
+				"go",
+				"graphql",
+				"html",
+				"ini",
+				"java",
+				"javascript",
+				"json",
+				"julia",
+				"kotlin",
+				"lua",
+				"markdown",
+				"mips",
+				"mysql",
+				"objective-c",
+				"pascal",
+				"perl",
+				"pgsql",
+				"php",
+				"plaintext",
+				"powerquery",
+				"powershell",
+				"pug",
+				"python",
+				"qsharp",
+				"r",
+				"razor",
+				"redis",
+				"ruby",
+				"rust",
+				"scala",
+				"scheme",
+				"scss",
+				"shell",
+				"sql",
+				"swift",
+				"typescript",
+				"vb",
+				"xml",
+				"yaml"
+			].map((lang) => JSON.stringify(lang))
 		})
 	],
 	devServer: {
