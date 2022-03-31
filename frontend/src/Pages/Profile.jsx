@@ -29,6 +29,7 @@ const userTypes = [
 function Profile() {
 	//Hook returns a navigate function used to navigate between
 	const navigate = useNavigate()
+	const { id } = useParams()
 	const [user, setUser] = useState({
 		userId: "",
 		firstName: "",
