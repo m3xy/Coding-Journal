@@ -155,7 +155,7 @@ function Profile() {
 			<br />
 			<h2>{user.firstName + " " + user.lastName}</h2>
 			<label>({userTypes[user.userType]})</label>
-			{userTypes(JwtService.getUserType()) == "Editor" &&
+			{userTypes[JwtService.getUserType()] == "Editor" &&
 				JwtService.getUserID() !== getUserID() &&
 				editTypeBtn()}
 			<br />
