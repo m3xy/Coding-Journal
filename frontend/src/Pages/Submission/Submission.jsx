@@ -22,7 +22,18 @@ import {
 	AssignmentModal,
 	ApprovalModal
 } from "./Children"
-import { Alert, Badge, Collapse, Button } from "react-bootstrap"
+import {
+	Alert,
+	Badge,
+	Card,
+	Collapse,
+	Button,
+	ButtonGroup,
+	DropdownButton,
+	Dropdown
+} from "react-bootstrap"
+
+const OTHER_JOURNALS = [2, 5, 8, 13, 17, 20, 23, 26]
 
 function Submission() {
 	// Router hooks
@@ -98,7 +109,13 @@ function Submission() {
 
 	// Get an author's full name.
 	const getUserFullName = (author) => {
-		return author?.firstName + " " + author?.lastName
+		return (
+			<Card.Link
+				className="me-auto"
+				onClick={() => navigate("/profile/" + author?.userId)}>
+				{author?.firstName + " " + author?.lastName}
+			</Card.Link>
+		)
 	}
 
 	// Get status badge from submission status
@@ -118,13 +135,25 @@ function Submission() {
 				{role}
 				{users?.length > 1 ? "s: " : ": "}
 				{users?.length > 0
-					? users?.map(
-							(user, i) =>
-								(i === 0 ? " " : ", ") + getUserFullName(user)
-					  )
+					? users?.map((user, i) => (
+							<>
+								{i === 0 ? " " : ", "} {getUserFullName(user)}
+							</>
+					  ))
 					: "No " + role + "s..."}
 			</h5>
 		)
+	}
+
+	// Export the submission to another journal
+	const exportSubmission = (journal) => {
+		axiosInstance
+			.post("/submission/" + submission.ID + "/export/" + journal)
+			.then(() => {
+				setAlertMsg("Export successful")
+				setAlert(true)
+			})
+			.catch((error) => console.log(error))
 	}
 
 	// Buttons for editor and reviewer, for review posting
@@ -132,14 +161,29 @@ function Submission() {
 	const permissionButtons = () => {
 		if (permissionLevel[perm] === "editor")
 			return (
-				<Button
-					onClick={() => showApproval(true)}
-					style={{
-						flex: "0.15",
-						justifyContent: "right"
-					}}>
-					Set Approval
-				</Button>
+				<ButtonGroup vertical>
+					<Button
+						onClick={() => showApproval(true)}
+						style={{
+							flex: "0.15",
+							justifyContent: "right"
+						}}>
+						Set Approval
+					</Button>
+					<DropdownButton
+						as={ButtonGroup}
+						title="Export submission"
+						variant="outline-secondary">
+						{OTHER_JOURNALS.map((journal) => {
+							return (
+								<Dropdown.Item
+									onClick={() => exportSubmission(journal)}>
+									Journal {journal}
+								</Dropdown.Item>
+							)
+						})}
+					</DropdownButton>
+				</ButtonGroup>
 			)
 		else if (
 			permissionLevel[perm] === "reviewer" &&

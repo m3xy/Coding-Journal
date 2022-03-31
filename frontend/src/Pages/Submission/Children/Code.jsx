@@ -7,11 +7,20 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import axiosInstance from "../../../Web/axiosInstance"
-import { Form, InputGroup, Card, Button, Collapse } from "react-bootstrap"
+import {
+	Form,
+	InputGroup,
+	Card,
+	Button,
+	Collapse,
+	Tabs,
+	Tab
+} from "react-bootstrap"
 import { SwitchTransition, CSSTransition } from "react-transition-group"
 import MonacoEditor, { monaco } from "react-monaco-editor"
 import FadeInTransition from "../../../Components/Transitions/FadeIn.module.css"
 import Comments from "./Comments"
+import ReactMarkdown from "react-markdown"
 
 const fileEndpoint = "/file"
 const defaultLanguage = "javascript"
@@ -21,6 +30,7 @@ const defaultLine = 1
 const CODE_HEIGHT = "50vh"
 
 function Code({ id, show }) {
+	//File to be fetched
 	const [file, setFile] = useState({
 		ID: null,
 		submissionId: null,
@@ -28,8 +38,11 @@ function Code({ id, show }) {
 		CreatedAt: "",
 		UpdatedAt: ""
 	})
+
+	//Code displayed
 	const [code, setCode] = useState("")
 
+	//Monaco's states
 	const monacoRef = useRef(null)
 	const [theme, setTheme] = useState(defaultTheme)
 	const [language, setLanguage] = useState(defaultLanguage)
@@ -37,14 +50,18 @@ function Code({ id, show }) {
 	const [endLine, setEndLine] = useState(defaultLine)
 	const [decorations, setDecorations] = useState([])
 
+	//File's comments
 	const [comments, setComments] = useState([])
 	const [showComments, setShowComments] = useState(false)
 
+	//Fetch file (content and comments) by file ID - useEffect hook is invoked when the page (re)renders/dependency changes (File ID in this case)
 	useEffect(() => {
 		getFile()
-	}, [id])
+	}, [id]) //If the file ID is changed, new file is fetched and components re render
 
+	//Get the file as specified by the id prop passed
 	const getFile = () => {
+		//Check ID is valid
 		if (id && id != -1) {
 			axiosInstance
 				.get(fileEndpoint + "/" + id)
@@ -55,6 +72,7 @@ function Code({ id, show }) {
 					monacoRef?.current?.editor?.setSelection(
 						new monaco.Selection(0, 0, 0, 0)
 					) //Fixes line issue
+					monacoRef?.current?.editor?.layout() //Fixes Code height issue
 					setComments(response.data.file.comments)
 					getDecorations(response.data.file.comments)
 				})
@@ -62,6 +80,7 @@ function Code({ id, show }) {
 					console.log(error)
 				})
 		} else {
+			//Invalid ID, set defaults
 			setFile({
 				ID: null,
 				submissionId: null,
@@ -74,8 +93,10 @@ function Code({ id, show }) {
 		}
 	}
 
+	//Gets the comment decorations for the monaco instance
 	const getDecorations = (comments) => {
 		let newDecorations = comments?.map((comment) => {
+			//Returns array of decorations for each comment
 			return {
 				range: new monaco.Range(
 					comment.startLine,
@@ -97,6 +118,7 @@ function Code({ id, show }) {
 			}
 		})
 		setDecorations(
+			//Set the decorations
 			monacoRef.current
 				? monacoRef.current.editor.deltaDecorations(
 						decorations,
@@ -106,6 +128,7 @@ function Code({ id, show }) {
 		)
 	}
 
+	//Invoked when the monaco component is mounted, add the in-line commenting functionality here
 	const editorDidMount = (editor, monaco) => {
 		editor.addAction({
 			id: "Comment", // An unique identifier of the contributed action.
@@ -127,15 +150,17 @@ function Code({ id, show }) {
 		editor.focus()
 	}
 
+	//Options for the Monaco editor component
 	const options = {
 		selectOnLineNumbers: true,
 		glyphMargin: true,
 		readOnly: true
 	}
 
+	//HTML to display code files
 	const codeHTML = () => {
 		return (
-			<>
+			<div>
 				<div style={{ display: "flex" }}>
 					<div style={{ flex: "1", marginRight: "5px" }}>
 						<InputGroup size="sm" className="mb-3">
@@ -148,12 +173,9 @@ function Code({ id, show }) {
 								onChange={(e) => {
 									setLanguage(e.target.value)
 								}}>
-								<option value="javascript">Javascript</option>
-								<option value="html">HTML</option>
-								<option value="css">CSS</option>
-								<option value="json">JSON</option>
-								<option value="java">Java</option>
-								<option value="python">Python</option>
+								{MONACO_SUPPORTED_LANGUAGES.map((lang) => (
+									<option>lang</option>
+								))}
 							</Form.Select>
 						</InputGroup>
 					</div>
@@ -187,10 +209,11 @@ function Code({ id, show }) {
 					options={options}
 					editorDidMount={editorDidMount}
 				/>
-			</>
+			</div>
 		)
 	}
 
+	//HTML to display PDFs
 	const pdfHTML = () => {
 		return (
 			<div style={{ textAlign: "center" }}>
@@ -201,6 +224,49 @@ function Code({ id, show }) {
 				/>
 			</div>
 		)
+	}
+
+	//HTML to display images
+	const imgHTML = (ext) => {
+		return (
+			<div style={{ textAlign: "center" }}>
+				<img
+					className="image"
+					src={"data:mage/" + ext + ";base64," + file.base64Value}
+				/>
+			</div>
+		)
+	}
+
+	//HTML to display Markdown files
+	const mdHTML = () => {
+		return <ReactMarkdown>{atob(file.base64Value)}</ReactMarkdown>
+	}
+
+	//Render the fetched file appropriately
+	const renderFile = () => {
+		const extension = file.path.split(".").pop()
+		switch (extension) {
+			case "md":
+				return (
+					<Tabs defaultActiveKey="code" style={{ margin: "15px" }}>
+						<Tab eventKey="code" title="Code">
+							{codeHTML()}
+						</Tab>
+						<Tab eventKey="md" title="Markdown">
+							{mdHTML()}
+						</Tab>
+					</Tabs>
+				)
+			case "pdf":
+				return pdfHTML()
+			case "png":
+			case "jpg":
+			case "jpeg":
+				return imgHTML(extension)
+			default:
+				return codeHTML()
+		}
 	}
 
 	return (
@@ -248,19 +314,24 @@ function Code({ id, show }) {
 										justifyContent: "space-between"
 									}}>
 									<Card.Text>
-										Created:{" "}
-										{new Date(
-											file.CreatedAt
-										).toDateString()}
+										Created:
+										{"\t" +
+											new Date(
+												file.CreatedAt
+											).toDateString()}
+										<br />
+										Updated:
+										{"\t" +
+											new Date(
+												file.UpdatedAt
+											).toDateString()}
 									</Card.Text>
 									<div className="text-muted">
-										Press Ctrl + m to display comments on
-										line...
+										Press Ctrl + m to comment on selected
+										line
 									</div>
 								</div>
-								{file.path.split(".").pop() !== "pdf"
-									? codeHTML()
-									: pdfHTML()}
+								{renderFile()}
 								<br />
 							</div>
 						) : (
@@ -272,7 +343,6 @@ function Code({ id, show }) {
 			<Comments
 				id={id}
 				comments={comments}
-				setComments={setComments}
 				startLine={startLine}
 				endLine={endLine}
 				show={showComments}
