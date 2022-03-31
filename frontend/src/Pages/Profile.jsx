@@ -70,7 +70,8 @@ function Profile() {
 							action
 							onClick={() => {
 								;(!id ||
-									JwtService.getUserType() == 4 ||
+									userTypes(JwtService.getUserType()) ==
+										"Editor" ||
 									submission.approved) &&
 									navigate(
 										submissionEndpoint + "/" + submission.ID
@@ -136,13 +137,10 @@ function Profile() {
 					✎
 				</Dropdown.Toggle>
 				<Dropdown.Menu>
-					{userTypes.map((type) => {
-						if (userTypes.indexOf(type) == 3) return
+					{userTypes.map((type, i) => {
+						if (i == 3) return
 						return (
-							<Dropdown.Item
-								onClick={() =>
-									editType(userTypes.indexOf(type))
-								}>
+							<Dropdown.Item onClick={() => editType(i)}>
 								{type}
 							</Dropdown.Item>
 						)
@@ -157,7 +155,7 @@ function Profile() {
 			<br />
 			<h2>{user.firstName + " " + user.lastName}</h2>
 			<label>({userTypes[user.userType]})</label>
-			{JwtService.getUserType() == 4 &&
+			{userTypes(JwtService.getUserType()) == "Editor" &&
 				JwtService.getUserID() !== getUserID() &&
 				editTypeBtn()}
 			<br />
