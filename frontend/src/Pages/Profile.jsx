@@ -7,7 +7,8 @@
 
 import React, { useState, useEffect } from "react"
 import { Tabs, Tab, ListGroup, Badge, Card, Col, Row } from "react-bootstrap"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
+
 import axiosInstance from "../Web/axiosInstance"
 import JwtService from "../Web/jwt.service"
 import AnalyticsAndSettings from "../Components/AnalyticsAndSettings"
